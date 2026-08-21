@@ -1,0 +1,296 @@
+#CAD10001R .sui-page-body {
+    height: 100%;
+}
+
+#CAD10001R {
+  height: 100%;
+}
+
+.s-form {
+  padding: 0 28px;
+}
+
+.step-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 98px;
+    background: #fff;
+    border-radius: 8px;
+    gap: 10px;
+}
+
+.step-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 400;
+    font-size: 14px;
+}
+.step-item-active {
+    color: #1764E8;
+}
+.step-item-icon {
+    width: 52px;
+    height: 52px;
+    background-size: 100% 100%; 
+    flex: none;
+    cursor: pointer;
+}
+
+.step-item-text {
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.step-item:nth-child(1) .step-item-icon {
+    background-image: url('./images/step0-active.png');
+}
+
+.step-item:nth-child(2) .step-item-icon {
+    background-image: url('./images/step1-active.png');
+}
+
+.step-item:nth-child(3) .step-item-icon {
+    background-image: url('./images/step2.png');
+}
+
+.step-item:nth-child(4) .step-item-icon {
+    background-image: url('./images/step3.png');
+}
+
+.step-item:nth-child(2).step-item-active .step-item-icon {
+    background-image: url('./images/step1-active.png');
+}
+
+.step-item:nth-child(3).step-item-active .step-item-icon {
+    background-image: url('./images/step2-active.png');
+}
+
+.step-item:nth-child(4).step-item-active .step-item-icon {
+    background-image: url('./images/step3-active.png');
+}
+
+.step-item-divider {
+    max-width: 270px;
+}
+
+.step-info {
+    position: absolute;
+    right: -10px;
+    top: 16px;
+    width: 117px;
+    height: 36px;
+    line-height: 36px;
+    text-align: center;
+    background: #FCE7BB;
+    border-radius: 18px 0px 0px 18px;
+    font-weight: 400;
+    font-size: 14px;
+    color: #A9833A;
+}
+
+#CAD10001R .page-content {
+    margin-top: 16px;
+    height: calc(100% - 114px);
+    box-shadow: 0px 0px 15px 0px rgba(0,0,0,0.05);
+    border-radius: 12px;
+    overflow: auto;
+}
+
+.step-content {
+    height: 100%;
+}
+
+.step-content-header {
+    position: relative;
+    height: 70px;
+    background: #fff;
+    padding: 16px 20px;
+    font-weight: bold;
+    font-size: 18px;
+    color: #333333;
+}
+
+.step-content-header:before {
+    position: absolute;
+    width: 23px;
+    height: 4px;
+    background: #4980FF;
+    border-radius: 1px 1px 1px 1px;
+    content: '';
+    left: 20px;
+    top: 50px;
+}
+
+.form-container {
+    height: calc(100% - 70px);
+    background: #fff;
+}
+
+.viewer-container {
+    position: relative;
+    height: calc(100% - 70px);
+}
+
+.viewer-panel {
+    position: absolute;
+    left: 16px;
+    bottom: 16px;
+    padding: 16px;
+    font-size: 0;
+    background: rgba(255,255,255,1);
+    box-shadow: 0px 0px 15px 0px rgba(0,0,0,0.05);
+    border-radius: 8px 8px 8px 8px;
+    z-index: 100;
+}
+
+.viewer-panel.expand {
+    top: 16px;
+    width: 600px;
+}
+
+.viewer-panel.expand.panel1 {
+    width: 1100px;
+}
+
+.viewer-panel-btn {
+    cursor: pointer;
+}
+
+.viewer-content {
+    position: relative;
+    height: 100%;
+}
+
+.viewer-box {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.viewer-box canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* 加载遮罩 */
+.viewer-content .loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+/* 点位悬浮提示框 */
+.point-tooltip {
+  position: absolute;
+  z-index: 1000;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  min-width: 200px;
+  pointer-events: none;
+  font-size: 12px;
+}
+
+.point-tooltip .tooltip-header {
+  padding: 8px 12px;
+  border-bottom: 1px solid #e8eaec;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.point-tooltip .tooltip-status {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 2px;
+  font-weight: 500;
+}
+
+.point-tooltip .tooltip-status.status-matched {
+  background: #f6ffed;
+  color: #52c41a;
+  border: 1px solid #b7eb8f;
+}
+
+.point-tooltip .tooltip-status.status-unmatched {
+  background: #fff2f0;
+  color: #ff4d4f;
+  border: 1px solid #ffccc7;
+}
+
+.point-tooltip .tooltip-body {
+  padding: 8px 12px;
+}
+
+.point-tooltip .tooltip-row {
+  display: flex;
+  align-items: center;
+  padding: 3px 0;
+  gap: 4px;
+}
+
+.point-tooltip .tooltip-label {
+  color: #808695;
+  white-space: nowrap;
+  min-width: 70px;
+}
+
+.point-tooltip .tooltip-value {
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viewer-content .loading-overlay .loading-content {
+  text-align: center;
+  color: #fff;
+}
+
+.viewer-content .loading-overlay .loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #52c41a;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 16px;
+}
+
+.viewer-content .loading-overlay .loading-text {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.viewer-content .loading-overlay .loading-step {
+  font-size: 13px;
+  color: #999;
+  margin-bottom: 16px;
+}
+
+.viewer-content .loading-overlay .loading-progress {
+  width: 200px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.viewer-content .loading-overlay .progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #52c41a, #73d13d);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}

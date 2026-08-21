@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="21px" height="20px" viewBox="0 0 21 20" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 63.1 (92452) - https://sketch.com -->
+    <title>12-消火栓按钮</title>
+    <desc>Created with Sketch.</desc>
+    <g id="汇总" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="同步CPT" transform="translate(-110.000000, -169.000000)">
+            <g id="12-消火栓按钮" transform="translate(110.000000, 169.000000)">
+                <rect id="Rectangle备份-74" fill="#2196F3" x="0.1" y="0" width="20" height="20" rx="4"></rect>
+                <g id="编组" transform="translate(5.000000, 4.000000)" stroke="#FFFFFF">
+                    <path d="M0.701,0.053 C0.701,0.053 0.366,4.848 5.004,4.848 C9.642,4.848 9.3,0.053 9.3,0.053" id="路径"></path>
+                    <line x1="5.003" y1="4.964" x2="5.003" y2="11.982" id="路径"></line>
+                    <line x1="1.309" y1="7.627" x2="8.691" y2="7.627" id="路径"></line>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

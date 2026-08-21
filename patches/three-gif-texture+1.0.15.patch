@@ -1,0 +1,13 @@
+diff --git a/node_modules/three-gif-texture/lib/GIFTexture.js b/node_modules/three-gif-texture/lib/GIFTexture.js
+index 4949fcf..4edd70e 100644
+--- a/node_modules/three-gif-texture/lib/GIFTexture.js
++++ b/node_modules/three-gif-texture/lib/GIFTexture.js
+@@ -15,8 +15,6 @@ import {
+ import GifLoader from "./gif-loader.js";
+ 
+ export class GIFTexture extends GifLoader {
+-  image;
+-
+   constructor(
+     path,
+     /**

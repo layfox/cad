@@ -1,0 +1,38 @@
+{
+  "defaultSeverity": "warning",
+  "extends": [
+    "tslint:recommended"
+  ],
+  "linterOptions": {
+    "exclude": [
+      "node_modules/**"
+    ]
+  },
+  "rules": {
+    "indent": [true, "tabs", 4],
+    "interface-name": false,
+    "no-consecutive-blank-lines": false,
+    "object-literal-sort-keys": false,
+    "ordered-imports": false,
+    "no-console": false,
+    "quotemark": false,
+    "trailing-comma": [true, {
+      "singleline": "never",
+      "multiline": {
+        "objects": "always",
+        "arrays": "always",
+        "functions": "none",
+        "typeLiterals": "ignore"
+      }
+    }],
+    "trailingCommas":"none",
+     "indent": [
+    true,
+    "tabs",
+    4
+    ],
+    "semi": [2, "always"],
+    "quotes": [2, "single"]
+
+  }
+}

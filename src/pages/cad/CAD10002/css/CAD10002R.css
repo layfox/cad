@@ -1,0 +1,92 @@
+#CAD10002R .sui-page-body {
+    height: 100%;
+    padding: 0;
+}
+
+#CAD10002R {
+  height: 100%;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    height: 90px;
+    background: url('./images/header.png') center bottom;
+    background-size: 100% 100%;
+    padding: 0 18px;
+}
+
+#CAD10002R .page-content {
+    height: calc(100% - 80px);
+    margin-top: -10px;
+    position: relative;
+}
+
+.tabs-container {
+    height: 100%;
+    display: flex;
+    margin-top: 12px;
+    gap: 10px;
+}
+
+.tab-item {
+    width: 94px;
+    height: 47px;
+    background: #EBF1F8;
+    line-height: 47px;
+    border-radius: 10px 10px 10px 10px;
+    font-size: 14px;
+    color: rgba(2,63,128,0.94);
+    text-align: center;
+    cursor: pointer;
+    background: url('./images/tab.png') no-repeat;
+}
+
+.tab-item-active {
+    font-weight: bold;
+    font-size: 14px;
+    color: #FFFFFF;
+    background-image: url('./images/tab-active.png');
+}
+
+.select-container {
+    display: flex;
+    align-items: center;
+    width: 222px;
+    height: 39px;
+    padding: 0 12px;
+    margin-top: 12px;
+    background: url('./images/select-bg.png');
+    gap: 8px;
+    cursor: pointer;
+}
+
+.select-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 16px;
+    color: #333333;
+}
+
+.viewer-panel {
+    position: absolute;
+    left: 16px;
+    bottom: 16px;
+    padding: 16px;
+    font-size: 0;
+    background: rgba(255,255,255,1);
+    box-shadow: 0px 0px 15px 0px rgba(0,0,0,0.05);
+    border-radius: 8px 8px 8px 8px;
+    z-index: 100;
+}
+
+#CAD10002R .viewer-panel.expand {
+    top: 16px;
+    width: 545px;
+}
+
+.viewer-panel-btn {
+    cursor: pointer;
+}
