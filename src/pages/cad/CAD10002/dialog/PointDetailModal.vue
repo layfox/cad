@@ -3,10 +3,8 @@
     <!-- 头部 -->
     <div class="pdm-header">
       <div class="pdm-title">
-        <span class="pdm-title-arrow">▶</span>
         <span class="pdm-title-name">{{ point.title }}</span>
       </div>
-      <span class="pdm-close" @click="onClose">×</span>
     </div>
 
     <!-- 测点信息 -->
@@ -194,22 +192,22 @@ export default {
 
 /* ===== 头部 ===== */
 .pdm-header {
+  height: 40px;
+  padding-left: 42px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
-  padding: 16px 20px;
-  border-bottom: 1px solid #eee;
+  background: url('../css/images/header1.png') no-repeat;
+  background-size: 100% 100%;
 }
 
 .pdm-title {
   display: flex;
   align-items: center;
-  font-size: 16px;
-  font-weight: 600;
-  color: #1a1a1a;
-  max-width: 80%;
-  overflow: hidden;
+  font-weight: bold;
+font-size: 16px;
+color: #333333;
 }
 
 .pdm-title-arrow {
@@ -240,8 +238,10 @@ export default {
 
 /* ===== 测点信息 ===== */
 .pdm-info-section {
-  padding: 16px 20px 0;
+  padding: 16px;
   flex-shrink: 0;
+  background: #F3F7F9;
+  margin: 20px 16px;
 }
 
 .pdm-info-row {
@@ -260,6 +260,7 @@ export default {
   display: flex;
   align-items: center;
   font-size: 14px;
+  flex: 1;
 }
 
 .pdm-info-label {
@@ -275,7 +276,7 @@ export default {
 /* ===== 趋势图表 ===== */
 .pdm-chart-section {
   flex: 1;
-  padding: 16px 20px 12px;
+  padding: 0 16px 16px;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -284,6 +285,7 @@ export default {
 .pdm-chart-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 16px;
   margin-bottom: 12px;
   flex-shrink: 0;
@@ -329,7 +331,7 @@ export default {
 
 .pdm-chart {
   width: 100%;
-  height: 100%;
+  height: 360px;
 }
 </style>
 

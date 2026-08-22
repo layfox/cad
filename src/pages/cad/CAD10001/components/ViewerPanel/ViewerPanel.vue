@@ -126,7 +126,7 @@ export default {
                     return h('span', (this.pointPage.current - 1) * this.pointPage.pageSize + index + 1)
                 } },
                 { title: '图纸点位名称', key: 'pointName', minWidth: 160 },
-                { title: '图纸点位编码', key: 'pointCode', width: 130 },
+                { title: '图纸点位编码', key: 'pointNo', width: 130 },
                 // { title: 'X 坐标', key: 'x', width: 120, align: 'right',  render: (h, { row, index}) => {
                 //     return h('span', {}, row.x ? (+row.x).toFixed(2): '')
                 // }},

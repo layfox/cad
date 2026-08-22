@@ -47,6 +47,11 @@
                   <img src="./css/images/collapse.png" alt="">
               </div>
           </div>
+          <div class="viewer-content">
+                <div ref="viewerContainer" class="viewer-box">
+                    <canvas ref="mxcadCanvas" id="mxcad"></canvas>
+                </div>
+            </div>
         </div>
       </div>
 
@@ -121,8 +126,15 @@ export default {
   methods: {
     onAlarmHandle() {
       this.$Message.info('告警处理功能待接入')
+    },
+  },
+  data() {
+    return {
+      showPersonModal: false,
+      showSafetyCheckModal: false,
+      showEquipModal: false,
     }
-  }
+  },
 }
 </script>
 

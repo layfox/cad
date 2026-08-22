@@ -25,7 +25,9 @@ window.cadApp = new Vue({
 
 window.cadStore = store
 window.cadStore.commit('setPointData', mockData.points)
-
+window.cadStore.commit('setTzInfo', mockData.tzInfo)
+window.cadStore.commit('setTzPoint', mockData.tzPoints)
+window.cadStore.commit('setTzNo', '133783326980808638464')
 
 
 

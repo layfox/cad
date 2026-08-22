@@ -3,10 +3,8 @@
     <!-- 头部（样式与 PersonInfoModal 一致） -->
     <div class="eim-header">
       <div class="eim-title">
-        <span class="eim-title-arrow">▶</span>
         <span class="eim-title-name">{{ equip.name }}</span>
       </div>
-      <span class="eim-close" @click="onClose">×</span>
     </div>
 
     <!-- 设备基本信息 -->
@@ -82,9 +80,9 @@
     <!-- 测点详情弹窗 -->
     <Modal
       v-model="showPointDetail"
-      :width="560"
+      :width="710"
       :footer-hide="true"
-      class-name="point-detail-modal-wrapper"
+      class-name="custom-modal"
       :styles="{ top: '40px' }"
     >
       <PointDetailModal

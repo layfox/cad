@@ -8,6 +8,7 @@ import { MyRect } from "@/test/DrawRect";
 import * as THREE from "three";
 import { mapState } from 'vuex'
 let _allMarkerIds = {}
+let rafPending = false
 export default {
   data() {
     return {
@@ -18,7 +19,12 @@ export default {
             { title: "发布应用", },
         ],
         currentStep: 0,
-        stepInfo: ['待解析', '待绑定', '待发布', '发布'],
+        stepInfo: {
+            '01': '待解析',
+            '02': '待绑定',
+            '03': '待发布',
+            '04': '发布'
+        },
         pointList: [],
         layers: [],
         panelCollapsed: true,
@@ -39,14 +45,28 @@ export default {
         // Ctrl+左键平移状态
         currentCommand: "",
 
+        // 点位绑定模式
+        matchMode: null, // 'manual-match' | 'manual-place' | null
+        selectedSurveyPoint: null,
+        manPlacePendingId: null,
+        highlightEntIds: [],
+        // 人工布点弹窗
+        manualPlaceVisible: false,
+        manualPlaceHasCoordFill: false,
+        manPlacePendingX: null,
+        manPlacePendingY: null,
+
         // 表单数据
         entity: {
-            id: '',
-            name: '',
-            code: '',
-            version: '',
-            user: '',
-            date: ''
+            "TZPZ_ID": "",
+            "TZXX_NO": "",
+            "TZPZ_USR": "11",
+            "TZPZ_DAT": "2026-11-02",
+            "TZPZ_STA": "04",
+            "resourceUrl": "",
+            "TZXX_ID": "",
+            "TZ_VERSION": "",
+            TZPZ_NO: ""
         },
     }
   },
@@ -58,21 +78,176 @@ export default {
     // _bindMarkerClickEvent 在 initViewer 内部调用（mxdraw 就绪后）
   },
   computed:{
-    ...mapState(['points'])
+    ...mapState(['points', 'tzInfo', 'tzPoints'])
+  },
+  watch: {
+    '$store.state.tzInfo': {
+        handler(val) {
+            this.entity.TZLX_ID = val.TZLX_ID
+            this.entity.resourceUrl = val.resourceUrl
+            this.entity.TZXX_NO = val.TZXX_NO
+            this.entity.TZ_VERSION = val.TZ_VERSION
+        },
+        immediate: true
+    },
+    '$store.state.tzPoints': {
+        handler(val) {
+            this.pointList = val.map(item => {
+                item.pointName = item.POINT_NAM
+                item.pointNo = item.POINT_ID
+                item.x = item.X_VALUE
+                item.y = item.Y_VALUE
+                return item
+            })
+        },
+        immediate: true
+    },
+    '$store.state.tzpzInfo': {
+        handler(val) {
+            this.entity.TZPZ_NO = val.TZPZ_NO
+        },
+        immediate: true,
+        deep: true
+    }
   },
   beforeDestroy() {
     this._unbindMarkerClickEvent();
+    this._clearHighlights();
+    this.matchMode = null;
+    this.selectedSurveyPoint = null;
+    this.manualPlaceVisible = false;
+    this.manualPlaceHasCoordFill = false;
   },
   methods: {
-    onStep(index) {
-        this.currentStep = index
-        if (index > 0) {
-            if (!this.mxcad) {
-                this.initViewer()
-                this.$nextTick(() => {
-                    this.initCtrlPan();
-                });
+    async postData(url = "", data = {}) {
+        const response = await fetch(url, {
+            method: "POST",
+            
+            body: JSON.stringify(data),
+        });
+        return response.json();
+    },
+    selectTz() {
+        if (parent && parent.getTz) {
+            parent.getTz()
+        }
+    },
+    stopVersion() {
+        this.$Modal.confirm({
+            title: '提示',
+            content: '停用后前台将无法展示，确定停用吗？停用后，页面跳转至点位绑定页面',
+            onOk: () => {
+
             }
+        })
+    },
+    setDefault() {
+
+    },
+    save() {
+        if (this.currentStep === 0) {
+            this.$refs.sForm.validate((valid) => {
+                if (!valid) {
+                    this.$Message.error('请填写信息后再保存')
+                    return
+                }
+                this.postData('/api/scaqyzt/upsertTzpp', {
+                    "TZPZ_ID": this.entity.TZPZ_ID,
+                    "TZXX_NO": this.entity.TZXX_NO,
+                    "TZPZ_USR": this.entity.TZPZ_USR,
+                    "TZPZ_DAT": this.entity.TZPZ_DAT,
+                    "TZPZ_STA": this.entity.TZPZ_STA,
+                    "TZPZ_NO": this.entity.TZPZ_NO
+                }).then(data => {
+                    this.entity.TZPZ_NO = data.data
+                })
+                // if (parent && parent.upsertTzpp) {
+                //     parent.upsertTzpp({
+                //         "TZPZ_ID": this.entity.TZPZ_ID,
+                //         "TZXX_NO": this.entity.TZXX_NO,
+                //         "TZPZ_USR": this.entity.TZPZ_USR,
+                //         "TZPZ_DAT": this.entity.TZPZ_DAT,
+                //         "TZPZ_STA": this.entity.TZPZ_STA,
+                //         "TZPZ_NO": this.entity.TZPZ_NO
+                //     })
+                // }
+            })
+        }
+    },
+    upsertPoint(points) {
+        if (parent && parent.upsertPoint) {
+            parent.upsertPoint({
+                TZPZ_NO: this.entity.TZPZ_NO,
+                data: points.map(item => {
+                    return {
+                        "POINT_ID": item.pointNo,
+                        "POINT_NAM": item.pointName,
+                        "X_VALUE": item.x,
+                        "Y_VALUE": item.y,
+                        "LAYER_ID": item.LAYER_ID,
+                        "LAYER_NAM": item.LAYER_NAM,
+                    }
+                })
+            })
+        }
+        this.postData('/api/scaqyzt/upsertTzpp', {
+            TZPZ_NO: this.entity.TZPZ_NO,
+                data: points.map(item => {
+                    return {
+                        "POINT_ID": item.pointNo,
+                        "POINT_NAM": item.pointName,
+                        "X_VALUE": item.x,
+                        "Y_VALUE": item.y,
+                        "LAYER_ID": item.LAYER_ID,
+                        "LAYER_NAM": item.LAYER_NAM,
+                    }
+                })
+        }).then(data => {
+            this.entity.TZPZ_NO = data.data
+        })
+    },
+    getCePoint() {
+
+    },
+    onStep(index) {
+        if (this.currentStep > index) {
+            this.currentStep = index
+            return
+        }
+        if (index > 2) {
+            if (this.entity.TZPZ_STA !== '04') {
+                this.$Message.error('请完成点位绑定并执行发布后再进行下一步操作')
+                return
+            }
+            this.currentStep = index
+        } else if (index > 1) {
+            if (this.entity.TZPZ_STA === '01' || !this.entity.TZPZ_STA) {
+                this.$Message.error('请解析图纸完后再进行下一步操作')
+                return
+            }
+            this.currentStep = index
+        } else if (index > 0) {
+            this.$refs.sForm.validate((valid) => {
+                if (!valid) {
+                    this.$Message.error('请填写信息保存后再进行下一步操作')
+                    return
+                }
+                if (index === 0) {
+                    this.save()
+                }
+                this.currentStep = index
+                if (index > 0) {
+                    if (!this.mxcad) {
+                        this.initViewer()
+                        this.$nextTick(() => {
+                            this.initCtrlPan();
+                        });
+                    }
+                }
+                
+            })
+        }  else {
+            this.currentStep = index
         }
     },
     onChoose() {
@@ -153,7 +328,6 @@ export default {
       });
 
         console.log("MxCAD 实例创建成功:", mxcad);
-console.log(new Date().getTime() - now, 22222222)
         this.mxcad = mxcad;
         this.mxDraw = mxcad.mxdraw;
         this.fileUrl = this.fileUrlInput; // 记录当前文件URL
@@ -164,7 +338,6 @@ console.log(new Date().getTime() - now, 22222222)
         // 启用鼠标中键平移（我们会把 Ctrl + 左键模拟成中键事件）
         try {
             mxcad.mxdraw.setMouseMiddlePan(true);
-            console.log("已启用中键平移，Ctrl + 左键会模拟成中键事件");
         } catch (e) {
             console.warn("设置中键平移失败:", e);
         }
@@ -172,13 +345,11 @@ console.log(new Date().getTime() - now, 22222222)
         // 设置滚轮缩放速度（数值越小缩放越慢）
         try {
             mxcad.mxdraw.setZoomSpeed(1.8);
-            console.log("已设置滚轮缩放速度为 1.8");
         } catch (e) {
             console.warn("设置缩放速度失败:", e);
         }
 
         // 二次注册命令（mxcad 实例创建后可能会重置 MxFun 状态）
-        console.log("二次注册命令...");
         RegistMxCommands();
         RxInitMxEntity();
 
@@ -187,21 +358,40 @@ console.log(new Date().getTime() - now, 22222222)
 
         // 监听文件加载完成
         mxcad.mxdraw.on("openFileComplete", () => {
-            console.log("文件加载完成");
             this.onFileLoaded();
         });
 
+        // mxcad.mxdraw.on("viewchange", () => {
+        //     if (rafPending) return
+        //     rafPending = true
+
+        //     requestAnimationFrame(() => {
+        //         if (this.pointList.length) {
+        //             this.pointList.forEach(point => {
+        //                 const screen = this.dwgToDomPoint(point)
+        //                 this.$set(point, 'screenX', screen.x)
+        //                 this.$set(point, 'screenY', screen.y)
+        //             })
+        //             console.log(this.pointList, 1111)
+        //         }
+
+        //         rafPending = false // 释放锁，允许下一帧调度
+        //     })
+        // })
 
 
         // 监听图层数据更新
         mxcad.mxdraw.on("uiSetLayerData", (listLayer) => {
             console.log("图层数据更新:", listLayer);
-            this.layers = listLayer.map(v => ({
-                name: v.name,
-                id: v.id,
-                off: v.off,
-                colorValue: v.colorValue,
-            }));
+            this.layers = listLayer.map(v => {
+                return {
+                    name: v.name,
+                    id: v.id,
+                    LAYER_ID: v.getHandle() || '',
+                    off: v.off,
+                    colorValue: v.colorValue,
+                }
+            });
             this.layerCount = this.layers.length;
         });
 
@@ -321,7 +511,6 @@ console.log(new Date().getTime() - now, 22222222)
             // 构建 name -> 当前 off 状态的映射（保留事件中用户已有的操作）
             const offMap = {};
             this.layers.forEach(l => { offMap[l.name] = l.off; });
-
             this.layers = aryId.map((id) => {
                 const record = id.getMcDbLayerTableRecord();
                 if (record) {
@@ -334,6 +523,7 @@ console.log(new Date().getTime() - now, 22222222)
 
                 return {
                     name: record.name,
+                    LAYER_ID: record.getHandle(),
                     id: id,  // 正确的 mxcad ID 对象
                     off: offMap[record.name] !== undefined ? offMap[record.name] : record.isOff,
                     colorValue: colorValue
@@ -342,22 +532,39 @@ console.log(new Date().getTime() - now, 22222222)
                 return {
                 name: "未知图层",
                 id: id,
+                LAYER_ID: '',
                 off: false,
                 colorValue: 0
                 };
             });
             this.layerCount = this.layers.length;
-            console.log("主动获取图层数据成功，图层数量:", this.layerCount);
-            console.log("图层列表:", this.layers.map((l) => l.name));
+            if (this.entity.TZPZ_STA === '01') {
+                if (parent && parent.upsertLayer) {
+                    parent.upsertLayer({
+                        TZPZ_NO: this.entity.TZPZ_NO,
+                        data: this.layers.map(item => {
+                            return {
+                                "LAYER_ID": item.LAYER_ID,
+                                "LAYER_NAM": item.name
+                            }
+                            
+                        })
+                    })
+                }
+            }
             }
         }
         } catch (e) {
         console.warn("主动获取图层数据失败:", e);
         }
         // 收集点位数据
-        const allPointEntities = this.getAllMcDbPoint();
-        this.pointList = allPointEntities;
-        this._addPointMarkers();
+        if (this.entity.TZPZ_STA === '01') {
+            const allPointEntities = this.getAllMcDbPoint();
+            this.upsertPoint(allPointEntities)
+        }
+        if (this.pointList.length) {
+            this._addPointMarkers();
+        }
     },
 
     /**
@@ -400,11 +607,14 @@ console.log(new Date().getTime() - now, 22222222)
      * @param {number} zoomFactor - 放大倍数，默认 3
      */
     zoomToPoint(x, y, zoomFactor = 3) {
+        if (!x || !y) {
+            return
+        }
         try {
             if (!this.mxcad || !this.mxcad.zoomCenter || !this.mxcad.zoomScale) return;
             this.mxcad.zoomCenter(x, y);
             this.mxcad.zoomScale(zoomFactor);
-            console.log(`[zoomToPoint] 定位到 (${x.toFixed(2)}, ${y.toFixed(2)}) scale=${zoomFactor}`);
+            console.log(`[zoomToPoint] 定位到 (${x}, ${y}) scale=${zoomFactor}`);
         } catch (e) {
             console.error('[zoomToPoint] 失败:', e);
         }
@@ -425,10 +635,12 @@ console.log(new Date().getTime() - now, 22222222)
      * 批量为所有点位添加标记圆点
      */
     _addPointMarkers() {
-        console.log(_allMarkerIds, 1111)
         if (!this.mxDraw || !this.pointList || this.pointList.length === 0) return;
         this.pointList.forEach((point) => {
-            // 重新添加
+            // 避免同一个点多次添加
+            if (_allMarkerIds[point.pointNo]) {
+                return
+            }
             const id = this._addImageAt(point.x, point.y, '1', point.pointNo);
             if (id !== null) {
                 
@@ -464,13 +676,26 @@ console.log(new Date().getTime() - now, 22222222)
      * @param {Array} points - 要删除的点位对象数组
      */
     onDeletePoints(points) {
-        if (!points || points.length === 0) return;
-        // 清除标记
-        this._deletePointMarkers(points);
-        // 从 pointList 移除
-        const ids = points.map(p => p.objectId);
-        this.pointList = this.pointList.filter(p => !ids.includes(p.objectId));
-        console.log(`[onDeletePoints] 已删除 ${points.length} 个点位`);
+        if (!points || points.length === 0) {
+            this.$Message.warning('请先选择测点');
+            return;
+        };
+        if (points.some(item => item.MATCH_STA === '匹配')) {
+            this.$Message.warning('只能选择未匹配的测点');
+            return;
+        }
+        this.$Modal.confirm({
+            title: '提示',
+            content: '确定要删除所选测点嘛？',
+            onOk: () => {
+                if (parent && parent.deleteIot) {
+                    parent.deleteIot({
+                        TZPZ_NO: this.entity.TZPZ_NO,
+                        I2P_NOs: points.map(item => item.I2P_NO)
+                    })
+                }
+            }
+        })
     },
 
     /**
@@ -481,7 +706,7 @@ console.log(new Date().getTime() - now, 22222222)
     _addImageAt(x, y,type, pointNo) {
         try {
             if (!this.mxDraw) return null;
-            let imgUrl = type === '1' ? './image/icon9.svg' : type === '2' ? './image/icon10.svg' : './image/icon9.svg';
+            let imgUrl = type === '1' ? './image/icon9.svg' : type === '2' ? './image/icon10.svg' : './image/icon10.svg';
             const marker = new MxDbImage();
             marker.setPoint1(new THREE.Vector3(x - 5, y + 5, 0));
             marker.setPoint2(new THREE.Vector3(x + 5, y - 5, 0));
@@ -489,6 +714,7 @@ console.log(new Date().getTime() - now, 22222222)
             const id = this.mxDraw.addMxEntity(marker);
             marker.userData.pointNo = pointNo;
             marker.userData.type = type;
+            this.zoomToPoint(x, y)
             return id;
         } catch (e) {
             console.error('[_addImageAt] 失败:', e);
@@ -503,89 +729,202 @@ console.log(new Date().getTime() - now, 22222222)
      * 绑定标记图标点击事件，点击后打印点位信息并缩放到对应位置
      */
     _bindMarkerClickEvent() {
-        try {
-            if (!MxFun) return;
-            this._windowsEventHandler = (type, event) => {
-                // 调试：打印所有事件类型
-                console.log('[event]', type, 'button:', event.button, 'ctrl:', event.ctrlKey);
-                if (type === 'mousedown') {
-                    if (event.ctrlKey && event.button === 0) return 0;
-                    try {
-                        const mxobj = MxFun.getCurrentDraw();
-                        if (!mxobj) return 0;
-                        const pt = mxobj.screenCoord2Doc(event.offsetX, event.offsetY);
-                        console.log(pt, 4444)
-                        if (!pt) return 0;
-                        // 方法1：findMxEntityAtPoint
-                        const ents = mxobj.findMxEntityAtPoint(pt);
-                        const ent = ents && ents.length > 0 ? ents[0] : null;
-                        // 方法2：兜底
-                        const fallback = this._findMarkerByDistance(mxobj, event.offsetX, event.offsetY);
-                        const targetEnt = ent || fallback;
-                        if (!targetEnt) return 0;
-                        const pointNo = targetEnt.userData && targetEnt.userData.pointNo;
-                        if (pointNo === undefined) return 0;
-                        const point = this.pointList.find(p => p.pointNo === pointNo);
-                        if (point) {
-                            console.log('========== 标记图标点击 ==========');
-                            console.log('  点位编号:', point.pointNo);
-                            console.log('  点位名称:', point.pointName);
-                            console.log('  坐标 X:', point.x, 'Y:', point.y);
-                            console.log('================================');
-                            this.zoomToPoint(point.x, point.y, 3);
-                            return 1;
-                        }
-                    } catch (e) {
-                        console.error('[_windowsEventHandler mousedown] 失败:', e);
+    try {
+        if (!MxFun) return;
+        const mxobj = MxFun.getCurrentDraw();
+        if (!mxobj) return;
+        const canvas = mxobj.getCanvas();
+        if (!canvas) return;
+
+        // 保存回调引用，组件销毁用来解绑
+        this._onCanvasMouseDown = (event) => {
+            console.log('[canvas mousedown] button:', event.button, 'ctrl:', event.ctrlKey);
+            if (event.ctrlKey && event.button === 0) return;
+
+            // 👉event 是canvas原生MouseEvent
+            // clientX/clientY：浏览器全局坐标
+            // offsetX / offsetY：**相对于canvas内部像素坐标（原生canvas事件下才可靠）**
+
+            // 人工布点模式
+            if (this.matchMode === 'manual-place-pick' && this.selectedSurveyPoint) {
+                return this._handleManualPlaceCanvasClick(event);
+            }
+            if (this.matchMode === 'manual-match' && this.selectedSurveyPoint) {
+                return this._handleManualMatchCanvasClick(event);
+            }
+            if (this.matchMode === 'manual-place' && this.selectedSurveyPoint) {
+                return this._handleManualPlaceCanvasClick(event);
+            }
+            try {
+                // screenCoord2Doc 入参 clientX/clientY
+                const pt = mxobj.screenCoord2Doc(event.clientX, event.clientY);
+                if (!pt) return;
+
+                const ent = ents && ents.length > 0 ? ents[0] : null;
+                // 兜底拾取，原生canvas事件 event.offsetX/event.offsetY 是可靠的
+                const fallback = this._findMarkerByDistance(mxobj, event.offsetX, event.offsetY);
+                const targetEnt = ent || fallback;
+
+                if (!targetEnt) return;
+                const pointNo = targetEnt.userData && targetEnt.userData.pointNo;
+                if (pointNo === undefined) return;
+                const point = this.pointList.find(p => p.pointNo === pointNo);
+                // if (point) {
+                //     console.log('标记图标点击', point);
+                //     this.zoomToPoint(point.x, point.y, 3);
+                // }
+            } catch (e) {
+                console.error('[canvas mousedown]', e);
+            }
+        };
+
+        // canvas mousemove，原生绑定，仅画布触发
+        this._onCanvasMouseMove = (event) => {
+            if (this._hoverTimer !== null) return;
+            // 捕获坐标，防止event复用
+            const captureX = event.offsetX;
+            const captureY = event.offsetY;
+            const captureClientX = event.clientX;
+            const captureClientY = event.clientY;
+
+            this._hoverTimer = window.setTimeout(() => {
+                this._hoverTimer = null;
+                try {
+                    const mxobj = MxFun.getCurrentDraw();
+                    if (!mxobj) {
+                        this._clearHoverTooltip();
+                        return;
                     }
-                }
-                if (type === 'mousemove') {
-                    if (this._hoverTimer !== null) return 0;
-                    // 立即捕获坐标，避免 20ms 后 event 对象被 SDK 回收
-                    const captureX = event.offsetX;
-                    const captureY = event.offsetY;
-                    const captureClientX = event.clientX;
-                    const captureClientY = event.clientY;
-                    this._hoverTimer = window.setTimeout(() => {
-                        this._hoverTimer = null;
-                        console.log('[hover tick]');
-                        try {
-                            const mxobj = MxFun.getCurrentDraw();
-                            if (!mxobj) {
-                                this._clearHoverTooltip();
-                                return;
-                            }
-                            const hoverEnt = this._findMarkerByDistance(mxobj, captureX, captureY);
-                            console.log('hoverEnt:', hoverEnt);
-                            if (hoverEnt) {
-                                if (this._lastHoverEnt !== hoverEnt) {
-                                    this._clearHoverTooltip();
-                                    this._lastHoverEnt = hoverEnt;
-                                    const pointNo = hoverEnt.userData.pointNo;
-                                    const point = this.pointList.find(p => p.pointNo === pointNo);
-                                    if (point) {
-                                        this._showHoverTooltip(captureClientX, captureClientY, point.pointName);
-                                        hoverEnt.scale = 1.3;
-                                        mxobj.updateDisplay();
-                                    }
-                                }
-                            } else {
-                                this._clearHoverTooltip();
-                            }
-                        } catch (err) {
-                            console.error('[mousemove hover]', err);
+                    const hoverEnt = this._findMarkerByDistance(mxobj, captureX, captureY);
+                    if (hoverEnt) {
+                        if (this._lastHoverEnt !== hoverEnt) {
                             this._clearHoverTooltip();
+                            this._lastHoverEnt = hoverEnt;
+                            const pointNo = hoverEnt.userData.pointNo;
+                            const point = this.pointList.find(p => p.pointNo === pointNo);
+                            if (point) {
+                                this._showHoverTooltip(captureClientX, captureClientY, point.pointName);
+                                hoverEnt.scale = 1.3;
+                                mxobj.updateDisplay();
+                            }
                         }
-                    }, 20);
-                    return 0;
+                    } else {
+                        this._clearHoverTooltip();
+                    }
+                } catch (err) {
+                    console.error('[canvas mousemove]', err);
+                    this._clearHoverTooltip();
                 }
-                return 0;
-            };
-            MxFun.addWindowsEvent(this._windowsEventHandler);
-        } catch (e) {
-            console.error('[_bindMarkerClickEvent] 失败:', e);
-        }
-    },
+            }, 20);
+        };
+
+        // ✅直接绑定canvas DOM，不再走MxFun.addWindowsEvent全局事件
+        canvas.addEventListener('mousedown', this._onCanvasMouseDown);
+        canvas.addEventListener('mousemove', this._onCanvasMouseMove);
+
+    } catch (e) {
+        console.error('[_bindMarkerClickEvent] 失败:', e);
+    }
+},
+    // _bindMarkerClickEvent() {
+    //     try {
+    //         if (!MxFun) return;
+    //         this._windowsEventHandler = (type, event) => {
+    //             // 调试：打印所有事件类型
+    //             console.log('[event]', type, 'button:', event.button, 'ctrl:', event.ctrlKey);
+    //             if (type === 'mousedown') {
+    //                 if (event.ctrlKey && event.button === 0) return 0;
+
+    //                 // 人工布点模式（从弹窗进入拾取）
+    //                 if (this.matchMode === 'manual-place-pick' && this.selectedSurveyPoint) {
+    //                     return this._handleManualPlaceCanvasClick(event);
+    //                 }
+
+    //                 // 人工匹配模式：已选中测点，本次点击是选择图纸点位
+    //                 if (this.matchMode === 'manual-match' && this.selectedSurveyPoint) {
+    //                     return this._handleManualMatchCanvasClick(event);
+    //                 }
+    //                 // 人工布点模式：本次点击是选择布点位置
+    //                 if (this.matchMode === 'manual-place' && this.selectedSurveyPoint) {
+    //                     return this._handleManualPlaceCanvasClick(event);
+    //                 }
+
+    //                 try {
+    //                     const mxobj = MxFun.getCurrentDraw();
+    //                     if (!mxobj) return 0;
+    //                     const pt = mxobj.screenCoord2Doc(event.offsetX, event.offsetY);
+    //                     console.log(pt, 4444)
+    //                     if (!pt) return 0;
+    //                     // 方法1：findMxEntityAtPoint
+    //                     const ents = mxobj.findMxEntityAtPoint(pt);
+    //                     const ent = ents && ents.length > 0 ? ents[0] : null;
+    //                     // 方法2：兜底
+    //                     const fallback = this._findMarkerByDistance(mxobj, event.offsetX, event.offsetY);
+    //                     const targetEnt = ent || fallback;
+    //                     if (!targetEnt) return 0;
+    //                     const pointNo = targetEnt.userData && targetEnt.userData.pointNo;
+    //                     if (pointNo === undefined) return 0;
+    //                     const point = this.pointList.find(p => p.pointNo === pointNo);
+    //                     if (point) {
+    //                         console.log('========== 标记图标点击 ==========');
+    //                         console.log('  点位编号:', point.pointNo);
+    //                         console.log('  点位名称:', point.pointName);
+    //                         console.log('  坐标 X:', point.x, 'Y:', point.y);
+    //                         console.log('================================');
+    //                         this.zoomToPoint(point.x, point.y, 3);
+    //                         return 1;
+    //                     }
+    //                 } catch (e) {
+    //                     console.error('[_windowsEventHandler mousedown] 失败:', e);
+    //                 }
+    //             }
+    //             if (type === 'mousemove') {
+    //                 if (this._hoverTimer !== null) return 0;
+    //                 // 立即捕获坐标，避免 20ms 后 event 对象被 SDK 回收
+    //                 const captureX = event.offsetX;
+    //                 const captureY = event.offsetY;
+    //                 const captureClientX = event.clientX;
+    //                 const captureClientY = event.clientY;
+    //                 this._hoverTimer = window.setTimeout(() => {
+    //                     this._hoverTimer = null;
+    //                     console.log('[hover tick]');
+    //                     try {
+    //                         const mxobj = MxFun.getCurrentDraw();
+    //                         if (!mxobj) {
+    //                             this._clearHoverTooltip();
+    //                             return;
+    //                         }
+    //                         const hoverEnt = this._findMarkerByDistance(mxobj, captureX, captureY);
+    //                         console.log('hoverEnt:', hoverEnt);
+    //                         if (hoverEnt) {
+    //                             if (this._lastHoverEnt !== hoverEnt) {
+    //                                 this._clearHoverTooltip();
+    //                                 this._lastHoverEnt = hoverEnt;
+    //                                 const pointNo = hoverEnt.userData.pointNo;
+    //                                 const point = this.pointList.find(p => p.pointNo === pointNo);
+    //                                 if (point) {
+    //                                     this._showHoverTooltip(captureClientX, captureClientY, point.pointName);
+    //                                     hoverEnt.scale = 1.3;
+    //                                     mxobj.updateDisplay();
+    //                                 }
+    //                             }
+    //                         } else {
+    //                             this._clearHoverTooltip();
+    //                         }
+    //                     } catch (err) {
+    //                         console.error('[mousemove hover]', err);
+    //                         this._clearHoverTooltip();
+    //                     }
+    //                 }, 20);
+    //                 return 0;
+    //             }
+    //             return 0;
+    //         };
+    //         MxFun.addWindowsEvent(this._windowsEventHandler);
+    //     } catch (e) {
+    //         console.error('[_bindMarkerClickEvent] 失败:', e);
+    //     }
+    // },
     _showHoverTooltip(clientX, clientY, text){
     if(!this._tooltipDom){
         this._tooltipDom = document.createElement('div');
@@ -624,8 +963,7 @@ _clearHoverTooltip(){
             if (!mxobj || Object.keys(_allMarkerIds).length === 0) return null;
             let bestEnt = null;
             let bestDist = Infinity;
-            const THRESHOLD = 10; // 文档坐标距离阈值
-            // 遍历已知标记 ID，用文档坐标直接与点位坐标比较
+            const THRESHOLD = 20; // 文档坐标距离阈值
             Object.values(_allMarkerIds).forEach(id => {
                 const ent = mxobj.getMxEntity(id);
                 if (!ent || !ent.userData || !ent.userData.pointNo) return;
@@ -634,6 +972,7 @@ _clearHoverTooltip(){
                 if (!point) return;
                 // 与点击位置的文档坐标距离
                  const screenPt = mxobj.cadCoord2View(point.x, point.y, point.z || 0);
+                 console.log(screenPt, 1111)
                 if (!screenPt) return;
        // 与点击位置的像素距离
                 const dx = screenPt.x - screenX;
@@ -650,16 +989,444 @@ _clearHoverTooltip(){
             return null;
         }
     },
-
+    screenCoord2Cad(x, y) {
+        const mxobj = MxFun.getCurrentDraw();
+        if (mxobj) {
+            const docPt = mxobj.screenCoord2Doc(x, y);
+            const cadPt = MxFun.docCoord2Cad(docPt.x, docPt.y, 0);
+            return [cadPt.x, cadPt.y];
+        }
+        return null
+    },
     _unbindMarkerClickEvent() {
         try {
-            if (MxFun && this._windowsEventHandler) {
-                MxFun.addWindowsEvent(() => 0); // 注册空事件以覆盖
-                this._windowsEventHandler = null;
+            const mxobj = MxFun.getCurrentDraw();
+            if (!mxobj) return;
+            const canvas = mxobj.getCanvas();
+            if (!canvas) return;
+
+            canvas.removeEventListener('mousedown', this._onCanvasMouseDown);
+            canvas.removeEventListener('mousemove', this._onCanvasMouseMove);
+
+            if (this._hoverTimer) {
+                clearTimeout(this._hoverTimer);
+                this._hoverTimer = null;
             }
+            this._clearHoverTooltip();
+            this._onCanvasMouseDown = null;
+            this._onCanvasMouseMove = null;
         } catch (e) {
-            console.error('[_unbindMarkerClickEvent] 失败:', e);
+            // SDK 已销毁，跳过清理
         }
+    },
+    dwgToDomPoint(dwgPt) {
+        const mxDraw = MxFun.getCurrentDraw();
+        if (!mxDraw) return null;
+        const docPt = MxFun.cadCoord2Doc(dwgPt.x, dwgPt.y, 0); // CAD → 文档坐标
+        const screen = MxFun.docCoord2Screen(docPt.x, docPt.y, 0);
+        const canvas = this.mxDraw.getCanvas();
+        return {
+            x: screen.x + canvas.offsetLeft,
+            y: screen.y + canvas.offsetTop
+        };
+    },
+    // _unbindMarkerClickEvent() {
+    //     try {
+    //         if (MxFun && this._windowsEventHandler) {
+    //             MxFun.addWindowsEvent(() => 0); // 注册空事件以覆盖
+    //             this._windowsEventHandler = null;
+    //         }
+    //     } catch (e) {
+    //         console.error('[_unbindMarkerClickEvent] 失败:', e);
+    //     }
+    // },
+
+    // ============== 坐标解析 ==============
+    _parseSurveyCoord(survey) {
+        
+        if (survey.PT_X_VALUE && survey.PT_Y_VALUE) return [parseFloat(survey.PT_X_VALUE), parseFloat(survey.PT_Y_VALUE)];
+        return null;
+    },
+
+    // ============== 面板控制 ==============
+    /**
+     * 隐藏 ViewerPanel1，展开画布区域用于选点操作
+     */
+    _hidePanel1() {
+        this.panelCollapsed1 = true;
+    },
+    /**
+     * 恢复 ViewerPanel1 显示
+     */
+    _showPanel1() {
+        this.panelCollapsed1 = false;
+    },
+
+    // ============== 高亮辅助 ==============
+    _clearHighlights() {
+        this.highlightEntIds.forEach(id => {
+            try { this.mxDraw.eraseMxEntity(id); } catch (e) {}
+        });
+        this.highlightEntIds = [];
+        if (this.mxDraw) this.mxDraw.updateDisplay();
+    },
+
+    /**
+     * 在图纸上高亮未匹配的点位（放大标记）
+     */
+    _highlightUnmatchedCADPoints() {
+        this.pointList.forEach(p => {
+            if (p.MATCH_STA === '未匹配') {
+                const id = _allMarkerIds[p.pointNo];
+                if (id) {
+                    const ent = this.mxDraw.getMxEntity(id);
+                    if (ent) { ent.scale = 1.5; this.highlightEntIds.push(id); }
+                }
+            }
+        });
+        if (this.mxDraw) this.mxDraw.updateDisplay();
+    },
+
+    /**
+     * 高亮定位到指定测点（用于人工匹配/人工布点）
+     */
+    _highlightSurveyPoint(survey) {
+        const coord = this._parseSurveyCoord(survey);
+        if (!coord) { this.$Message.warning('该测点无有效坐标，无法定位'); return; }
+        const [x, y] = coord;
+        if (this.mxcad) this.mxcad.zoomCenter(x, y);
+        // 在图纸坐标处加一个红色临时标记
+        const id = this._addImageAt(x, y, '3', null);
+        if (id !== null) this.highlightEntIds.push(id);
+    },
+
+    // ============== 按钮方法 ==============
+
+    /**
+     * 三、自动匹配
+     */
+    onAutoMatch(points, threshold) {
+        // const unmatched = points.filter(p => p.MATCH_STA === '未匹配');
+        // if (unmatched.length === 0) {
+        //     this.$Message.warning('请选择未匹配状态的测点');
+        //     return;
+        // }
+        console.log({
+                TZPZ_NO: this.entity.TZPZ_NO,
+                threshold
+            }, 7777)
+        if (parent && parent.autoMatch) {
+            parent.autoMatch({
+                TZPZ_NO: this.entity.TZPZ_NO,
+                threshold
+            })
+            this.$Message.success('匹配成功')
+        }
+    },
+
+    /**
+     * 四、人工匹配
+     */
+    onManualMatch(points) {
+        if (!points || points.length !== 1) {
+            this.$Message.warning('请选择一个未匹配状态的测点');
+            return;
+        }
+        const unmatched = points.filter(p => p.MATCH_STA === '未匹配');
+        if (unmatched.length === 0) {
+            this.$Message.warning('请选择一个未匹配状态的测点');
+            return;
+        }
+        this._clearHighlights();
+        this.selectedSurveyPoint = unmatched[0];
+        this.zoomToPoint(this.selectedSurveyPoint.PT_X_VALUE, this.selectedSurveyPoint.PT_Y_VALUE)
+        if (!_allMarkerIds[this.selectedSurveyPoint.PT_NO]) {
+            const id = this._addImageAt(this.selectedSurveyPoint.PT_X_VALUE, this.selectedSurveyPoint.PT_Y_VALUE, '2', this.selectedSurveyPoint.PT_NO)
+            _allMarkerIds[this.selectedSurveyPoint.PT_NO] = id
+        }
+        
+        this.matchMode = 'manual-match';
+        this._hidePanel1();
+        this._highlightSurveyPoint(this.selectedSurveyPoint);
+        this._highlightUnmatchedCADPoints();
+        this.$Message.info('请在图纸上点击一个未匹配的图纸点位完成匹配');
+    },
+
+    /**
+     * 五、自动布点
+     */
+    onAutoPlace(points) {
+        const pts = points;
+        const valid = pts.filter(p =>
+            p.MATCH_STA === '未匹配' && this._parseSurveyCoord(p)
+        );
+        if (valid.length !== 1) {
+            this.$Message.warning('请选择一个未匹配且有坐标的测点');
+            return;
+        }
+        this._hidePanel1()
+        valid.forEach(survey => {
+            const coord = this._parseSurveyCoord(survey);
+            if (!coord) return;
+            const [x, y] = coord;
+            if (!_allMarkerIds[survey.PT_NO]) {
+                const id = this._addImageAt(x, y, '2', survey.PT_NO);
+                _allMarkerIds[survey.PT_NO] = id
+                if (id !== null) survey.objectId = id;
+            }
+        });
+        console.log({
+                "TZPZ_NO": this.entity.TZPZ_NO,
+                I2P_NO: valid[0].I2P_NO
+            }, 2222)
+        if (parent && parent.autoAddAndMatch) {
+            parent.autoAddAndMatch({
+                "TZPZ_NO": this.entity.TZPZ_NO,
+                I2P_NO: valid[0].I2P_NO
+            })
+        }
+        if (this.mxcad) this.mxcad.regen();
+        this.$Message.success('布点成功')
+    },
+
+    /**
+     * 六、人工布点
+     */
+    onManualPlace(points) {
+        if (!points || points.length !== 1) {
+            this.$Message.warning('请选择一个测点');
+            return;
+        }
+        const unmatched = points.filter(p => p.MATCH_STA === '未匹配');
+        if (unmatched.length === 0) {
+            this.$Message.warning('请选择未匹配状态的测点');
+            return;
+        }
+        this.selectedSurveyPoint = unmatched[0];
+        if (this.selectedSurveyPoint.PT_X_VALUE && this.selectedSurveyPoint.PT_Y_VALUE) {
+            this.$Message.warning('请选择没有坐标的测点');
+            return;
+        }
+        // 打开弹窗，不进入图纸拾取模式
+        this._hidePanel1();
+        this.$refs.manualPlaceForm.resetPos()
+        this.manualPlaceVisible = true;
+    },
+
+    /**
+     * 七、解除匹配
+     */
+    onUnmatch(points) {
+        if (!points || points.length !== 1) {
+            this.$Message.warning('请先选择要一个要解除绑定的测点');
+            return;
+        }
+        if (points.some(item => item.MATCH_STA === '未匹配')) {
+            this.$Message.warning('只能选择匹配的测点');
+            return;
+        }
+        console.log(points)
+        this.$Modal.confirm({
+            title: '提示',
+            content: '请选择已匹配状态的测点。点击后弹出提示：解除匹配后不可撤销，确定吗？',
+            onOk: () => {
+                if (parent && parent.cancelMatch) {
+                    parent.cancelMatch({
+                        TZPZ_NO: this.entity.TZPZ_NO,
+                        I2P_NO: points[0].I2P_NO
+                    })
+                }
+            }
+        })
+    },
+
+    /**
+     * 人工匹配模式下，在图纸上点击了某个点位
+     */
+    _handleManualMatchCanvasClick(event) {
+        try {
+            const mxobj = MxFun.getCurrentDraw();
+            if (!mxobj) return 0;
+
+            const fallback = this._findMarkerByDistance(mxobj, event.offsetX, event.offsetY);
+            const targetEnt = fallback;
+
+            if (!targetEnt) return;
+            const pointNo = targetEnt.userData && targetEnt.userData.pointNo;
+            if (pointNo === undefined) return;
+            const point = this.pointList.find(p => p.pointNo === pointNo);
+            if (!point) {
+                this.$Message.warning('请点击一个未匹配的图纸点位');
+                return 0;
+            }
+            // 连线
+            const surveyCoord = this._parseSurveyCoord(this.selectedSurveyPoint);
+            if (surveyCoord) {
+                const line = new MxDbLine();
+                line.pt1 = new THREE.Vector3(surveyCoord[0], surveyCoord[1], 0);
+                line.pt2 = new THREE.Vector3(point.x, point.y, 0);
+                line.setColor('#ff4d4f');
+                const lineId = this.mxDraw.addMxEntity(line);
+                if (lineId !== null) {
+                    this.highlightEntIds.push(lineId);
+                    this.mxDraw.updateDisplay();
+                }
+            }
+            // 弹窗确认
+            this.$Modal.confirm({
+                title: '确认匹配',
+                render: h => {
+                    return h('div', {
+                        lineHeight: 2
+                    },[
+                        h('p', `实时测点： ${this.selectedSurveyPoint.PT_NAM}`),
+                        h('p', `图纸点位： ${point.pointName}`)
+                    ])
+                },
+                okText: '匹配',
+                onOk: () => {
+                    this._clearHighlights();
+                    this.matchMode = null;
+                    if (parent && parent.manualMatch) {
+                        parent.manualMatch({
+                            TZPZ_NO: this.entity.TZPZ_NO,
+                            "I2P_NO":this.selectedSurveyPoint.I2P_NO,
+                            "POINT_NO": point.POINT_NO
+                        })
+                    }
+                    this.$Message.success('匹配成功');
+                    this.selectedSurveyPoint = null;
+                }
+            });
+            return 0;
+        } catch (e) {
+            console.error('[_handleManualMatchCanvasClick] 失败:', e);
+            return 0;
+        }
+    },
+
+    /**
+     * 人工布点模式下，在图纸上点击了位置
+     */
+    _handleManualPlaceCanvasClick(event) {
+        try {
+            const mxobj = MxFun.getCurrentDraw();
+            if (!mxobj) return 0;
+            const docPt = mxobj.screenCoord2Doc(event.offsetX, event.offsetY);
+            const pt = MxFun.docCoord2Cad(docPt.x, docPt.y, 0);
+            if (!pt) return 0;
+            // 拾取模式：回填坐标到表单，不关闭弹窗，不清空 selectedSurveyPoint
+            if (this.matchMode === 'manual-place-pick') {
+                this._clearHighlights();
+                this.manPlacePendingX = pt.x;
+                this.manPlacePendingY = pt.y;
+                this.matchMode = null;
+                this.$refs.manualPlaceForm && this.$refs.manualPlaceForm.onFillCoord(pt.x, pt.y);
+                this.manualPlaceVisible = true
+                return 0;
+            }
+            // 弹窗确认后手动输入坐标的放置模式
+            if (this.matchMode === 'manual-place') {
+                if (!_allMarkerIds[this.selectedSurveyPoint.PT_NO]) {
+                    const id = this._addImageAt(pt.x, pt.y, '2', this.selectedSurveyPoint.PT_NO);
+                    _allMarkerIds[this.selectedSurveyPoint.PT_NO] = id
+                    if (id !== null) {
+                        this.selectedSurveyPoint.objectId = id;
+                    }
+                }
+                this._clearHighlights();
+                this.matchMode = null;
+                this.selectedSurveyPoint = null;
+                if (this.mxcad) this.mxcad.regen();
+                this.$Message.success('布点成功');
+                this._showPanel1();
+                this._refreshPointData().then(() => {});
+                return 0;
+            }
+            return 0;
+        } catch (e) {
+            console.error('[_handleManualPlaceCanvasClick] 失败:', e);
+            return 0;
+        }
+    },
+
+    /**
+     * 弹窗"选择坐标"按钮触发的图纸拾取
+     */
+    onPickCoordinateFromCanvas() {
+        this.matchMode = 'manual-place-pick';
+        this.manualPlaceVisible = false
+    },
+
+    /**
+     * 坐标已由画布拾取回填（form 更新后触发）
+     */
+    onFillCoordToForm() {
+        this.manualPlaceHasCoordFill = true;
+    },
+
+    /**
+     * 弹窗确认布点（用户填写坐标后点击确认）
+     */
+    onManualPlaceConfirm(coords) {
+        if (!this.selectedSurveyPoint) return;
+        const survey = this.selectedSurveyPoint;
+        const { x, y } = coords;
+        // 添加标记
+        if (!_allMarkerIds[survey.PT_NO]) {
+            const id = this._addImageAt(x, y, '2', survey.PT_NO);
+            _allMarkerIds[survey.PT_NO] = id
+            if (id !== null) {
+                survey.objectId = id;
+                survey.coordValue = { x, y };
+            }
+        }
+        console.log({
+                "TZPZ_NO": this.entity.TZPZ_NO,
+                "X_VALUE": x,
+                "Y_VALUE": y
+            })
+        if (parent && parent.manualAddAndMatch) {
+            parent.manualAddAndMatch({
+                "TZPZ_NO": this.entity.TZPZ_NO,
+                "X_VALUE": x,
+                "Y_VALUE": y
+            })
+        }
+        this.matchMode = null;
+        this.selectedSurveyPoint = null;
+        if (this.mxcad) this.mxcad.regen();
+        this.manualPlaceVisible = false
+        this._refreshPointData().then(() => {});
+    },
+
+    /**
+     * 弹窗取消
+     */
+    onManualPlaceCancel() {
+        this.matchMode = null;
+        this.selectedSurveyPoint = null;
+        this._clearHighlights();
+        this.manualPlaceVisible = false
+    },
+
+    /**
+     * 刷新点位数据（操作完成后调用）
+     * TODO: 替换为实际接口请求
+     */
+    _refreshPointData() {
+        // 模拟 API 请求延迟
+        return new Promise(resolve => {
+            setTimeout(() => {
+                // TODO: 此处替换为真实接口
+                // fetch('/api/points/refresh', { method: 'POST', body: JSON.stringify(...) })
+                //   .then(res => res.json()).then(data => {
+                //     window.cadStore.commit('setPointData', data)
+                //     resolve()
+                //   })
+                resolve()
+            }, 300)
+        })
     },
 
     /**
@@ -727,28 +1494,18 @@ _clearHoverTooltip(){
         const ent = id.getMcDbEntity();
         const pos = ent.position;
         if (!pos) continue;
-
         result.push({
             x: pos.x,
             y: pos.y,
             z: pos.z,
-            handle: ent.getHandle ? ent.getHandle() : '',
-            layer: ent.layer || '',
-            entity: ent,
-            objectId: id,
+            LAYER_ID: ent.layerId ? (ent.layerId.getMcDbLayerTableRecord().getHandle() || '') : '',
+            LAYER_NAM: ent.layer || '',
             // 点位名称从块名取
             pointName: ent.blockName || '',
-            parseMethod: '自动解析',
-            matchStatus: '未匹配',
-            matchPoint: null
+            pointNo: ent.getHandle()
         });
         }
-        result.forEach((item, index)  => {
-            item.pointNo = index + 1
-        })
-console.log(result.slice(0, 10))
-        console.log(`共找到 ${result.length} 个点位`);
-        return result.slice(0, 20);
+        return result
     },
 
     // ============== Ctrl+左键平移 ==============

@@ -2,14 +2,14 @@
     <div class="viewer-panel-wrapper">
         <!-- 工具栏 -->
         <div class="vp-toolbar">
-            <Button type="primary" size="large" ghost><img src="../../css/images/icon1.png" alt="">添加测点</Button>
+            <Button type="primary" @click="onAdd" size="large" ghost><img src="../../css/images/icon1.png" alt="">添加测点</Button>
             <span class="vp-toolbar-label">坐标匹配容差</span>
             <InputNumber v-model="tolerance" :min="0" :precision="2" style="width: 80px" />
-            <Button type="primary" ghost><img src="../../css/images/icon2.png" alt="">自动绑定</Button>
-            <Button type="primary" ghost><img src="../../css/images/icon3.png" alt="">人工绑定</Button>
-            <Button type="primary" ghost><img src="../../css/images/icon4.png" alt="">自动布点</Button>
-            <Button type="primary" ghost><img src="../../css/images/icon4.png" alt="">人工布点</Button>
-            <Button type="primary" ghost><img src="../../css/images/icon5.png" alt="">解除匹配</Button>
+            <Button type="primary" ghost @click="onAutoMatch"><img src="../../css/images/icon2.png" alt="">自动绑定</Button>
+            <Button type="primary" ghost @click="onManualMatch"><img src="../../css/images/icon3.png" alt="">人工绑定</Button>
+            <Button type="primary" ghost @click="onAutoPlace"><img src="../../css/images/icon4.png" alt="">自动布点</Button>
+            <Button type="primary" ghost @click="onManualPlace"><img src="../../css/images/icon4.png" alt="">人工布点</Button>
+            <Button type="primary" ghost @click="onUnmatch"><img src="../../css/images/icon5.png" alt="">解除绑定</Button>
             <Button type="primary" ghost @click="onDeletePoints(selectedPoints)"><img src="../../css/images/icon6.png" alt="">删除测点</Button>
         </div>
 
@@ -61,13 +61,13 @@
                 no-data-text="暂无点位数据"
             >
                 <template slot-scope="{ row }" slot="coordStatus">
-                    <span :class="row.coordValue === '无坐标' ? 'vp-no-coord' : ''">
-                        {{ row.coordValue || '无坐标' }}
+                    <span :class="row.PT_X_VALUE && row.PT_Y_VALUE ? '' : 'vp-no-coord'">
+                        {{ row.PT_X_VALUE && row.PT_Y_VALUE ? ((+row.PT_X_VALUE).toFixed(2) + ',' + (+row.PT_Y_VALUE).toFixed(2)) : '无坐标' }}
                     </span>
                 </template>
-                <template slot-scope="{ row }" slot="matchStatus">
-                    <span :class="['vp-match-status', row.matchStatus === '未匹配' ? 'status-unmatched' : 'status-matched']">
-                        {{ row.matchStatus || '匹配' }}
+                <template slot-scope="{ row }" slot="MATCH_STA">
+                    <span :class="['vp-match-status', row.MATCH_STA === '未匹配' ? 'status-unmatched' : 'status-matched']">
+                        {{ row.MATCH_STA || '匹配' }}
                     </span>
                 </template>
             </Table>
@@ -82,7 +82,6 @@
                 <span class="vp-selected-count">已选 {{ selectedPoints.length }} 条</span>
             </div>
             <div class="vp-pagination">
-                <span class="vp-total">共 {{ total }} 条</span>
                 <Page
                     :total="total"
                     :page-size="pageSize"
@@ -106,6 +105,7 @@ export default {
             default: () => []
         }
     },
+    emits: ['zoom-to-point', 'delete-points', 'auto-match', 'manual-match', 'auto-place', 'manual-place', 'unmatch'],
     data() {
         return {
             currentPage: 1,
@@ -120,15 +120,12 @@ export default {
                 { slot: 'seq', title: '序号', key: 'seq', width: 60, align: 'center', render: (h, { row,index }) => {
                     return h('span',  (this.currentPage -1) * this.pageSize + index + 1)
                 } },
-                { title: '实时测点', key: 'pointName', minWidth: 160 },
-                // { title: 'X 坐标', key: 'x', width: 120, align: 'right' },
-                // { title: 'Y 坐标', key: 'y', width: 120, align: 'right' },
-                { title: '测点坐标', key: 'coordValue', width: 140, align: 'center', slot: 'coordStatus' },
-                { title: '匹配状态', key: 'matchStatus', width: 100, align: 'center', slot: 'matchStatus' },
-                { title: '坐标差', key: 'coordDiff', width: 80, align: 'center' },
-                { title: '匹配图纸点位', key: 'matchPoint', width: 140 },
-                { title: '解析方式', key: 'parseMethod', width: 100, align: 'center' },
-                { title: '匹配方式', key: 'matchMethod', width: 100, align: 'center' }
+                { title: '实时测点', key: 'PT_NAM', minWidth: 160 },
+                { title: '测点坐标', key: 'coordValue', minWidth: 160, align: 'center', slot: 'coordStatus' },
+                { title: '匹配状态', key: 'MATCH_STA', width: 100, align: 'center', slot: 'MATCH_STA' },
+                { title: '坐标差', key: 'DALTA_XY', width: 80, align: 'center' },
+                { title: '匹配图纸点位', key: 'POINT_NAM', width: 140 },
+                { title: '匹配方式', key: 'MATCH_TYP', width: 100, align: 'center' }
             ]
         }
     },
@@ -139,11 +136,11 @@ export default {
         },
         summaryData() {
             const total = this.points.length
-            const noCoord = this.points.filter(p => !p.coordValue || p.coordValue === '无坐标').length
-            const matched = this.points.filter(p => p.matchStatus !== '未匹配').length
-            const unmatched = this.points.filter(p => p.matchStatus === '未匹配').length
+            const noCoord = this.points.filter(p => !(p.PT_X_VALUE && p.PT_Y_VALUE)).length
+            const matched = this.points.filter(p => p.MATCH_STA !== '未匹配').length
+            const unmatched = this.points.filter(p => p.MATCH_STA === '未匹配').length
             const totalPoints = new Set(this.points.map(p => p.matchPoint).filter(Boolean)).size
-            const used = new Set(this.points.filter(p => p.matchStatus !== '未匹配').map(p => p.matchPoint).filter(Boolean)).size
+            const used = new Set(this.points.filter(p => p.MATCH_STA !== '未匹配').map(p => p.matchPoint).filter(Boolean)).size
             return { total, noCoord, matched, unmatched, totalPoints, used }
         },
         // 为每页数据添加全局序号
@@ -164,6 +161,11 @@ export default {
         this.onDataChange()
     },
     methods: {
+        onAdd() {
+            if (parent && parent.addPoint) {
+                parent.addPoint()
+            }
+        },
         onDataChange() {
             this.total = this.points.length
             this.currentPage = 1
@@ -202,6 +204,21 @@ export default {
         },
         onDeletePoints(points) {
             this.$emit('delete-points', points)
+        },
+        onAutoMatch() {
+            this.$emit('auto-match', this.selectedPoints, this.tolerance)
+        },
+        onManualMatch() {
+            this.$emit('manual-match', this.selectedPoints)
+        },
+        onAutoPlace() {
+            this.$emit('auto-place', this.selectedPoints)
+        },
+        onManualPlace() {
+            this.$emit('manual-place', this.selectedPoints)
+        },
+        onUnmatch() {
+            this.$emit('unmatch', this.selectedPoints)
         }
     }
 }

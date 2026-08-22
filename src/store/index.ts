@@ -9,12 +9,16 @@ const store = new Vuex.Store({
         cursorSize: 128,
         // cursorRectSize 光标矩形框大小
         cursorRectSize: 10,
-        points: []
+        points: [],
+        tzInfo: {},
+        tzPoints: [],
+        tzpzInfo: {
+            TZPZ_NO: '',
+        }
     },
     
     mutations: {
         setMsCmdTip(state, data) {
-            console.log(data, 1111)
             state.msCmdTip = data
         },
         setTipCoord(state, data) {
@@ -27,8 +31,17 @@ const store = new Vuex.Store({
             state.cursorRectSize = data
         },
         setPointData(state, data) {
-            console.log(data, 2222)
             state.points = data
+        },
+        setTzInfo(state, data) {
+            state.tzInfo = data
+        },
+        setTzPoint(state, data) {
+            state.tzPoints = data
+        },
+        setTzNo(state, data) {
+            console.log(data, 1111)
+            state.tzpzInfo.TZPZ_NO = data
         }
     }
 })

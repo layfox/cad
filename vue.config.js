@@ -1,10 +1,14 @@
 const CopyWebpackPlugin = require("copy-webpack-plugin")
 const path = require("path")
 module.exports = {
-  publicPath: '/',
+  publicPath: './',
   lintOnSave: false,
   // 解决mxcad es6特性可选链报错
   transpileDependencies: ['mxcad', 'mxdraw'],
+  // 关闭 TS 类型检查
+  chainWebpack: config => {
+    config.plugins.delete('fork-ts-checker')
+  },
   configureWebpack: {
     devtool: 'source-map',
     plugins: [
