@@ -42,7 +42,7 @@
                         size="small"
                         highlight-row
                         @on-selection-change="onCatSelectionChange(catIdx, $event)"
-                        no-data-text="暂无数据"
+                        no-data-text=""
                     />
                     <!-- 分页 -->
                     <div class="vp-cat-footer">
@@ -83,8 +83,8 @@ export default {
                     width: 60,
                     align: 'center'
                 },
-                { title: '人员', key: 'pointName', minWidth: 160 },
-                { title: '所属团队', key: 'value', minWidth: 160, align: 'center' }
+                { title: '人员', key: 'pointName', minWidth: 160, ellipsis: true },
+                { title: '所属团队', key: 'value', minWidth: 160, align: 'center', ellipsis: true }
             ]
         }
     },
@@ -229,7 +229,7 @@ export default {
     padding: 0 32px 0 12px;
     border: 1px solid #d9d9d9;
     border-radius: 4px;
-    font-size: 13px;
+    font-size: 14px;
     color: #333;
     outline: none;
     box-sizing: border-box;
@@ -360,7 +360,7 @@ export default {
 }
 
 .vp-cat-total {
-    font-size: 13px;
+    font-size: 14px;
     color: #515a6e;
     margin-right: 8px;
 }

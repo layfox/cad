@@ -1,6 +1,12 @@
 <template>
-    <div>
-        <Form label-position="top" ref="formRef" :model="form" :rules="rules">
+    <div class="modal-container">
+        <div class="modal-header">
+            <div class="modal-title">
+                <img src="../css/images/modal-icon.png" alt="">
+                <span class="modal-title-text">选择图纸</span>
+            </div>
+        </div>
+        <Form class="modal-body" label-position="top" ref="formRef" :model="form" :rules="rules">
             <Row :gutter="16">
                 <Col span="12">
                     <FormItem label="点位编码" prop="code">
@@ -134,11 +140,41 @@ export default {
 </script>
 
 <style scoped>
+.modal-modal {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-size: 14px;
+}
+
+/* ===== 头部 ===== */
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  padding: 0 16px;
+  border-bottom: 1px solid #e8e8e8;
+  flex-shrink: 0;
+}
+
+.modal-title {
+  display: flex;
+  align-items: center;
+  font-weight: bold;
+font-size: 16px;
+color: #333333;
+gap: 6px;
+}
+.modal-body {
+    padding: 16px;
+}
 .dialog-footer {
-    padding: 12px 16px 0;
+    padding: 16px;
     text-align: right;
     border-top: 1px solid #e8eaec;
-    margin-top: 8px;
 }
 .dialog-footer .ivu-btn {
     margin-left: 8px;

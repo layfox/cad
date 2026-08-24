@@ -33,7 +33,7 @@
                             </Col>
                             <Col :span="6">
                                 <FormItem label="图纸信息名称" prop="TZXX_NO" :rules="[{ required: true, message: '请选择图纸信息', trigger: 'change' }]">
-                                    <Input readonly :disabled="entity.TZPZ_STA&&entity.TZPZ_STA!=='01'" v-model="entity.TZXX_NO" @click="onChoose" style="cursor:pointer">
+                                    <Input :disabled="entity.TZPZ_STA&&entity.TZPZ_STA!=='01'" v-model="entity.TZXX_NO" @click="onChoose" style="cursor:pointer">
                                         <Button @click="selectTz" slot="append" icon="ios-more"></Button>
                                     </Input>
                                 </FormItem>
@@ -95,6 +95,7 @@
                             @auto-place="onAutoPlace"
                             @manual-place="onManualPlace"
                             @unmatch="onUnmatch"
+                            @add-points="onAddPoints"
                             style="height:calc(100% - 36px);margin-bottom: 16px;"
                         />
                         <div v-if="panelCollapsed1" class="viewer-panel-btn" @click="panelCollapsed1 = false">
@@ -114,6 +115,9 @@
                                 <div class="loading-text">文件加载解析中，请稍候...</div>
                             </div>
                         </div>
+                        <div ref="markerLayer" class="marker-layer"></div>
+                        <div class="svg-container" ref="matchLineContainer">
+                        </div>
                         <!-- <div class="marker-container">
                             <div class="marker-item" :style="{left: item.screenX + 'px', top: item.screenY + 'px'}" v-for="(item, index) in pointList" :key="index"></div>
                         </div> -->
@@ -126,9 +130,9 @@
       <!-- 人工布点弹窗 -->
       <Modal
           v-model="manualPlaceVisible"
-          title="添加点位"
           width="770"
           :mask-closable="false"
+          class-name="custom-modal1"
           :footer-hide="true"
       >
           <ManualPlaceDialog
@@ -140,19 +144,52 @@
               @cancel="onManualPlaceCancel"
           />
       </Modal>
+      <Modal
+        v-model="showTz"
+        :width="800"
+        :footer-hide="true"
+        class-name="custom-modal1"
+        :styles="{ top: '40px' }"
+      >
+        <TzModal
+          :visible="showTz"
+          :orgNo="orgNo"
+          @update:visible="showTz = $event"
+          @close="showTz = false"
+          @confirm="onSelectTz"
+        />
+      </Modal>
     </div>
 </template>
 
 <script>
 import CAD10001R from './js/CAD10001R';
 import ManualPlaceDialog from './dialog/ManualPlaceDialog.vue';
+import TzModal from './dialog/tzModal.vue';
+import PointSelectModal from './dialog/PointSelectModal.vue';
 export default {
   name: 'CAD10001R',
   mixins: [CAD10001R],
-  components: { ManualPlaceDialog }
+  components: { ManualPlaceDialog, TzModal, PointSelectModal}
 }
 </script>
 
 <style scoped>
 @import url('./css/CAD10001R.css');
+</style>
+
+<style>
+  .custom-modal1 .ivu-modal-body {
+    padding: 0;
+  }
+
+  .custom-modal1 .ivu-modal-close {
+    top: 8px;
+    color: #8B99B9;
+    font-weight: bold;
+  }
+
+  #CAD10001R table {
+    width: 100%!important;
+  }
 </style>

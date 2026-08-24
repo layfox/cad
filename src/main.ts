@@ -11,8 +11,6 @@ import mockData from './mock'
 
 // 注册vue指令
 import "./directive/index"
-
-
 // 注册 iView (ViewUI)
 Vue.use(iView)
 
@@ -24,10 +22,6 @@ window.cadApp = new Vue({
 }).$mount("#app");
 
 window.cadStore = store
-window.cadStore.commit('setPointData', mockData.points)
-window.cadStore.commit('setTzInfo', mockData.tzInfo)
-window.cadStore.commit('setTzPoint', mockData.tzPoints)
-window.cadStore.commit('setTzNo', '133783326980808638464')
 
 
 

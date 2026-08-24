@@ -9,7 +9,7 @@ const store = new Vuex.Store({
         cursorSize: 128,
         // cursorRectSize 光标矩形框大小
         cursorRectSize: 10,
-        points: [],
+        points: '',
         tzInfo: {},
         tzPoints: [],
         tzpzInfo: {
@@ -31,7 +31,7 @@ const store = new Vuex.Store({
             state.cursorRectSize = data
         },
         setPointData(state, data) {
-            state.points = data
+            state.points = new Date().getTime() + ''
         },
         setTzInfo(state, data) {
             state.tzInfo = data
@@ -40,7 +40,6 @@ const store = new Vuex.Store({
             state.tzPoints = data
         },
         setTzNo(state, data) {
-            console.log(data, 1111)
             state.tzpzInfo.TZPZ_NO = data
         }
     }

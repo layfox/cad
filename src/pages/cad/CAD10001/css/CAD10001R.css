@@ -293,7 +293,7 @@
 }
 
 .viewer-content .loading-overlay .loading-step {
-  font-size: 13px;
+  font-size: 14px;
   color: #999;
   margin-bottom: 16px;
 }
@@ -333,6 +333,34 @@
 
 .marker-item:hover {
   transform: scale(1.4);
+}
+
+.cad-container {
+  position: relative;
+  width:100%;
+  height:600px;
+}
+.marker-layer {
+  position:absolute;
+  left:0;
+  top:0;
+  width:100%;
+  height:100%;
+  pointer-events:none;
+  z-index:10;
+}
+.marker-icon {
+  pointer-events: auto;
+  transform: scale(1);
+}
+.marker-icon:hover{
+  transform: scale(1.3);
+  cursor:pointer;
+}
+
+.svg-container {
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  pointer-events:none;z-index:100;
 }
 
 @keyframes spin {

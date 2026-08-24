@@ -26,24 +26,16 @@
             >
                 <!-- 分类头部 -->
                 <div class="vp-cat-header" @click="toggleCat(catIdx)">
-                    <span class="vp-cat-actions" @click.stop>
-                        <Checkbox
-                            :value="isCatAllSelected(catIdx)"
-                            :indeterminate="isCatIndeterminate(catIdx)"
-                            @on-change="(val) => handleCatSelectAll(catIdx, val)"
-                        >
-                        </Checkbox>
-                    </span>
                     <span class="vp-cat-name">{{ cat.name }}</span>
                     <span class="vp-cat-arrow" :class="cat.expanded ? 'arrow-up' : 'arrow-down'">
                         <img src="../../css/images/arrow-down.png" alt="">
                     </span>
                 </div>
 
-                <!-- 分类表格 -->
+                <!-- 分类表格：用 v-if 替代 v-show，避免 View Design 在隐藏状态下初始化 selection 失效 -->
                 <div v-if="cat.expanded" :key="'cat-body-' + catIdx" class="vp-cat-body">
                     <Table
-                        :ref="'catTable_' + catIdx"
+                        ref="catTable"
                         :data="cat.pageData"
                         :columns="catColumns"
                         :border="false"
@@ -77,7 +69,7 @@ export default {
         categories: {
             type: Array,
             default: () => []
-            // 每项结构: { name, points: [{ id, pointName, value }] }
+            // 每项结构: { name, points: [{ pointName, value }] }
         }
     },
     data() {
@@ -92,12 +84,11 @@ export default {
                     align: 'center'
                 },
                 { title: '图纸点位名称', key: 'pointName', minWidth: 160, ellipsis: true },
-                { title: '数值', key: 'value', minWidth: 120, align: 'center' }
+                { title: '编号', key: 'value', minWidth: 120, align: 'center' }
             ]
         }
     },
     computed: {
-        // 搜索过滤后的分类数据
         filteredCategories() {
             if (!this.searchKeyword.trim()) {
                 return this.categories
@@ -111,83 +102,51 @@ export default {
                 )
             })).filter(cat => cat.points.length > 0)
         },
-        // 展示用的分类数据（包含分页、选中状态等）
         displayCategories() {
             return this.filteredCategories.map(cat => {
-                // 初始化分页参数
                 if (!cat.currentPage) cat.currentPage = 1
                 if (!cat.pageSize) cat.pageSize = 10
-                // 初始化选中列表（存储的是完整的 row 对象，便于跨页选中）
-                if (!cat.selectedPoints) {
-                    this.$set(cat, 'selectedPoints', [])
-                }
-                
                 const start = (cat.currentPage - 1) * cat.pageSize
-                const end = Math.min(start + cat.pageSize, cat.points.length)
-                const pageData = cat.points.slice(start, end).map((item, index) => {
-                    // 添加序号
-                    const seq = (cat.currentPage - 1) * cat.pageSize + index + 1
-                    // 关键：根据 selectedPoints 判断是否选中，设置 _checked
-                    const isChecked = cat.selectedPoints.some(p => p.id === item.id)
-                    return {
-                        ...item,
-                        seq,
-                        _checked: isChecked
-                    }
+                const pageData = cat.points.slice(start, start + cat.pageSize).map((item, index) => {
+                    item.seq = (cat.currentPage - 1) * cat.pageSize + index + 1;
+                    return item;
                 })
-                
                 return {
                     ...cat,
                     total: cat.points.length,
+                    currentPage: cat.currentPage,
+                    pageSize: cat.pageSize,
                     pageData,
-                    // 保留原始的 selectedPoints 引用
+                    selectedPoints: cat.selectedPoints || []
                 }
             })
         }
     },
     watch: {
-        categories: {
-            handler() {
-                this.categories.forEach(cat => {
-                    if (!cat.currentPage) cat.currentPage = 1
-                    if (!cat.selectedPoints) {
-                        this.$set(cat, 'selectedPoints', [])
-                    }
-                })
-            },
-            immediate: true,
-            deep: true
+        categories() {
+            this.categories.forEach(cat => {
+                cat.currentPage = 1
+                cat.selectedPoints = cat.selectedPoints || []
+            })
         },
         searchKeyword() {
-            // 搜索后重置页码和选中状态
-            this.filteredCategories.forEach(cat => {
-                cat.currentPage = 1
-                if (cat.selectedPoints) {
-                    // 过滤掉不在当前搜索结果中的选中项
-                    const validIds = new Set(cat.points.map(p => p.id))
-                    cat.selectedPoints = cat.selectedPoints.filter(p => validIds.has(p.id))
-                }
-            })
+            // 搜索恢复后刷新 selection
             this.$nextTick(() => this.refreshSelection())
         }
     },
     mounted() {
+        // 默认展开的 category，等 DOM 渲染后重置 selection，修复 View Design 全选失效问题
         this.$nextTick(() => {
             this.refreshSelection()
         })
     },
     methods: {
-        // ============ 刷新所有表格的选中状态 ============
         refreshSelection() {
-            this.displayCategories.forEach((cat, idx) => {
-                const table = this.$refs['catTable_' + idx]
-                if (table && table.clearSelection) {
-                    table.clearSelection()
-                }
+            const tables = this.$refs.catTable
+            ;(Array.isArray(tables) ? tables : [tables]).forEach(t => {
+                if (t && t.clearSelection) t.clearSelection()
             })
         },
-        
-        // ============ 折叠/展开 ============
         toggleCat(idx) {
             const cat = this.filteredCategories[idx]
             if (cat) {
@@ -197,108 +156,25 @@ export default {
                 }
             }
         },
-        
-        // ============ 表格选中变化 ============
         onCatSelectionChange(catIdx, rows) {
             const cat = this.filteredCategories[catIdx]
-            if (!cat) return
-            
-            // 获取当前页所有数据的 id
-            const currentPageIds = new Set(
-                this.displayCategories[catIdx].pageData.map(p => p.id)
-            )
-            
-            // 移除当前页在 selectedPoints 中的旧数据
-            cat.selectedPoints = cat.selectedPoints.filter(
-                p => !currentPageIds.has(p.id)
-            )
-            
-            // 添加当前页新选中的数据
-            rows.forEach(row => {
-                if (!cat.selectedPoints.some(p => p.id === row.id)) {
-                    cat.selectedPoints.push(row)
-                }
-            })
+            if (cat) cat.selectedPoints = rows || []
         },
-        
-        // ============ 分类全选/取消全选 ============
-        handleCatSelectAll(catIdx, checked) {
-            const cat = this.filteredCategories[catIdx]
-            if (!cat) return
-            
-            if (checked) {
-                // 全选：将该分类下所有点加入 selectedPoints
-                const existingIds = new Set(cat.selectedPoints.map(p => p.id))
-                cat.points.forEach(p => {
-                    if (!existingIds.has(p.id)) {
-                        cat.selectedPoints.push(p)
-                    }
-                })
-            } else {
-                // 取消全选：清空该分类的选中列表
-                cat.selectedPoints = []
-            }
-            
-            // 刷新表格显示
-            this.$nextTick(() => this.refreshSelection())
-        },
-        
-        // ============ 判断分类全选状态 ============
-        isCatAllSelected(catIdx) {
-            const cat = this.filteredCategories[catIdx]
-            if (!cat || cat.points.length === 0) return false
-            return cat.selectedPoints.length === cat.points.length
-        },
-        
-        isCatIndeterminate(catIdx) {
-            const cat = this.filteredCategories[catIdx]
-            if (!cat || cat.points.length === 0) return false
-            const count = cat.selectedPoints.length
-            return count > 0 && count < cat.points.length
-        },
-        
-        // ============ 分页切换 ============
         onCatPageChange(catIdx, page) {
             const cat = this.filteredCategories[catIdx]
-            if (cat) {
-                cat.currentPage = page
-                this.$nextTick(() => this.refreshSelection())
-            }
+            if (cat) cat.currentPage = page
         },
-        
         onCatPageSizeChange(catIdx, size) {
             const cat = this.filteredCategories[catIdx]
             if (cat) {
                 cat.pageSize = size
                 cat.currentPage = 1
-                this.$nextTick(() => this.refreshSelection())
             }
         },
-        
-        // ============ 搜索 ============
         onSearch() {
             this.filteredCategories.forEach(cat => {
                 cat.currentPage = 1
             })
-        },
-        
-        // ============ 获取所有分类的选中数据（供父组件调用） ============
-        getSelectedData() {
-            const result = {}
-            this.filteredCategories.forEach(cat => {
-                result[cat.name] = cat.selectedPoints || []
-            })
-            return result
-        },
-        
-        // ============ 清空所有选中（供父组件调用） ============
-        clearAllSelection() {
-            this.filteredCategories.forEach(cat => {
-                if (cat.selectedPoints) {
-                    cat.selectedPoints = []
-                }
-            })
-            this.$nextTick(() => this.refreshSelection())
         }
     }
 }
@@ -384,36 +260,31 @@ export default {
     padding: 0 0 8px;
 }
 
-.vp-category {
-    margin-bottom: 4px;
-}
-
-/* ===== 分类头部 ===== */
 .vp-cat-header {
     display: flex;
     align-items: center;
-    height: 42px;
+    height: 48px;
     cursor: pointer;
     gap: 8px;
     user-select: none;
     transition: background 0.15s;
-    padding: 0 8px;
 }
 
-.vp-cat-arrow {
+.vp-cat-icon {
     display: inline-flex;
     align-items: center;
-    color: #808695;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    margin-right: 8px;
+    border-radius: 2px;
     flex-shrink: 0;
-    transition: transform 0.2s;
 }
 
-.vp-cat-arrow img {
-    transition: transform 0.2s;
-}
-
-.vp-cat-arrow.arrow-up img {
-    transform: rotate(180deg);
+.vp-cat-icon.cat-icon-expanded,
+.vp-cat-icon.cat-icon-collapsed {
+    background: #1764e8;
+    color: #fff;
 }
 
 .vp-cat-name {
@@ -422,31 +293,19 @@ export default {
     color: #1a1a1a;
 }
 
-.vp-cat-actions {
-    display: flex;
+.vp-cat-arrow {
+    display: inline-flex;
     align-items: center;
-    gap: 16px;
-    flex-shrink: 0;
-}
-
-.vp-cat-actions  .ivu-checkbox-wrapper {
-    margin-right: 0;
-}
-
-.vp-cat-actions >>> .ivu-checkbox-wrapper {
-    font-size: 14px;
-    color: #515a6e;
-}
-
-.vp-cat-total {
-    font-size: 14px;
     color: #808695;
 }
 
-/* ===== 分类表格区域 ===== */
+.vp-cat-arrow.arrow-up img {
+    transform: rotate(180deg);
+}
 
-.vp-cat-body >>> .ivu-table-wrapper {
-    border: none;
+/* ===== 分类表格区域 ===== */
+.vp-cat-body {
+    
 }
 
 .vp-cat-body >>> .ivu-table-header thead tr th {
@@ -486,14 +345,9 @@ export default {
     border: none;
 }
 
-.vp-cat-body >>> .ivu-table:before,
-.vp-cat-body >>> .ivu-table:after {
+.vp-cat-body >>> .ivu-table-bordered:before,
+.vp-cat-body >>> .ivu-table-bordered:after {
     display: none;
-}
-
-.vp-cat-body >>> .ivu-table-border td,
-.vp-cat-body >>> .ivu-table-border th {
-    border: none;
 }
 
 /* ===== 分页底部 ===== */
@@ -505,12 +359,9 @@ export default {
     gap: 8px;
 }
 
-.vp-cat-footer >>> .ivu-page {
-    font-size: 14px;
-}
-
-.vp-cat-footer >>> .ivu-page-total {
+.vp-cat-total {
     font-size: 14px;
     color: #515a6e;
+    margin-right: 8px;
 }
 </style>

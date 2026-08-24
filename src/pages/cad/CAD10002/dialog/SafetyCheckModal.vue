@@ -91,6 +91,10 @@ export default {
     sensorId: {
       type: String,
       default: ''
+    },
+    alarm: {
+      type: Object,
+      default: () => ({})
     }
   },
   data() {
@@ -159,7 +163,7 @@ export default {
       this.$emit('close')
     },
     onAlarmHandle() {
-      this.$emit('alarm-handle')
+      this.$emit('alarm-handle', this.alarm)
     },
     onTimeTabClick(idx) {
       this.activeTimeTab = idx
@@ -341,7 +345,7 @@ color: #333333;
 
 .scm-current-label {
   margin-top: 6px;
-  font-size: 13px;
+  font-size: 14px;
   color: #888;
 }
 

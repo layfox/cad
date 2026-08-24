@@ -22,9 +22,9 @@ const routes: RouteConfig[] = [
     component:  CAD10002R // 一张图
   },
   {
-    path: '/IvCadViewer',
-    name: 'IvCadViewer',
-    component:  IvCadViewer // 一张图
+    path: '/CAD10003S',
+    name: 'CAD10003S',
+    component: () => import('@/pages/cad/CAD10003/CAD10003S.vue')
   }
 ];
 

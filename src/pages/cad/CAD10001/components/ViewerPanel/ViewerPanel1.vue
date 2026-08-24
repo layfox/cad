@@ -58,7 +58,7 @@
                 highlight-row
                 @on-selection-change="onPointSelectionChange"
                 @on-row-click="onPointRowClick"
-                no-data-text="暂无点位数据"
+                no-data-text=""
             >
                 <template slot-scope="{ row }" slot="coordStatus">
                     <span :class="row.PT_X_VALUE && row.PT_Y_VALUE ? '' : 'vp-no-coord'">
@@ -76,9 +76,6 @@
         <!-- 分页 -->
         <div class="vp-footer">
             <div class="vp-selected-info">
-                <!-- <Checkbox :indeterminate="isIndeterminate" v-model="checkAll" @on-change="onCheckAllChange">
-                    选择
-                </Checkbox> -->
                 <span class="vp-selected-count">已选 {{ selectedPoints.length }} 条</span>
             </div>
             <div class="vp-pagination">
@@ -93,10 +90,25 @@
                 />
             </div>
         </div>
+
+        <!-- 选择测点弹窗 -->
+        <Modal
+            v-model="pointModalVisible"
+            :width="900"
+            :footer-hide="true"
+            class-name="point-select-modal-wrapper"
+        >
+            <PointSelectModal
+                :visible="pointModalVisible"
+                @update:visible="pointModalVisible = $event"
+                @confirm="onPointSelectConfirm"
+            />
+        </Modal>
     </div>
 </template>
 
 <script>
+import PointSelectModal from '../../dialog/PointSelectModal.vue'
 export default {
     name: 'ViewerPanel1',
     props: {
@@ -105,7 +117,7 @@ export default {
             default: () => []
         }
     },
-    emits: ['zoom-to-point', 'delete-points', 'auto-match', 'manual-match', 'auto-place', 'manual-place', 'unmatch'],
+    emits: ['zoom-to-point', 'delete-points', 'auto-match', 'manual-match', 'auto-place', 'manual-place', 'unmatch', 'add-points'],
     data() {
         return {
             currentPage: 1,
@@ -115,6 +127,7 @@ export default {
             checkAll: false,
             isIndeterminate: false,
             tolerance: 4,
+            pointModalVisible: false,
             pointColumns: [
                 { type: 'selection', width: 60, align: 'center' },
                 { slot: 'seq', title: '序号', key: 'seq', width: 60, align: 'center', render: (h, { row,index }) => {
@@ -152,6 +165,7 @@ export default {
             }))
         }
     },
+    components: { PointSelectModal },
     watch: {
         points() {
             this.onDataChange()
@@ -162,9 +176,10 @@ export default {
     },
     methods: {
         onAdd() {
-            if (parent && parent.addPoint) {
-                parent.addPoint()
-            }
+            this.pointModalVisible = true
+        },
+        onPointSelectConfirm(points) {
+            this.$emit('add-points', points)
         },
         onDataChange() {
             this.total = this.points.length
@@ -246,7 +261,7 @@ export default {
 }
 
 .vp-toolbar-label {
-    font-size: 13px;
+    font-size: 14px;
     color: #515a6e;
     margin-left: 4px;
 }
@@ -401,6 +416,6 @@ export default {
 
 .vp-total {
     color: #515a6e;
-    font-size: 13px;
+    font-size: 14px;
 }
 </style>

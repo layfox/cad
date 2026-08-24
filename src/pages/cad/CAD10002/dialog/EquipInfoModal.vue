@@ -69,7 +69,7 @@
               :columns="pointColumns"
               :border="false"
               size="small"
-              no-data-text="暂无数据"
+              no-data-text=""
               @on-row-click="onRowClick"
             />
           </div>

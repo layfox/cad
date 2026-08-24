@@ -3,28 +3,15 @@
     <!-- 头部：标题 + 公司选择 -->
     <div class="dsm-header">
       <div class="dsm-title">
-        <span class="dsm-title-icon">≡</span>
+        <img src="../css/images/modal-icon.png" alt="">
         <span class="dsm-title-text">选择图纸</span>
       </div>
-      <Select
-        v-model="selectedCompany"
-        size="small"
-        class="dsm-company-select"
-        @on-change="onCompanyChange"
-      >
-        <Option
-          v-for="company in companyOptions"
-          :key="company"
-          :value="company"
-        >{{ company }}</Option>
-      </Select>
     </div>
 
     <!-- 搜索框 -->
-    <div class="dsm-search">
+    <div class="dsm-search" style="justify-content: flex-end;">
       <Input
         v-model="searchKeyword"
-        size="small"
         placeholder="输入关键字"
         clearable
         class="dsm-search-input"
@@ -40,8 +27,6 @@
         size="small"
         highlight-row
         @on-selection-change="onSelectionChange"
-        @on-row-click="onRowClick"
-        no-data-text=""
       />
     </div>
 
@@ -62,8 +47,8 @@
 
     <!-- 底部按钮 -->
     <div class="dsm-footer">
-      <Button size="large" class="dsm-btn-confirm" @click="onConfirm">确定</Button>
-      <Button size="large" class="dsm-btn-cancel" @click="onCancel">取消</Button>
+      <Button type="primary" class="dsm-btn-confirm" @click="onConfirm">确定</Button>
+      <Button class="dsm-btn-cancel" @click="onCancel">取消</Button>
     </div>
   </div>
 </template>
@@ -79,6 +64,10 @@ export default {
     company: {
       type: String,
       default: '小纪汗'
+    },
+    orgNo: {
+      type: String,
+      default: ''
     }
   },
   data() {
@@ -89,13 +78,7 @@ export default {
       pageSize: 10,
       selectedDrawings: [],
       companyOptions: ['小纪汗', '肖家洼'],
-      drawings: [
-        { id: '1', name: '图纸1', code: 'XJH-SWJC-30', number: '0002' },
-        { id: '2', name: '图纸2', code: 'XJH-SWJC-32', number: '0001' },
-        { id: '3', name: '图纸3', code: 'XJH-SWJC-23', number: '0012' },
-        { id: '4', name: '图纸4', code: 'XJH-SWJC-22', number: '0003' },
-        { id: '5', name: '图纸5', code: 'XJH-SWJC-11', number: '0005' }
-      ]
+      drawings: []
     }
   },
   computed: {
@@ -103,9 +86,7 @@ export default {
       if (!this.searchKeyword.trim()) return this.drawings
       const kw = this.searchKeyword.trim().toLowerCase()
       return this.drawings.filter(d =>
-        d.name.toLowerCase().includes(kw) ||
-        d.code.toLowerCase().includes(kw) ||
-        d.number.toLowerCase().includes(kw)
+        d.TZLX_NAM.toLowerCase().includes(kw)
       )
     },
     displayDrawings() {
@@ -118,9 +99,9 @@ export default {
     columns() {
       return [
         { type: 'selection', width: 45, align: 'center' },
-        { title: '名称', key: 'name', width: 120 },
-        { title: '编码', key: 'code', minWidth: 140 },
-        { title: '编号', key: 'number', width: 80, align: 'center' }
+        { title: '图纸类型名称', key: 'TZLX_NAM', minWidth: 180 },
+        { title: '图纸信息编号', key: 'TZXX_ID', minWidth: 120 },
+        { title: '图纸版本号', key: 'TZ_VERSION', minWidth: 120, align: 'center' }
       ]
     }
   },
@@ -129,7 +110,24 @@ export default {
       this.selectedCompany = val
     }
   },
+  mounted() {
+    this.postData('/api/scaqyzt/getTzpzList', {
+      "pageSize": "1000",
+      "pageNum": "1",
+      param_orgNo: this.orgNo
+    }).then(data => {
+      this.drawings = data.data.data.filter(item => item.TZPZ_STA=='04')
+    })
+  },
   methods: {
+    async postData(url = "", data = {}) {
+        const response = await fetch(url, {
+            method: "POST",
+
+            body: JSON.stringify(data),
+        });
+        return response.json();
+    },
     onCompanyChange() {
       // 切换公司时重置搜索和分页
       this.searchKeyword = ''
@@ -156,11 +154,12 @@ export default {
       this.selectedDrawings = []
     },
     onConfirm() {
-      if (this.selectedDrawings.length === 0) {
-        this.$Message.warning('请选择图纸')
+      if (this.selectedDrawings.length !== 1) {
+        this.$Message.warning('请选择一张图纸')
         return
       }
       this.$emit('confirm', this.selectedDrawings[0])
+      this.onCancel()
     },
     onCancel() {
       this.$emit('update:visible', false)
@@ -185,7 +184,8 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 20px;
+  height: 48px;
+  padding: 0 16px;
   border-bottom: 1px solid #e8e8e8;
   flex-shrink: 0;
 }
@@ -193,7 +193,10 @@ export default {
 .dsm-title {
   display: flex;
   align-items: center;
-  gap: 8px;
+  font-weight: bold;
+font-size: 16px;
+color: #333333;
+gap: 6px;
 }
 
 .dsm-title-icon {
@@ -202,32 +205,28 @@ export default {
   line-height: 1;
 }
 
-.dsm-title-text {
-  font-size: 16px;
-  font-weight: 600;
-  color: #1764e8;
-}
-
 .dsm-company-select {
   width: 120px;
 }
 
 /* ===== 搜索 ===== */
 .dsm-search {
-  padding: 12px 20px;
-  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
   flex-shrink: 0;
 }
 
 .dsm-search-input {
-  width: 100%;
+  width: 320px;
 }
 
 /* ===== 列表 ===== */
 .dsm-list {
   flex: 1;
   overflow: hidden;
-  padding: 8px 20px;
+  padding: 0 16px;
   min-height: 0;
 }
 
@@ -236,25 +235,33 @@ export default {
 }
 
 .dsm-list >>> .ivu-table-header thead tr th {
-  height: 40px;
-  padding: 0 12px;
-  background: #f5f7fa;
-  font-size: 14px;
-  color: #666;
-  border: none;
+  height: 42px;
+    padding: 0 8px;
+    background: #EEF1F6;
+    font-size: 14px;
+    color: #515a6e;
+    border: none;
 }
 
 .dsm-list >>> .ivu-table-body tr td {
-  height: 40px;
-  padding: 0 12px;
-  font-size: 14px;
-  color: #333;
-  border: none;
-  cursor: pointer;
+  height: 42px;
+    padding: 0 8px;
+    font-size: 14px;
+    color: #333;
+    border: none;
+}
+
+.dsm-list >>> .ivu-table:before,
+.dsm-list >>> .ivu-table:after {
+    display: none;
+}
+
+.dsm-list >>> .ivu-table-border td,
+.dsm-list >>> .ivu-table-border th {
+    border: none;
 }
 
 .dsm-list >>> .ivu-table-cell {
-  padding: 0 12px;
 }
 
 .dsm-list >>> .ivu-table .ivu-table-row:nth-child(odd) td {
@@ -286,8 +293,8 @@ export default {
 .dsm-pagination {
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 10px 20px;
+  justify-content: right;
+  padding: 8px 16px;
   border-top: 1px solid #f0f0f0;
   flex-shrink: 0;
 }
@@ -306,38 +313,11 @@ export default {
 .dsm-footer {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: right;
   gap: 12px;
-  padding: 14px 20px;
+  padding: 16px;
   border-top: 1px solid #e8e8e8;
   flex-shrink: 0;
-}
-
-.dsm-btn-confirm {
-  min-width: 100px;
-  background: linear-gradient(135deg, #d6f0ff 0%, #b8e0ff 100%);
-  border-color: #8ec5ff;
-  color: #1764e8;
-  font-weight: 500;
-}
-
-.dsm-btn-confirm:hover {
-  background: linear-gradient(135deg, #b8e0ff 0%, #9dd0ff 100%);
-  border-color: #6bb5ff;
-  color: #0f52cc;
-}
-
-.dsm-btn-cancel {
-  min-width: 100px;
-  background: linear-gradient(135deg, #f5f7fa 0%, #eef1f6 100%);
-  border-color: #c5c5c5;
-  color: #666;
-}
-
-.dsm-btn-cancel:hover {
-  background: linear-gradient(135deg, #eef1f6 0%, #e0e4ea 100%);
-  border-color: #a8a8a8;
-  color: #444;
 }
 </style>
 

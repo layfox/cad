@@ -31,7 +31,7 @@
                     :columns="layerColumns"
                     :border="false"
                     size="small"
-                    no-data-text="暂无图层数据"
+                    no-data-text=""
                 >
                     <template slot-scope="{ row, $index }" slot="seq">
                         {{ (currentPage - 1) * pageSize + $index + 1 }}
@@ -50,7 +50,7 @@
                     highlight-row
                     @on-selection-change="onPointSelectionChange"
                     @on-row-click="onPointRowClick"
-                    no-data-text="暂无点位数据"
+                    no-data-text=""
                 >
                     <template slot-scope="{ row }" slot="status">
                         <span :class="['vp-status', row.matchStatus === '未匹配' ? 'status-unmatched' : 'status-matched']">

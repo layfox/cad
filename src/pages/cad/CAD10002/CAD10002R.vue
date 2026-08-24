@@ -5,7 +5,7 @@
             <div class="tabs-container">
               <div class="tab-item" @click="onTabClick(item, index)" :class="tabIndex==index?'tab-item-active':''" v-for="(item, index) in tabs" :key="index">{{ item }}</div>
             </div>
-            <div class="select-container" @click="showEquipModal = true">
+            <div class="select-container" @click="showTz = true">
               <span class="select-text">{{ fileName }}</span>
               <img src="./css/images/arrow-down.png" alt="">
             </div>
@@ -16,27 +16,31 @@
                 <ViewerPanel
                     v-show="!panelCollapsed"
                     :categories="categories"
+                    title="安全检测"
                     style="height: calc(100% - 36px); margin-bottom: 16px;"
                 />
             </template>
             <template v-if="tabIndex === 1">
-                <ViewerPanel1
+                <ViewerPanel
                     v-show="!panelCollapsed"
+                    title="水文检测"
                     :categories="categories1"
                     style="height: calc(100% - 36px); margin-bottom: 16px;"
                 />
             </template>
             <template v-if="tabIndex === 2">
-                <ViewerPanel2
+                <ViewerPanel
                     v-show="!panelCollapsed"
+                    title="瓦斯抽采"
                     :categories="categories2"
                     style="height: calc(100% - 36px); margin-bottom: 16px;"
                 />
             </template>
             <template v-if="tabIndex === 3">
-                <ViewerPane3
+                <ViewerPanel
                     v-show="!panelCollapsed"
-                    :categories="categories"
+                    :categories="categories3"
+                    title="人员定位"
                     style="height: calc(100% - 36px); margin-bottom: 16px;"
                 />
             </template>
@@ -47,10 +51,17 @@
                   <img src="./css/images/collapse.png" alt="">
               </div>
           </div>
-          <div class="viewer-content">
+          <div ref="viewerContent" class="viewer-content">
                 <div ref="viewerContainer" class="viewer-box">
                     <canvas ref="mxcadCanvas" id="mxcad"></canvas>
                 </div>
+                <div v-if="loading" class="loading-overlay">
+                            <div class="loading-content">
+                                <div class="loading-spinner"></div>
+                                <div class="loading-text">文件加载解析中，请稍候...</div>
+                            </div>
+                        </div>
+                <div ref="markerLayer" class="marker-layer"></div>
             </div>
         </div>
       </div>
@@ -70,6 +81,24 @@
         />
       </Modal>
 
+      <!-- 告警闭环处理弹窗 -->
+      <Modal
+        v-model="showAlarmModal"
+        :width="640"
+        :footer-hide="true"
+        class-name="custom-modal alarm-handle-modal-wrapper"
+        :styles="{ top: '40px' }"
+      >
+        <AlarmHandleModal
+          :visible="showAlarmModal"
+          :alarm="currentAlarm"
+          @update:visible="showAlarmModal = $event"
+          @close="showAlarmModal = false"
+          @step-change="onAlarmStepChange"
+          @dispatch="onAlarmDispatch"
+        />
+      </Modal>
+
       <!-- 安全检测弹窗 -->
       <Modal
         v-model="showSafetyCheckModal"
@@ -80,6 +109,7 @@
       >
         <SafetyCheckModal
           :visible="showSafetyCheckModal"
+          :alarm="currentAlarm"
           @update:visible="showSafetyCheckModal = $event"
           @close="showSafetyCheckModal = false"
           @alarm-handle="onAlarmHandle"
@@ -100,41 +130,27 @@
           @close="showEquipModal = false"
         />
       </Modal>
+      <Modal
+        v-model="showTz"
+        :width="800"
+        :footer-hide="true"
+        class-name="custom-modal tz-modal"
+        :styles="{ top: '40px' }"
+      >
+        <TzModal
+          :visible="showTz"
+          @update:visible="showTz = $event"
+          @close="showTz = false"
+        />
+      </Modal>
     </div>
 </template>
 
 <script>
 import CAD10002R from './js/CAD10002R';
-import PersonInfoModal from './dialog/PersonInfoModal.vue';
-import SafetyCheckModal from './dialog/SafetyCheckModal.vue';
-import EquipInfoModal from './dialog/EquipInfoModal.vue';
 export default {
   name: 'CAD10002R',
-  mixins: [CAD10002R],
-  components: {
-    PersonInfoModal,
-    SafetyCheckModal,
-    EquipInfoModal
-  },
-  data() {
-    return {
-      showPersonModal: false,
-      showSafetyCheckModal: false,
-      showEquipModal: false
-    }
-  },
-  methods: {
-    onAlarmHandle() {
-      this.$Message.info('告警处理功能待接入')
-    },
-  },
-  data() {
-    return {
-      showPersonModal: false,
-      showSafetyCheckModal: false,
-      showEquipModal: false,
-    }
-  },
+  mixins: [CAD10002R]
 }
 </script>
 
@@ -151,5 +167,17 @@ export default {
     top: 4px;
     color: #8B99B9;
     font-weight: bold;
+  }
+
+  .tz-modal .ivu-modal-close {
+    top: 8px;
+  }
+
+  .alarm-handle-modal-wrapper .ivu-modal-body {
+    padding: 0;
+  }
+
+  #CAD10002R table {
+    width: 100%!important;
   }
 </style>
