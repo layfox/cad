@@ -79,7 +79,7 @@ html, body {
 }
 
 .ivu-table .ivu-table-tip td {
-  background: url('/image/no_data.jpg') no-repeat center center;
+  background: url('./pages/cad/CAD10001/css/images/no_data.jpg') no-repeat center center;
   background-size: 180px 180px;
   height: 400px;
   font-size: 0;

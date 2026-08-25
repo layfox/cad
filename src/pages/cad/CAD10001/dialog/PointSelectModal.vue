@@ -27,7 +27,6 @@
         :data="pageData"
         :columns="columns"
         :border="false"
-        size="small"
         highlight-row
         @on-select="onSelect"
         @on-select-cancel="onSelectCancel"
@@ -38,7 +37,7 @@
 
     <!-- 分页 -->
     <div class="psm-pagination">
-      <span class="psm-selected-count" v-if="selectedPoints.length > 0">
+      <span class="psm-selected-count">
         已选 {{ selectedPoints.length }} 条
       </span>
       <Page
@@ -222,6 +221,7 @@ export default {
         this.currentPage = 1
         this.selectedPoints = []
         this.searchKeyword = ''
+        this.$refs.pointTable.clearSelection()
         // this.fetchData()
       }
     }
@@ -350,9 +350,8 @@ export default {
 }
 
 .psm-selected-count {
-  font-size: 12px;
-  color: #1764e8;
-  background: #e6f0ff;
+  font-size: 14px;
+  color: #333;
   padding: 2px 8px;
   border-radius: 10px;
 }
@@ -437,7 +436,7 @@ export default {
 .psm-pagination {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   padding: 8px 16px;
   border-top: 1px solid #f0f0f0;
   flex-shrink: 0;

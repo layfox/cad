@@ -80,6 +80,21 @@ export default {
             points: [],
             orgNo: '',
             lastFileUrl: '',
+            annotationPoints: [],
+            lastHoverGroup: null,
+            tempLineObj: null,
+            tempArrowHead: null,
+            showManualMatchPop: false,
+            popoverPos: { x: 0, y: 0 }, //弹窗在画布内坐标
+            popData: {
+                realPoint: null,
+                drawPoint: null,
+                matchGap: 0
+            },
+            pointInfo: '',
+            showPointInfoModal: false,
+            detailPos: { x: 0, y: 0 },
+            bloomComposer: null,
         }
     },
     components: {
@@ -87,186 +102,186 @@ export default {
         ViewerPanel1
     },
     mounted() {
-        // this.pointList = [
-        //     {
-        //         "X_VALUE": 23369467.890141826,
-        //         "Y_VALUE": -30382998.077860042,
-        //         "z": 0,
-        //         "LAYER_ID": "288127",
-        //         "LAYER_NAM": "A通风系统图",
-        //         "POINT_NAM": "A$C379E0320",
-        //         "POINT_ID": "58a6"
-        //     },
-        //     {
-        //         "X_VALUE": 23369439.109730206,
-        //         "Y_VALUE": -30382957.704416513,
-        //         "z": 0,
-        //         "LAYER_ID": "288127",
-        //         "LAYER_NAM": "A通风系统图",
-        //         "POINT_NAM": "A$C379E0320",
-        //         "POINT_ID": "58a7"
-        //     },
-        //     {
-        //         "X_VALUE": 23114724.227396417,
-        //         "Y_VALUE": -28141241.35896348,
-        //         "z": 0,
-        //         "LAYER_ID": "288125",
-        //         "LAYER_NAM": "底图",
-        //         "POINT_NAM": "栅栏2",
-        //         "POINT_ID": "6472"
-        //     },
-        //     {
-        //         "X_VALUE": 23114953.04550457,
-        //         "Y_VALUE": -28137480.675759755,
-        //         "z": 0,
-        //         "LAYER_ID": "288125",
-        //         "LAYER_NAM": "底图",
-        //         "POINT_NAM": "栅栏2",
-        //         "POINT_ID": "6666"
-        //     },
-        //     {
-        //         "X_VALUE": 23369400.29165956,
-        //         "Y_VALUE": -30383083.760237556,
-        //         "z": 0,
-        //         "LAYER_ID": "288125",
-        //         "LAYER_NAM": "底图",
-        //         "POINT_NAM": "A$C095F2CEC",
-        //         "POINT_ID": "7b38"
-        //     },
-        //     {
-        //         "X_VALUE": 23372829.43129492,
-        //         "Y_VALUE": -30382923.520400725,
-        //         "z": 0,
-        //         "LAYER_ID": "288125",
-        //         "LAYER_NAM": "底图",
-        //         "POINT_NAM": "A$C095F2CEC",
-        //         "POINT_ID": "7b45"
-        //     },
-        //     {
-        //         "X_VALUE": 23372754.41310084,
-        //         "Y_VALUE": -30382938.718711346,
-        //         "z": 0,
-        //         "LAYER_ID": "288125",
-        //         "LAYER_NAM": "底图",
-        //         "POINT_NAM": "A$C095F2CEC",
-        //         "POINT_ID": "7b48"
-        //     },
-        //     {
-        //         "X_VALUE": 23370027.331389386,
-        //         "Y_VALUE": -30382984.480325278,
-        //         "z": 0,
-        //         "LAYER_ID": "288125",
-        //         "LAYER_NAM": "底图",
-        //         "POINT_NAM": "A$C095F2CEC",
-        //         "POINT_ID": "7b4a"
-        //     },
-        //     {
-        //         "X_VALUE": 23366674.88328121,
-        //         "Y_VALUE": -30383334.350133996,
-        //         "z": 0,
-        //         "LAYER_ID": "288125",
-        //         "LAYER_NAM": "底图",
-        //         "POINT_NAM": "A$C38615BD1",
-        //         "POINT_ID": "7b61"
-        //     },
-        //     {
-        //         "X_VALUE": 23366674.583281208,
-        //         "Y_VALUE": -30384035.850133996,
-        //         "z": 0,
-        //         "LAYER_ID": "288125",
-        //         "LAYER_NAM": "底图",
-        //         "POINT_NAM": "A$C38615BD1",
-        //         "POINT_ID": "7b62"
-        //     }
-        // ].map(item => {
-        //     item.pointName = item.POINT_NAM
-        //     item.pointNo = item.POINT_ID
-        //     item.x = item.X_VALUE
-        //     item.y = item.Y_VALUE
-        //     return item
-        // })
-        // this.points = [
-        //     {
-        //         "I2P_NO": "133777110241938767871",
-        //         "TZPZ_NO": "133775589162091020281",
-        //         "POINT_X_VALUE": "",
-        //         "MATCH_STA": "匹配",
-        //         "POINT_ID": "",
-        //         "POINT_NAM": "",
-        //         "PT_Y_VALUE": "-30388651.27496908",
-        //         "PT_NAM": "氧气1",
-        //         "PT_NO": "128681301464609980416",
-        //         "MATCH_TYP": "",
-        //         "DALTA_XY": "",
-        //         "PT_ID": "61080201921101MN001200001816",
-        //         "PT_X_VALUE": "23372898.909408778",
-        //         "POINT_Y_VALUE": "",
-        //         "POINT_NO": ""
-        //     },
-        //     {
-        //         "I2P_NO": "133777110241938767872",
-        //         "TZPZ_NO": "133775589162091020288",
-        //         "POINT_X_VALUE": "",
-        //         "MATCH_STA": "未匹配",
-        //         "POINT_ID": "",
-        //         "POINT_NAM": "",
-        //         "PT_Y_VALUE": "-30382999.282143094",
-        //         "PT_NAM": "氧气",
-        //         "PT_NO": "128681301464609980416",
-        //         "MATCH_TYP": "",
-        //         "DALTA_XY": "",
-        //         "PT_ID": "61080201921101MN001200001818",
-        //         "PT_X_VALUE": "23369467.220270775",
-        //         "POINT_Y_VALUE": "",
-        //         "POINT_NO": ""
-        //     },
-        //     {
-        //         "I2P_NO": "133777112498138775552",
-        //         "TZPZ_NO": "133775589162091020288",
-        //         "POINT_X_VALUE": "",
-        //         "MATCH_STA": "未匹配",
-        //         "POINT_ID": "",
-        //         "POINT_NAM": "",
-        //         "PT_Y_VALUE": "39394974.134983465",
-        //         "PT_NAM": "环境温度",
-        //         "PT_NO": "128681301465683722240",
-        //         "MATCH_TYP": "",
-        //         "DALTA_XY": "",
-        //         "PT_ID": "61080201921101MN000300000200",
-        //         "PT_X_VALUE": "-63240812.58022698",
-        //         "POINT_Y_VALUE": "",
-        //         "POINT_NO": ""
-        //     },
-        //     {
-        //         "I2P_NO": "133777112498138775552",
-        //         "TZPZ_NO": "133775589162091020288",
-        //         "POINT_X_VALUE": "",
-        //         "MATCH_STA": "未匹配",
-        //         "POINT_ID": "",
-        //         "POINT_NAM": "",
-        //         "PT_Y_VALUE": "",
-        //         "PT_NAM": "环境温度",
-        //         "PT_NO": "128681301465683722240",
-        //         "MATCH_TYP": "",
-        //         "DALTA_XY": "",
-        //         "PT_ID": "61080201921101MN000300000200",
-        //         "PT_X_VALUE": "",
-        //         "POINT_Y_VALUE": "",
-        //         "POINT_NO": ""
-        //     }
-        // ]
-        // this.entity = {
-        //     "TZPZ_ID": "",
-        //     "TZXX_NO": "11",
-        //     "TZPZ_USR": "111",
-        //     "TZPZ_DAT": "2026-11-12",
-        //     "TZPZ_STA": "04",
-        //     "resourceUrl": "",
-        //     "TZXX_ID": "",
-        //     "TZLX_NAM": "",
-        //     "TZ_VERSION": "",
-        //     TZPZ_NO: "",
-        // }
+        this.pointList = [
+            {
+                "X_VALUE": 23369467.890141826,
+                "Y_VALUE": -30382998.077860042,
+                "z": 0,
+                "LAYER_ID": "288127",
+                "LAYER_NAM": "A通风系统图",
+                "POINT_NAM": "A$C379E0320",
+                "POINT_ID": "58a6"
+            },
+            {
+                "X_VALUE": 23369439.109730206,
+                "Y_VALUE": -30382957.704416513,
+                "z": 0,
+                "LAYER_ID": "288127",
+                "LAYER_NAM": "A通风系统图",
+                "POINT_NAM": "A$C379E0320",
+                "POINT_ID": "58a7"
+            },
+            {
+                "X_VALUE": 23114724.227396417,
+                "Y_VALUE": -28141241.35896348,
+                "z": 0,
+                "LAYER_ID": "288125",
+                "LAYER_NAM": "底图",
+                "POINT_NAM": "栅栏2",
+                "POINT_ID": "6472"
+            },
+            {
+                "X_VALUE": 23114953.04550457,
+                "Y_VALUE": -28137480.675759755,
+                "z": 0,
+                "LAYER_ID": "288125",
+                "LAYER_NAM": "底图",
+                "POINT_NAM": "栅栏2",
+                "POINT_ID": "6666"
+            },
+            {
+                "X_VALUE": 23369400.29165956,
+                "Y_VALUE": -30383083.760237556,
+                "z": 0,
+                "LAYER_ID": "288125",
+                "LAYER_NAM": "底图",
+                "POINT_NAM": "A$C095F2CEC",
+                "POINT_ID": "7b38"
+            },
+            {
+                "X_VALUE": 23372829.43129492,
+                "Y_VALUE": -30382923.520400725,
+                "z": 0,
+                "LAYER_ID": "288125",
+                "LAYER_NAM": "底图",
+                "POINT_NAM": "A$C095F2CEC",
+                "POINT_ID": "7b45"
+            },
+            {
+                "X_VALUE": 23372754.41310084,
+                "Y_VALUE": -30382938.718711346,
+                "z": 0,
+                "LAYER_ID": "288125",
+                "LAYER_NAM": "底图",
+                "POINT_NAM": "A$C095F2CEC",
+                "POINT_ID": "7b48"
+            },
+            {
+                "X_VALUE": 23370027.331389386,
+                "Y_VALUE": -30382984.480325278,
+                "z": 0,
+                "LAYER_ID": "288125",
+                "LAYER_NAM": "底图",
+                "POINT_NAM": "A$C095F2CEC",
+                "POINT_ID": "7b4a"
+            },
+            {
+                "X_VALUE": 23366674.88328121,
+                "Y_VALUE": -30383334.350133996,
+                "z": 0,
+                "LAYER_ID": "288125",
+                "LAYER_NAM": "底图",
+                "POINT_NAM": "A$C38615BD1",
+                "POINT_ID": "7b61"
+            },
+            {
+                "X_VALUE": 23366674.583281208,
+                "Y_VALUE": -30384035.850133996,
+                "z": 0,
+                "LAYER_ID": "288125",
+                "LAYER_NAM": "底图",
+                "POINT_NAM": "A$C38615BD1",
+                "POINT_ID": "7b62"
+            }
+        ].map(item => {
+            item.pointName = item.POINT_NAM
+            item.pointNo = item.POINT_ID
+            item.x = item.X_VALUE
+            item.y = item.Y_VALUE
+            return item
+        })
+        this.points = [
+            {
+                "I2P_NO": "133777110241938767871",
+                "TZPZ_NO": "133775589162091020281",
+                "POINT_X_VALUE": "",
+                "MATCH_STA": "匹配",
+                "POINT_ID": "",
+                "POINT_NAM": "",
+                "PT_Y_VALUE": "-30388651.27496908",
+                "PT_NAM": "氧气1",
+                "PT_NO": "128681301464609980416",
+                "MATCH_TYP": "",
+                "DALTA_XY": "",
+                "PT_ID": "61080201921101MN001200001816",
+                "PT_X_VALUE": "23372898.909408778",
+                "POINT_Y_VALUE": "",
+                "POINT_NO": ""
+            },
+            {
+                "I2P_NO": "133777110241938767872",
+                "TZPZ_NO": "133775589162091020288",
+                "POINT_X_VALUE": "",
+                "MATCH_STA": "未匹配",
+                "POINT_ID": "",
+                "POINT_NAM": "",
+                "PT_Y_VALUE": "-30382999.282143094",
+                "PT_NAM": "氧气",
+                "PT_NO": "128681301464609980416",
+                "MATCH_TYP": "",
+                "DALTA_XY": "",
+                "PT_ID": "61080201921101MN001200001818",
+                "PT_X_VALUE": "23369467.220270775",
+                "POINT_Y_VALUE": "",
+                "POINT_NO": ""
+            },
+            {
+                "I2P_NO": "133777112498138775552",
+                "TZPZ_NO": "133775589162091020288",
+                "POINT_X_VALUE": "",
+                "MATCH_STA": "未匹配",
+                "POINT_ID": "",
+                "POINT_NAM": "",
+                "PT_Y_VALUE": "39394974.134983465",
+                "PT_NAM": "环境温度",
+                "PT_NO": "128681301465683722240",
+                "MATCH_TYP": "",
+                "DALTA_XY": "",
+                "PT_ID": "61080201921101MN000300000200",
+                "PT_X_VALUE": "-63240812.58022698",
+                "POINT_Y_VALUE": "",
+                "POINT_NO": ""
+            },
+            {
+                "I2P_NO": "133777112498138775552",
+                "TZPZ_NO": "133775589162091020288",
+                "POINT_X_VALUE": "",
+                "MATCH_STA": "未匹配",
+                "POINT_ID": "",
+                "POINT_NAM": "",
+                "PT_Y_VALUE": "",
+                "PT_NAM": "环境温度",
+                "PT_NO": "128681301465683722240",
+                "MATCH_TYP": "",
+                "DALTA_XY": "",
+                "PT_ID": "61080201921101MN000300000200",
+                "PT_X_VALUE": "",
+                "POINT_Y_VALUE": "",
+                "POINT_NO": ""
+            }
+        ]
+        this.entity = {
+            "TZPZ_ID": "",
+            "TZXX_NO": "11",
+            "TZPZ_USR": "111",
+            "TZPZ_DAT": "2026-11-12",
+            "TZPZ_STA": "04",
+            "resourceUrl": "",
+            "TZXX_ID": "",
+            "TZLX_NAM": "",
+            "TZ_VERSION": "",
+            TZPZ_NO: "",
+        }
         const params = new URLSearchParams(location.search)
         if (params.get('TZPZ_NO')) {
             this.entity.TZPZ_NO = params.get('TZPZ_NO')
@@ -295,14 +310,605 @@ export default {
         // }
     },
     beforeDestroy() {
-        this._unbindMarkerClickEvent();
-        this._clearHighlights();
+        this.destroyAnnotationEvent();
+        this.destroyAnnotationBloom();
         this.matchMode = null;
         this.selectedSurveyPoint = null;
         this.manualPlaceVisible = false;
         this.manualPlaceHasCoordFill = false;
     },
     methods: {
+        initAnnotationBloom() {
+            if (!this.annotationBloomEnabled) return;
+            const mxObj = MxFun.getCurrentDraw();
+            const scene = mxObj.getScene();
+            const camera = mxObj.getCamera();
+            const renderer = mxObj.getRenderer();
+            if (!scene || !camera || !renderer) return;
+            if (this.bloomComposer) return;
+            this.bloomComposer = new EffectComposer(renderer);
+            const renderPass = new RenderPass(scene, camera);
+            this.bloomComposer.addPass(renderPass);
+            this.bloomPass = new UnrealBloomPass(
+                new THREE.Vector2(window.innerWidth, window.innerHeight),
+                this.bloomStrength,
+                this.bloomRadius,
+                this.bloomThreshold
+            );
+            this.bloomComposer.addPass(this.bloomPass);
+            this.bloomRenderCb = () => {
+                this.bloomComposer.render();
+            };
+            mxObj.on("postRender", this.bloomRenderCb);
+            this.handleBloomResize = () => {
+                if (this.bloomPass) this.bloomPass.setSize(window.innerWidth, window.innerHeight);
+            };
+            window.addEventListener("resize", this.handleBloomResize);
+            mxObj.updateDisplay(true);
+        },
+        destroyAnnotationBloom() {
+            const mxObj = MxFun.getCurrentDraw();
+            if (this.bloomRenderCb && mxObj) {
+                mxObj.off("postRender", this.bloomRenderCb);
+            }
+            if (this.handleBloomResize) {
+                window.removeEventListener("resize", this.handleBloomResize);
+            }
+            if (this.bloomComposer) {
+                this.bloomComposer.passes.forEach(pass => {
+                    if (pass.dispose) pass.dispose();
+                });
+                this.bloomComposer = null;
+            }
+            this.bloomPass = null;
+        },
+        initAnnotationClick() {
+            const canvas = document.getElementById("mxcad");
+            if (!canvas) {
+                console.warn("[标注点] 未找到 canvas 元素，1秒后重试");
+                setTimeout(() => this.initAnnotationClick(), 1000);
+                return;
+            }
+            canvas.addEventListener("mousedown", this.handleAnnotationClick, true);
+            canvas.addEventListener("mousemove", this.handleAnnotationHover);
+        },
+        destroyAnnotationEvent() {
+            const canvas = document.getElementById("mxcad");
+            if (canvas) {
+                canvas.removeEventListener("mousedown", this.handleAnnotationClick, true);
+                canvas.removeEventListener("mousemove", this.handleAnnotationHover);
+            }
+            this.tooltip.show = false;
+        },
+        handleAnnotationHover(e) {
+            try {
+                if (this.isAddingAnnotation) return;
+                const canvas = document.getElementById("mxcad");
+                if (!canvas) return;
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                const mxObj = MxFun.getCurrentDraw();
+                if (!mxObj) return;
+                const scene = mxObj.getScene?.();
+                const camera = mxObj.getCamera?.();
+                if (!scene || !camera) return;
+
+                const ndcX = (mouseX / rect.width) * 2 - 1;
+                const ndcY = -(mouseY / rect.height) * 2 + 1;
+                const raycaster = new THREE.Raycaster();
+                raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
+                const intersects = raycaster.intersectObjects(scene.children, true);
+
+                let hoverTargetGroup = null;
+                for (const intersect of intersects) {
+                    let curObj = intersect.object;
+                    while (curObj) {
+                        if (curObj.userData && curObj.userData.isAnnotationPoint) {
+                            hoverTargetGroup = curObj;
+                            break;
+                        }
+                        curObj = curObj.parent;
+                    }
+                    if (hoverTargetGroup) break;
+                }
+
+                // 恢复上一个hover节点大小和发光
+                if (this.lastHoverGroup) {
+                    if (this.lastHoverGroup.userData.originScale) {
+                        this.lastHoverGroup.scale.copy(this.lastHoverGroup.userData.originScale);
+                    }
+                    this.lastHoverGroup.traverse((obj) => {
+                        if (obj.material && obj.material.emissiveIntensity !== undefined) {
+                            obj.material.emissiveIntensity = 0.2;
+                        }
+                    });
+                    this.lastHoverGroup = null;
+                }
+
+                if (hoverTargetGroup) {
+                    if (!hoverTargetGroup.userData.originScale) {
+                        hoverTargetGroup.userData.originScale = hoverTargetGroup.scale.clone();
+                    }
+                    // 放大1.4倍
+                    hoverTargetGroup.scale.copy(hoverTargetGroup.userData.originScale).multiplyScalar(1.4);
+                    this.lastHoverGroup = hoverTargetGroup;
+                    // 悬浮增强自发光，模拟辉光
+                    hoverTargetGroup.traverse((obj) => {
+                        if (obj.material && obj.material.emissiveIntensity !== undefined) {
+                            obj.material.emissiveIntensity = 0.9;
+                        }
+                    });
+                } else {
+
+                }
+                canvas.style.cursor = hoverTargetGroup ? "pointer" : "";
+                mxObj.updateDisplay(true);
+            } catch (err) {
+                console.error('hover异常', err);
+            }
+        },
+
+        async handleAnnotationClick(e) {
+            try {
+                if (this.isAddingAnnotation) return;
+                if (this.annotationPoints.length === 0) return;
+                const canvas = document.getElementById("mxcad");
+                if (!canvas) return;
+                const rect = canvas.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const clickY = e.clientY - rect.top;
+
+                const mxObj = MxFun.getCurrentDraw();
+                if (!mxObj) return;
+                const scene = mxObj.getScene?.();
+                const camera = mxObj.getCamera?.();
+                if (!scene || !camera) return;
+
+                const ndcX = (clickX / rect.width) * 2 - 1;
+                const ndcY = -(clickY / rect.height) * 2 + 1;
+                const raycaster = new THREE.Raycaster();
+                raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
+                const intersects = raycaster.intersectObjects(scene.children, true);
+                if (this.matchMode === 'manual-match') {
+                    if (!this.selectedSurveyPoint) return;
+
+                    for (const inter of intersects) {
+                        let curObj = inter.object;
+                        while (curObj) {
+                            if (curObj.userData && curObj.userData.isAnnotationPoint) {
+                                const ud = curObj.userData;
+                                const id = curObj.userData.annotationId;
+                                const targetDrawPoint = this.annotationPoints.find(b => b.id === id);
+                                if (!targetDrawPoint) {
+                                    curObj = curObj.parent;
+                                    continue;
+                                };
+                                if (!targetDrawPoint.id || targetDrawPoint.type === '2' || targetDrawPoint.MATCH_STA === '匹配') {
+                                    curObj = curObj.parent;
+                                    continue;
+                                }
+                                // 绘制临时连线
+                                const realScreen = MxFun.docCoord2Screen(
+                                    this.selectedSurveyPoint.PT_X_VALUE,
+                                    this.selectedSurveyPoint.PT_Y_VALUE
+                                );
+                                const drawScreen = MxFun.docCoord2Screen(targetDrawPoint.x, targetDrawPoint.y);
+                                const startVec = { x: this.selectedSurveyPoint.PT_X_VALUE, y: this.selectedSurveyPoint.PT_Y_VALUE };
+                                const endVec = { x: targetDrawPoint.x, y: targetDrawPoint.y };
+                                console.log(startVec, endVec, 1111)
+                                this.createTempLine(startVec, endVec);
+
+                                // // 抛出事件，上层Vue弹出【人工匹配弹窗】
+                                // const gap = this.calcDocDistance({
+                                //     x: this.selectedSurveyPoint.pointX,
+                                //     y: this.selectedSurveyPoint.pointY
+                                // }, { x: targetDrawPoint.x, y: targetDrawPoint.y });
+                                const emitData = {
+                                    realPoint: this.selectedSurveyPoint,
+                                    drawPoint: targetDrawPoint,
+                                    // matchGap: Number(gap.toFixed(2))
+                                };
+                                this.popoverPos = {
+                                    x: clickX,
+                                    y: clickY + 26
+                                };
+                                this.popData = {
+                                    realPoint: this.selectedSurveyPoint,
+                                    drawPoint: targetDrawPoint,
+                                    // matchGap: Number(gap.toFixed(2))
+                                };
+                                this.showManualMatchPop = true;
+                                return
+                            }
+                            curObj = curObj.parent;
+                        }
+                    }
+                    return;
+                }
+                for (const intersect of intersects) {
+                    let curObj = intersect.object;
+                    // =========关键：向上遍历父节点，找到标记根group=========
+                    while (curObj) {
+                        if (curObj.userData && curObj.userData.isAnnotationPoint) {
+                            const id = curObj.userData.annotationId;
+                            const bindItem = this.annotationPoints.find(b => b.id === id);
+                            if (bindItem) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                this.detailPos = {
+                                    x: clickX + 24,
+                                    y: clickY - 16
+                                };
+                                this.pointInfo = bindItem.type === '1' ? `图纸点位：${bindItem.name}` : `实时测点：${bindItem.name}`;
+                                this.showPointInfoModal = true;
+                                setTimeout(() => {
+                                    this.showPointInfoModal = false;
+                                }, 3000)
+                                return;
+                            }
+                        }
+                        curObj = curObj.parent;
+                    }
+                }
+            } catch (err) {
+                console.error("点击marker异常", err);
+            }
+        },
+        screenToThreeWorld(screenX, screenY) {
+            const mxDraw = MxFun.getCurrentDraw();
+            const camera = mxDraw.getCamera();
+            const renderer = mxDraw.getRenderer();
+            const size = new THREE.Vector2();
+            renderer.getSize(size);
+
+            const x = (screenX / size.x) * 2 - 1;
+            const y = -(screenY / size.y) * 2 + 1;
+
+            const vec = new THREE.Vector3(x, y, 0.5);
+            vec.unproject(camera);
+            return vec;
+        },
+        //关闭弹窗，销毁箭头连线
+        closeManualPop() {
+            this.showManualMatchPop = false;
+            this.destroyTempLine();
+            this.popData = { realPoint: null, drawPoint: null, matchGap: 0 };
+        },
+
+        //点击匹配按钮
+        async handlePopConfirm() {
+            const { realPoint, drawPoint } = this.popData;
+            await this.manualMatchCallback(realPoint, {
+                id: drawPoint.id,
+                title: drawPoint.name
+            });
+            this.closeManualPop();
+        },
+        createTempLine(startVec, endVec) {
+            this.destroyTempLine();
+            const mxObj = MxFun.getCurrentDraw();
+            const scene = mxObj.getScene();
+            const camera = mxObj.getCamera();
+            const renderer = mxObj.getRenderer();
+
+            const start = new THREE.Vector3(startVec.x, startVec.y, startVec.z);
+            const end = new THREE.Vector3(endVec.x, endVec.y, endVec.z);
+
+            const dir = new THREE.Vector3().subVectors(end, start);
+            const dist = dir.length();
+            if (dist < 0.05) {
+                console.warn("两点距离过小，跳过绘制连线");
+                return;
+            }
+            dir.normalize();
+
+            // =====大坐标偏移核心：以start为基准，顶点使用相对坐标=====
+            const basePos = start.clone();
+            const p1Rel = new THREE.Vector3(0, 0, 0);
+            const p2Rel = end.clone().sub(basePos);
+
+            // 主线(原生Line，仅1px)
+            const points = [p1Rel, p2Rel];
+            const geoLine = new THREE.BufferGeometry().setFromPoints(points);
+            const matLine = new THREE.LineBasicMaterial({
+                color: 0xff7700,
+                depthTest: false,
+                depthWrite: false
+            });
+            const line = new THREE.Line(geoLine, matLine);
+
+            // 箭头圆锥
+            const arrowSize = 2.2;
+            const coneGeo = new THREE.ConeGeometry(arrowSize * 0.4, arrowSize, 4);
+            const coneMat = new THREE.MeshBasicMaterial({
+                color: 0xff7700,
+                depthTest: false,
+                depthWrite: false
+            });
+            const cone = new THREE.Mesh(coneGeo, coneMat);
+
+            // 朝向：Cone默认尖向+Y；旋转到dir方向
+            const quat = new THREE.Quaternion().setFromUnitVectors(
+                new THREE.Vector3(0, 1, 0),
+                dir
+            );
+            cone.quaternion.copy(quat);
+            // ✅关键：向线段反方向偏移半个圆锥高度，锥尖正好落在end点
+            cone.position.copy(p2Rel).addScaledVector(dir, -arrowSize / 2);
+
+            // group整体放置到CAD真实世界位置
+            this.tempLineGroup = new THREE.Group();
+            this.tempLineGroup.position.copy(basePos);
+            this.tempLineGroup.add(line);
+            this.tempLineGroup.add(cone);
+            scene.add(this.tempLineGroup);
+
+            // =====叠加渲染，解决被CAD画布遮挡=====
+            renderer.autoClear = false;
+            this.postRenderCb = () => {
+                renderer.render(scene, camera);
+            };
+            mxObj.on("postRender", this.postRenderCb);
+
+            mxObj.updateDisplay(true);
+        },
+        destroyTempLine() {
+            const mxObj = MxFun.getCurrentDraw();
+            const scene = mxObj?.getScene?.();
+            const renderer = mxObj?.getRenderer?.();
+
+            // 解绑渲染回调
+            if (this.postRenderCb) {
+                mxObj.off("postRender", this.postRenderCb);
+                this.postRenderCb = null;
+            }
+
+            // 销毁group下所有几何体材质
+            if (this.tempLineGroup && scene) {
+                this.tempLineGroup.traverse((obj) => {
+                    if (obj.geometry) obj.geometry.dispose();
+                    if (obj.material) obj.material.dispose();
+                });
+                scene.remove(this.tempLineGroup);
+                this.tempLineGroup = null;
+            }
+
+            // 恢复渲染器默认状态，不干扰mxdraw自身绘制
+            if (renderer) {
+                renderer.autoClear = true;
+            }
+
+            mxObj?.updateDisplay(true);
+        },
+        // createTempLine(startVec, endVec) {
+        //     this.destroyTempLine();
+        //     const mxObj = MxFun.getCurrentDraw();
+        //     const scene = mxObj.getScene();
+
+        //     // 保险：强制转成真正Vector3
+        //     const start = new THREE.Vector3(startVec.x, startVec.y, startVec.z);
+        //     const end = new THREE.Vector3(endVec.x, endVec.y, endVec.z);
+
+        //     const dir = new THREE.Vector3().subVectors(end, start);
+        //     const dist = dir.length();
+        //     if (dist < 0.05) {
+        //         console.warn("两点距离过小，跳过绘制连线");
+        //         return;
+        //     }
+        //     dir.normalize();
+
+        //     // ---------- 1.绘制主线 橙色粗线 ----------
+        //     const points = [start, end];
+        //     const geoLine = new THREE.BufferGeometry().setFromPoints(points);
+        //     const matLine = new THREE.LineBasicMaterial({
+        //         color: 0xff7700,
+        //         depthTest: false,
+        //         depthWrite: false
+        //     });
+        //     this.tempLineObj = new THREE.Line(geoLine, matLine);
+        //     scene.add(this.tempLineObj);
+
+        //     // ----------2.手动绘制箭头头部小三角----------
+        //     const arrowSize = 2.2;
+        //     const quat = new THREE.Quaternion().setFromUnitVectors(
+        //         new THREE.Vector3(0, 1, 0),
+        //         dir
+        //     );
+        //     const coneGeo = new THREE.ConeGeometry(arrowSize * 0.4, arrowSize, 4);
+        //     const coneMat = new THREE.MeshBasicMaterial({
+        //         color: 0xff7700,
+        //         depthTest: false,
+        //         depthWrite: false
+        //     });
+        //     this.tempArrowHead = new THREE.Mesh(coneGeo, coneMat);
+        //     this.tempArrowHead.position.copy(end);
+        //     this.tempArrowHead.quaternion.copy(quat);
+        //     scene.add(this.tempArrowHead);
+        //     mxObj.updateDisplay(true);
+        // },
+
+        // destroyTempLine() {
+        //     const mxObj = MxFun.getCurrentDraw();
+        //     const scene = mxObj?.getScene?.();
+        //     if (this.tempLineObj) {
+        //         scene.remove(this.tempLineObj);
+        //         this.tempLineObj.geometry?.dispose();
+        //         this.tempLineObj.material?.dispose();
+        //         this.tempLineObj = null;
+        //     }
+        //     if (this.tempArrowHead) {
+        //         scene.remove(this.tempArrowHead);
+        //         this.tempArrowHead.geometry?.dispose();
+        //         this.tempArrowHead.material?.dispose();
+        //         this.tempArrowHead = null;
+        //     }
+        //     mxObj?.updateDisplay(true);
+        // },
+
+        /**
+         * 刷新点位显示：已匹配isMatched=true则隐藏
+         */
+        refreshDrawMarkerDisplay() {
+            this.annotationPoints.forEach(item => {
+                item.mesh.visible = !item.isMatched;
+            });
+            const mxObj = MxFun.getCurrentDraw();
+            mxObj && mxObj.updateDisplay && mxObj.updateDisplay(true);
+        },
+        docCoordToWorld(docX, docY, docZ = 0) {
+            const mxObj = MxFun.getCurrentDraw();
+            if (!mxObj || !mxObj.docCoord2World) {
+                return { x: docX, y: docY, z: docZ };
+            }
+            const wp = mxObj.docCoord2World(docX, docY, docZ);
+            return wp ? { x: wp.x, y: wp.y, z: wp.z } : { x: docX, y: docY, z: docZ };
+        },
+        showBindPointInfo(bindItem) {
+            this.currentEditPoint = bindItem;
+            this.showPointInfoModal = true;
+        },
+        createBindMarker(bindItem) {
+            const mxObj = MxFun.getCurrentDraw();
+            if (!mxObj) return null;
+            const docX = bindItem.x;
+            const docY = bindItem.y;
+            const docZ = bindItem.z || 0;
+            const baseSize = 10;
+            const group = new THREE.Object3D();
+            group.position.set(docX, docY, docZ);
+            group.userData = {
+                isAnnotationPoint: true,
+                annotationId: bindItem.id,
+                originScale: new THREE.Vector3(baseSize, baseSize, 1),
+                type: bindItem.type,
+                bindItem: bindItem
+            };
+
+            if (bindItem.type === '2') {
+                // 绿色方块 + 白色边框
+                const geoSquare = new THREE.PlaneGeometry(1, 1);
+                const matSquare = new THREE.MeshStandardMaterial({
+                    color: 0x26C557,
+                    emissive: 0x26C557,
+                    emissiveIntensity: 0.2,
+                    transparent: true,
+                    depthTest: false,
+                    depthWrite: false,
+                    side: THREE.DoubleSide
+                });
+                const squareMesh = new THREE.Mesh(geoSquare, matSquare);
+                squareMesh.renderOrder = 9999;
+
+                const geoBorder = new THREE.PlaneGeometry(1.2, 1.2);
+                const matBorder = new THREE.MeshStandardMaterial({
+                    color: 0xffffff,
+                    emissive: 0xffffff,
+                    emissiveIntensity: 0.1,
+                    transparent: true,
+                    depthTest: false,
+                    depthWrite: false,
+                    side: THREE.DoubleSide
+                });
+                const borderMesh = new THREE.Mesh(geoBorder, matBorder);
+                borderMesh.renderOrder = 9998;
+                group.add(borderMesh);
+                group.add(squareMesh);
+            } else {
+                // 红色圆点
+                const geoCircle = new THREE.CircleGeometry(0.5, 32);
+                const matCircle = new THREE.MeshStandardMaterial({
+                    color: 0xec3000,
+                    emissive: 0xec3000,
+                    emissiveIntensity: 0.2,
+                    transparent: true,
+                    depthTest: false,
+                    depthWrite: false,
+                    side: THREE.DoubleSide
+                });
+                const circleMesh = new THREE.Mesh(geoCircle, matCircle);
+                circleMesh.renderOrder = 9999;
+                group.add(circleMesh);
+            }
+            group.scale.set(baseSize, baseSize, 1);
+            mxObj.addObject(group);
+            mxObj.updateDisplay(true);
+            return group;
+        },
+        createBindMarker1(bindItem) {
+            const mxObj = MxFun.getCurrentDraw();
+            if (!mxObj) return null;
+
+            const docX = bindItem.x;
+            const docY = bindItem.y;
+            const docZ = bindItem.z || 0;
+
+            const iconSize = 10;
+            const group = new THREE.Object3D();
+            group.position.set(docX, docY, docZ);
+
+            let imgUrl;
+            if (bindItem.type === '2') {
+                imgUrl = '/image/icon10.png';
+            } else {
+                imgUrl = '/image/icon9.png';
+            }
+            if (!imgUrl) return null;
+
+            const geometry = new THREE.PlaneGeometry(1, 1);
+            const material = new THREE.MeshBasicMaterial({
+                transparent: true,
+                depthTest: false,
+                depthWrite: false,
+                side: THREE.DoubleSide,
+                map: null
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.scale.set(1, 1, 1);
+            group.scale.set(iconSize, iconSize, 1);
+            mesh.renderOrder = 9999;
+            group.add(mesh);
+
+            group.userData.isAnnotationPoint = true;
+            group.userData.annotationId = bindItem.id;
+            group.userData.originScale = group.scale.clone();
+
+            mxObj.addObject(group);
+            mxObj.updateDisplay(true);
+
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                console.log("✅Image onload成功", imgUrl);
+                const texture = new THREE.Texture(img);
+                texture.flipY = false;
+
+                // ========= 核心修复贴图模糊参数 =========
+                texture.generateMipmaps = false;   // 关闭mipmap，小图标必关
+                texture.minFilter = THREE.LinearFilter;
+                texture.magFilter = THREE.LinearFilter;
+                // ========================================
+
+                texture.needsUpdate = true;
+
+                material.map = texture;
+                material.needsUpdate = true;
+
+                mxObj.updateDisplay(true);
+            };
+            img.onerror = (e) => {
+                console.error("❌图片加载失败", imgUrl, e);
+            };
+            img.src = imgUrl;
+
+            return group;
+        },
+        renderMarkersByList(data) {
+            data.forEach(bind => {
+                const mesh = this.createBindMarker(bind);
+                this.annotationPoints.push({ ...bind, mesh: mesh });
+            });
+        },
         onSelectTz(data) {
             this.entity.TZXX_NO = data.TZXX_NO
             this.entity.TZXX_ID = data.TZXX_ID
@@ -387,6 +993,7 @@ export default {
          * 把全部测点世界坐标转屏幕像素，渲染DOM图标
          */
         renderDomMarkers() {
+            return
             const draw = MxFun.getCurrentDraw();
             if (!draw) return;
             const markerLayer = this.$refs.markerLayer;
@@ -510,6 +1117,7 @@ export default {
         },
         upsertTzpp(data) {
             this.postData('/api/scaqyzt/upsertTzpp', data).then(data => {
+                this.TZPZ_NO = data.data
                 this.getTzpzInfo()
             })
         },
@@ -596,7 +1204,7 @@ export default {
             })
         },
         save() {
-            if (this.currentStep === 0 && this.entity.TZPZ_STA==='01') {
+            if (this.currentStep === 0 && this.entity.TZPZ_STA === '01') {
                 this.$refs.sForm.validate((valid) => {
                     if (!valid) {
                         this.$Message.error('请填写信息后再保存')
@@ -628,44 +1236,45 @@ export default {
                 this.currentStep = index
                 return
             }
-            if (index > 2) {
+            if (index == 3) {
                 if (this.entity.TZPZ_STA !== '04') {
                     this.$Message.error('请完成点位绑定并执行发布后再进行下一步操作')
                     return
                 }
                 this.currentStep = index
-            } else if (index > 1) {
+            } else if (index == 2) {
                 if (this.entity.TZPZ_STA === '01' || !this.entity.TZPZ_STA) {
                     this.$Message.error('请解析图纸完后再进行下一步操作')
                     return
                 }
                 this.currentStep = index
-            } else if (index > 0) {
+            } else if (index == 1) {
                 this.$refs.sForm.validate((valid) => {
                     if (!valid) {
                         this.$Message.error('请填写信息保存后再进行下一步操作')
                         return
                     }
-                    if (index === 0) {
+                    if (this.entity.TZPZ_STA === '01' || !this.entity.TZPZ_STA) {
                         this.save()
                     }
                     this.currentStep = index
-                    if (index > 0) {
-                        if (!this.mxcad) {
-                            this.initViewer()
-                            this.$nextTick(() => {
-                                this.initCtrlPan();
-                            });
-                        }
-                    }
-
                 })
             } else {
                 this.currentStep = index
             }
+            if (index > 0) {
+                if (!this.mxcad) {
+                    this.initViewer()
+                    this.$nextTick(() => {
+                        this.initCtrlPan();
+                    });
+                }
+            }
             if (index === 1 && this.fileUrlInput !== this.lastFileUrl) {
                 this.save()
-                await this.mxcad.openWebFile(this.fileUrlInput)
+                if (this.mxcad) {
+                    await this.mxcad.openWebFile(this.fileUrlInput)
+                }
                 this.lastFileUrl = this.fileUrlInput;
             }
             if (index == 2 && this.entity.ZTPZ_STA === '01') {
@@ -864,7 +1473,8 @@ export default {
                 this.loading = false;
                 this.$Message.error("MxCAD 查看器初始化失败: " + error.message);
             }
-            this._bindMarkerClickEvent();
+            this.initAnnotationClick()
+            // this._bindMarkerClickEvent();
         },
         /**
        * 文件加载完成回调
@@ -1011,18 +1621,13 @@ export default {
                 this.pointList = this.getAllMcDbPoint();
             }
             if (this.pointList.length) {
-                this.pointList.forEach(item => {
-                    this.markerList.push({
-                        worldPt: new McGePoint3d(item.x, item.y, 0),
-                        type: '1',
-                        biz: {
-                            id: item.pointNo,
-                            name: item.pointName,
-                            type: '1'
-                        }
-                    });
-                });
-                this.renderDomMarkers();
+                // this.renderDomMarkers();
+                this.renderMarkersByList(this.pointList.map(item => {
+                    item.id = item.pointNo,
+                        item.name = item.pointName,
+                        item.type = '1'
+                    return item
+                }));
             }
         },
 
@@ -1217,47 +1822,14 @@ export default {
             }
         },
         manualMatchCallback(current, target) {
-            this.matchLineIds = {
-                i2pNo: current.PT_NO,
-                pointNo: target.id
-            };
-            this.tryRedrawMatchLine();
-            this.$Modal.confirm({
-                title: '确认匹配',
-                render: h => {
-                    return h('div', {
-                        style: {
-                            lineHeight: 2
-                        }
-                    }, [
-                        h('p', `实时测点： ${current.PT_NAM}`),
-                        h('p', `图纸点位： ${target.title}`)
-                    ])
-                },
-                okText: '匹配',
-                onOk: () => {
-                    this._clearHighlights();
-                    this.matchMode = null;
-                    // if (parent && parent.manualMatch) {
-                    //     parent.manualMatch({
-                    //         TZPZ_NO: this.entity.TZPZ_NO,
-                    //         "I2P_NO": current.I2P_NO,
-                    //         "POINT_NO": target.id
-                    //     })
-                    // }
-                    this.manualMatch({
-                        TZPZ_NO: this.entity.TZPZ_NO,
-                        "I2P_NO": current.I2P_NO,
-                        "POINT_NO": target.id
-                    })
-                    this.clearMatchLineState()
-                    this.$Message.success('匹配成功');
-                    this.selectedSurveyPoint = null;
-                },
-                onCancel() {
-
-                }
-            });
+            this.manualMatch({
+                TZPZ_NO: this.entity.TZPZ_NO,
+                "I2P_NO": current.I2P_NO,
+                "POINT_NO": target.id
+            })
+            this.$Message.success('匹配成功');
+            this.selectedSurveyPoint = null;
+            this.matchMode = null
         },
         tryRedrawMatchLine() {
             if (!this.matchLineIds) return;
@@ -1544,7 +2116,7 @@ export default {
         /**
          * 四、人工匹配
          */
-        onManualMatch(points) {
+        async onManualMatch(points) {
             if (!points || points.length !== 1) {
                 this.$Message.warning('请选择一个未匹配状态的测点');
                 return;
@@ -1559,14 +2131,30 @@ export default {
                 this.$Message.warning('请选择有坐标的测点');
                 return;
             }
-            this.setForceShow(this.selectedSurveyPoint.PT_NO)
             this.zoomToPoint(this.selectedSurveyPoint.PT_X_VALUE, this.selectedSurveyPoint.PT_Y_VALUE);
-            this._addImageAt(this.selectedSurveyPoint.PT_X_VALUE, this.selectedSurveyPoint.PT_Y_VALUE, '2', { id: this.selectedSurveyPoint.PT_NO, name: this.selectedSurveyPoint.PT_NAM, type: '2' });
+            const mesh = await this.createBindMarker({
+                id: this.selectedSurveyPoint.PT_NO,
+                name: this.selectedSurveyPoint.PT_NAM,
+                x: this.selectedSurveyPoint.PT_X_VALUE,
+                y: this.selectedSurveyPoint.PT_Y_VALUE,
+                z: 0,
+                type: '2',
+                ...this.selectedSurveyPoint
+            })
+            this.annotationPoints.push({
+                ...{
+                    id: this.selectedSurveyPoint.PT_NO,
+                    name: this.selectedSurveyPoint.PT_NAM,
+                    x: this.selectedSurveyPoint.PT_X_VALUE,
+                    y: this.selectedSurveyPoint.PT_Y_VALUE,
+                    z: 0,
+                    type: '2',
+                    ...this.selectedSurveyPoint
+                }, mesh: mesh
+            });
 
             this.matchMode = 'manual-match';
             this._hidePanel1();
-            // this._highlightSurveyPoint(this.selectedSurveyPoint);
-            // this._highlightUnmatchedCADPoints();
             this.$Message.info('请在图纸上点击一个未匹配的图纸点位完成匹配');
         },
 
@@ -1583,12 +2171,30 @@ export default {
                 return;
             }
             this._hidePanel1()
-            valid.forEach(survey => {
+            valid.forEach(async survey => {
                 const coord = this._parseSurveyCoord(survey);
                 if (!coord) return;
                 const [x, y] = coord;
-                this.setForceShow(valid.PT_NO)
-                this._addImageAt(x, y, '2', { id: survey.PT_NO, name: survey.PT_NAM, type: '2' });
+                const mesh = await this.createBindMarker({
+                    id: survey.PT_NO,
+                    name: survey.PT_NAM,
+                    x: x,
+                    y: y,
+                    z: 0,
+                    type: '2',
+                    ...survey
+                })
+                this.annotationPoints.push({
+                    ...{
+                        id: survey.PT_NO,
+                        name: survey.PT_NAM,
+                        x: x,
+                        y: y,
+                        z: 0,
+                        type: '2',
+                        ...survey
+                    }, mesh: mesh
+                });
             });
             //if (parent && parent.autoAddAndMatch) {
             this.autoAddAndMatch({
@@ -1692,14 +2298,14 @@ export default {
                 const pt = MxFun.docCoord2Cad(docPt.x, docPt.y, 0);
                 if (!pt) return 0;
                 // 拾取模式：回填坐标到表单，不关闭弹窗，不清空 selectedSurveyPoint
-                if (this.matchMode === 'manual-place-pick') {
-                    this.manPlacePendingX = pt.x;
-                    this.manPlacePendingY = pt.y;
-                    this.matchMode = null;
-                    this.$refs.manualPlaceForm && this.$refs.manualPlaceForm.onFillCoord(pt.x, pt.y);
-                    this.manualPlaceVisible = true
-                    return 0;
-                }
+                // if (this.matchMode === 'manual-place-pick') {
+                //     this.manPlacePendingX = pt.x;
+                //     this.manPlacePendingY = pt.y;
+                //     this.matchMode = null;
+                //     this.$refs.manualPlaceForm && this.$refs.manualPlaceForm.onFillCoord(pt.x, pt.y);
+                //     this.manualPlaceVisible = true
+                //     return 0;
+                // }
                 // 弹窗确认后手动输入坐标的放置模式
                 if (this.matchMode === 'manual-place') {
                     this._addImageAt(pt.x, pt.y, '2', { id: this.selectedSurveyPoint.PT_NO, name: this.selectedSurveyPoint.PT_NAM, type: '2' });
@@ -1719,9 +2325,21 @@ export default {
         /**
          * 弹窗"选择坐标"按钮触发的图纸拾取
          */
-        onPickCoordinateFromCanvas() {
+        async onPickCoordinateFromCanvas() {
             this.matchMode = 'manual-place-pick';
             this.manualPlaceVisible = false
+            const getPoint = new MrxDbgUiPrPoint();
+            const point = await getPoint.go();
+            if (!point) {
+                return
+            }
+
+            this.manPlacePendingX = point.x;
+            this.manPlacePendingY = point.y;
+            this.matchMode = null;
+            this.$refs.manualPlaceForm && this.$refs.manualPlaceForm.onFillCoord(point.x, point.y);
+
+            this.manualPlaceVisible = true
         },
 
         /**
@@ -1734,28 +2352,51 @@ export default {
         /**
          * 弹窗确认布点（用户填写坐标后点击确认）
          */
-        onManualPlaceConfirm(coords) {
+        async onManualPlaceConfirm(coords) {
             if (!this.selectedSurveyPoint) return;
             const survey = this.selectedSurveyPoint;
             const { x, y } = coords;
             // 添加标记
-            this._addImageAt(x, y, '2', { id: survey.PT_NO, name: survey.PT_NAM, type: '2' });
-            survey.coordValue = { x, y };
-            console.log({
-                "TZPZ_NO": this.entity.TZPZ_NO,
-                "X_VALUE": x,
-                "Y_VALUE": y
+            const mesh = await this.createBindMarker({
+                id: survey.PT_NO,
+                name: survey.PT_NAM,
+                x: x,
+                y: y,
+                z: 0,
+                type: '2',
+                ...survey
             })
+            this.annotationPoints.push({
+                ...{
+                    id: survey.PT_NO,
+                    name: survey.PT_NAM,
+                    x: x,
+                    y: y,
+                    z: 0,
+                    type: '2',
+                    ...survey
+                }, mesh: mesh
+            });
             //if (parent && parent.manualAddAndMatch) {
             this.manualAddAndMatch({
                 "TZPZ_NO": this.entity.TZPZ_NO,
+                I2P_NO: survey.I2P_NO,
                 "X_VALUE": x,
                 "Y_VALUE": y
             })
             //}
             this.matchMode = null;
             this.selectedSurveyPoint = null;
+            this.$nextTick(() => {
+                this.stopCommand();
+            });
             this.manualPlaceVisible = false
+        },
+
+        stopCommand() {
+            if (MxFun) {
+                MxFun.stopRunCommand();
+            }
         },
 
         /**

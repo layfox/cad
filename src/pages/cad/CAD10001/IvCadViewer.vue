@@ -1984,7 +1984,7 @@ export default class IvCadViewer extends Vue {
           userData: intersects[0].object?.userData,
           距离: intersects[0].distance
         });
-        
+        console.log(intersects.length)
         // 遍历检测到的对象，查找标注点
         for (const intersect of intersects) {
           const obj = intersect.object;
