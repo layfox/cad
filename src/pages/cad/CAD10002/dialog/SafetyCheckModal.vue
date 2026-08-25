@@ -71,10 +71,10 @@
     </div>
 
     <!-- 底部按钮 -->
-    <div class="scm-footer">
+    <!-- <div class="scm-footer">
       <Button size="default" @click="onClose">关闭</Button>
       <Button type="primary" size="default" @click="onAlarmHandle">告警处理</Button>
-    </div>
+    </div> -->
   </div>
 </template>
 

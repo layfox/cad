@@ -6,9 +6,7 @@
         <img src="../css/images/modal-icon.png" alt="">
         <span class="psm-title-text">选择测点</span>
       </div>
-      <span class="psm-selected-count" v-if="selectedPoints.length > 0">
-        已选 {{ selectedPoints.length }} 项
-      </span>
+      
     </div>
 
     <!-- 搜索框 -->

@@ -57,6 +57,16 @@ export default {
             matchSvgLine: null,
             matchLineIds: null,
             pointList: [],
+            // 告警 tooltip 状态
+            tooltipVisible: false,
+            tooltipContent: '',
+            tooltipX: 0,
+            tooltipY: 0,
+            tooltipMarkerId: null,
+            tooltipStyle: {
+                left: '0px',
+                top: '0px'
+            }
         }
     },
     beforeDestroy() {
@@ -74,7 +84,82 @@ export default {
         TzModal
     },
     mounted() {
-        
+        // if (false) {
+        //     this.pointList = [
+        //         {
+        //             "I2P_NO": "133777110241938767871",
+        //             "TZPZ_NO": "133775589162091020281",
+        //             "POINT_X_VALUE": "",
+        //             "MATCH_STA": "匹配",
+        //             "POINT_ID": "",
+        //             "POINT_NAM": "",
+        //             "PT_Y_VALUE": "-30388651.27496908",
+        //             "PT_NAM": "氧气1",
+        //             "PT_NO": "128681301464609980416",
+        //             "MATCH_TYP": "",
+        //             "DALTA_XY": "",
+        //             "PT_ID": "61080201921101MN001200001816",
+        //             "PT_X_VALUE": "23372898.909408778",
+        //             "POINT_Y_VALUE": "",
+        //             "POINT_NO": ""
+        //         },
+        //         {
+        //             "I2P_NO": "133777110241938767872",
+        //             "TZPZ_NO": "133775589162091020288",
+        //             "POINT_X_VALUE": "",
+        //             "MATCH_STA": "未匹配",
+        //             "POINT_ID": "",
+        //             "POINT_NAM": "",
+        //             "PT_Y_VALUE": "-30382999.282143094",
+        //             "PT_NAM": "氧气",
+        //             "PT_NO": "128681301464609980416",
+        //             "MATCH_TYP": "",
+        //             "DALTA_XY": "",
+        //             "PT_ID": "61080201921101MN001200001818",
+        //             "PT_X_VALUE": "23369467.220270775",
+        //             "POINT_Y_VALUE": "",
+        //             "POINT_NO": ""
+        //         },
+        //         {
+        //             "I2P_NO": "133777112498138775552",
+        //             "TZPZ_NO": "133775589162091020288",
+        //             "POINT_X_VALUE": "",
+        //             "MATCH_STA": "未匹配",
+        //             "POINT_ID": "",
+        //             "POINT_NAM": "",
+        //             "PT_Y_VALUE": "39394974.134983465",
+        //             "PT_NAM": "环境温度",
+        //             "PT_NO": "128681301465683722240",
+        //             "MATCH_TYP": "",
+        //             "DALTA_XY": "",
+        //             "PT_ID": "61080201921101MN000300000200",
+        //             "PT_X_VALUE": "-63240812.58022698",
+        //             "POINT_Y_VALUE": "",
+        //             "POINT_NO": ""
+        //         },
+        //         {
+        //             "I2P_NO": "133777112498138775552",
+        //             "TZPZ_NO": "133775589162091020288",
+        //             "POINT_X_VALUE": "",
+        //             "MATCH_STA": "未匹配",
+        //             "POINT_ID": "",
+        //             "POINT_NAM": "",
+        //             "PT_Y_VALUE": "",
+        //             "PT_NAM": "环境温度",
+        //             "PT_NO": "128681301465683722240",
+        //             "MATCH_TYP": "",
+        //             "DALTA_XY": "",
+        //             "PT_ID": "61080201921101MN000300000200",
+        //             "PT_X_VALUE": "",
+        //             "POINT_Y_VALUE": "",
+        //             "POINT_NO": ""
+        //         }
+        //     ]
+        //     this.initViewer()
+        //     this.$nextTick(() => {
+        //         this.initCtrlPan();
+        //     });
+        // }
         this.postData('/api/scaqyzt/getTzpzList', {
             "pageSize": "1000",
             "pageNum": "1",
@@ -264,6 +349,10 @@ export default {
                     this.isRenderPending = true;
                     requestAnimationFrame(() => {
                         this.renderDomMarkers();
+                        // 平移缩放时同步更新 tooltip 位置（不重建 DOM，避免频闪）
+                        if (this.tooltipVisible && this.tooltipMarkerId) {
+                            this.updateTooltipPosition();
+                        }
                         this.isRenderPending = false;
                     })
                 };
@@ -455,23 +544,19 @@ export default {
                 div.style.backgroundSize = "contain";
                 div.style.backgroundRepeat = "no‑repeat";
                 div.style.backgroundImage = imgUrl;
-                markerLayer.appendChild(div);
                 if (m.isWarning) {
-                    const tooltipDiv = document.createElement("div");
-                    tooltipDiv.className = "marker-tooltip";
-                    tooltipDiv.style.position = "absolute";
-                    tooltipDiv.style.left = (screenPos.x + 30) + "px";
-                    tooltipDiv.style.top = (screenPos.y - 19) + "px";
-                    tooltipDiv.innerText = m.warningText;
-                    tooltipDiv.style.pointerEvents = "none";
-                    markerLayer.appendChild(tooltipDiv);
+                    div.addEventListener('mouseenter', () => this.onMarkerHover(m, screenPos));
+                    div.addEventListener('mouseleave', () => this.onMarkerLeave());
                 }
+                markerLayer.appendChild(div);
             }
         },
 
         clearAllMarker() {
             this.markerList = [];
             this.forceShowIds.clear();
+            this.tooltipVisible = false;
+            this.tooltipMarkerId = null;
             this.triggerRenderMarker();
         },
         async postData(url = "", data = {}) {
@@ -566,6 +651,7 @@ export default {
                         worldPt: new McGePoint3d(item.x, item.y, 0),
                         type: item.type,
                         isWarning: item.isWarning,
+                        warningText: item.warningText || this.buildWarningText(item),
                         biz: {
                             id: item.pointNo,
                             name: item.pointName,
@@ -591,6 +677,8 @@ export default {
         },
         _clearAllMarkers() {
             this.markerList = [];
+            this.tooltipVisible = false;
+            this.tooltipMarkerId = null;
             this.renderDomMarkers();
         },
 
@@ -670,6 +758,51 @@ export default {
         _unbindMarkerClickEvent() {
             this.$refs.viewerContent.removeEventListener('mousedown', this._onLayerMouseDown)
             this._onLayerMouseDown = null
+        },
+
+        // ============== 告警 Tooltip ==============
+        buildWarningText(item) {
+            // 根据数据类型生成告警文本
+            const typeMap = {
+                '1': '水位',
+                '2': '瓦斯',
+                '3': '甲烷',
+                '4': '风速'
+            }
+            const typeName = typeMap[item.type] || '监测'
+            const value = item.value || item.currentValue || '0'
+            const overValue = item.overValue || item.alertValue || '0'
+            return `${typeName}${overValue}m 超标+${overValue}m`
+        },
+        onMarkerHover(marker, screenPos) {
+            if (!marker.isWarning || !marker.warningText) return
+            this.tooltipMarkerId = marker.biz.id
+            this.tooltipContent = marker.warningText
+            this._updateTooltipPosition(screenPos)
+            this.tooltipVisible = true
+        },
+        onMarkerLeave() {
+            this.tooltipMarkerId = null
+            this.tooltipVisible = false
+        },
+        _updateTooltipPosition(screenPos) {
+            this.tooltipX = screenPos.x + 36
+            this.tooltipY = screenPos.y - 19
+        },
+        updateTooltipPosition() {
+            if (!this.tooltipVisible || !this.tooltipMarkerId) return
+            const marker = this.markerList.find(m => m.biz && m.biz.id === this.tooltipMarkerId)
+            if (!marker) return
+            const draw = MxFun.getCurrentDraw()
+            if (!draw) return
+            const screenPos = draw.cadCoord2View(marker.worldPt.x, marker.worldPt.y)
+            this._updateTooltipPosition(screenPos)
+            // 直接操作 DOM，不经过 Vue 响应式更新，避免闪烁
+            const tooltipEl = this.$refs.alarmTooltip
+            if (tooltipEl) {
+                tooltipEl.style.left = this.tooltipX + 'px'
+                tooltipEl.style.top = this.tooltipY + 'px'
+            }
         },
         /**
              * 在图纸上高亮未匹配的点位（DOM 放大标记）

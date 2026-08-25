@@ -78,7 +78,8 @@ export default {
             matchLineIds: null,
             showTz: false,
             points: [],
-            orgNo: ''
+            orgNo: '',
+            lastFileUrl: '',
         }
     },
     components: {
@@ -86,186 +87,186 @@ export default {
         ViewerPanel1
     },
     mounted() {
-        this.pointList = [
-        {
-            "X_VALUE": 23369467.890141826,
-            "Y_VALUE": -30382998.077860042,
-            "z": 0,
-            "LAYER_ID": "288127",
-            "LAYER_NAM": "A通风系统图",
-            "POINT_NAM": "A$C379E0320",
-            "POINT_ID": "58a6"
-        },
-        {
-            "X_VALUE": 23369439.109730206,
-            "Y_VALUE": -30382957.704416513,
-            "z": 0,
-            "LAYER_ID": "288127",
-            "LAYER_NAM": "A通风系统图",
-            "POINT_NAM": "A$C379E0320",
-            "POINT_ID": "58a7"
-        },
-        {
-            "X_VALUE": 23114724.227396417,
-            "Y_VALUE": -28141241.35896348,
-            "z": 0,
-            "LAYER_ID": "288125",
-            "LAYER_NAM": "底图",
-            "POINT_NAM": "栅栏2",
-            "POINT_ID": "6472"
-        },
-        {
-            "X_VALUE": 23114953.04550457,
-            "Y_VALUE": -28137480.675759755,
-            "z": 0,
-            "LAYER_ID": "288125",
-            "LAYER_NAM": "底图",
-            "POINT_NAM": "栅栏2",
-            "POINT_ID": "6666"
-        },
-        {
-            "X_VALUE": 23369400.29165956,
-            "Y_VALUE": -30383083.760237556,
-            "z": 0,
-            "LAYER_ID": "288125",
-            "LAYER_NAM": "底图",
-            "POINT_NAM": "A$C095F2CEC",
-            "POINT_ID": "7b38"
-        },
-        {
-            "X_VALUE": 23372829.43129492,
-            "Y_VALUE": -30382923.520400725,
-            "z": 0,
-            "LAYER_ID": "288125",
-            "LAYER_NAM": "底图",
-            "POINT_NAM": "A$C095F2CEC",
-            "POINT_ID": "7b45"
-        },
-        {
-            "X_VALUE": 23372754.41310084,
-            "Y_VALUE": -30382938.718711346,
-            "z": 0,
-            "LAYER_ID": "288125",
-            "LAYER_NAM": "底图",
-            "POINT_NAM": "A$C095F2CEC",
-            "POINT_ID": "7b48"
-        },
-        {
-            "X_VALUE": 23370027.331389386,
-            "Y_VALUE": -30382984.480325278,
-            "z": 0,
-            "LAYER_ID": "288125",
-            "LAYER_NAM": "底图",
-            "POINT_NAM": "A$C095F2CEC",
-            "POINT_ID": "7b4a"
-        },
-        {
-            "X_VALUE": 23366674.88328121,
-            "Y_VALUE": -30383334.350133996,
-            "z": 0,
-            "LAYER_ID": "288125",
-            "LAYER_NAM": "底图",
-            "POINT_NAM": "A$C38615BD1",
-            "POINT_ID": "7b61"
-        },
-        {
-            "X_VALUE": 23366674.583281208,
-            "Y_VALUE": -30384035.850133996,
-            "z": 0,
-            "LAYER_ID": "288125",
-            "LAYER_NAM": "底图",
-            "POINT_NAM": "A$C38615BD1",
-            "POINT_ID": "7b62"
-        }
-    ].map(item => {
-                    item.pointName = item.POINT_NAM
-                    item.pointNo = item.POINT_ID
-                    item.x = item.X_VALUE
-                    item.y = item.Y_VALUE
-                    return item
-                })
-                this.points = [
-        {
-            "I2P_NO": "133777110241938767871",
-            "TZPZ_NO": "133775589162091020281",
-            "POINT_X_VALUE": "",
-            "MATCH_STA": "匹配",
-            "POINT_ID": "",
-            "POINT_NAM": "",
-            "PT_Y_VALUE": "-30388651.27496908",
-            "PT_NAM": "氧气1",
-            "PT_NO": "128681301464609980416",
-            "MATCH_TYP": "",
-            "DALTA_XY": "",
-            "PT_ID": "61080201921101MN001200001816",
-            "PT_X_VALUE": "23372898.909408778",
-            "POINT_Y_VALUE": "",
-            "POINT_NO": ""
-        },
-        {
-            "I2P_NO": "133777110241938767872",
-            "TZPZ_NO": "133775589162091020288",
-            "POINT_X_VALUE": "",
-            "MATCH_STA": "未匹配",
-            "POINT_ID": "",
-            "POINT_NAM": "",
-            "PT_Y_VALUE": "-30382999.282143094",
-            "PT_NAM": "氧气",
-            "PT_NO": "128681301464609980416",
-            "MATCH_TYP": "",
-            "DALTA_XY": "",
-            "PT_ID": "61080201921101MN001200001818",
-            "PT_X_VALUE": "23369467.220270775",
-            "POINT_Y_VALUE": "",
-            "POINT_NO": ""
-        },
-        {
-            "I2P_NO": "133777112498138775552",
-            "TZPZ_NO": "133775589162091020288",
-            "POINT_X_VALUE": "",
-            "MATCH_STA": "未匹配",
-            "POINT_ID": "",
-            "POINT_NAM": "",
-            "PT_Y_VALUE": "39394974.134983465",
-            "PT_NAM": "环境温度",
-            "PT_NO": "128681301465683722240",
-            "MATCH_TYP": "",
-            "DALTA_XY": "",
-            "PT_ID": "61080201921101MN000300000200",
-            "PT_X_VALUE": "-63240812.58022698",
-            "POINT_Y_VALUE": "",
-            "POINT_NO": ""
-        },
-        {
-            "I2P_NO": "133777112498138775552",
-            "TZPZ_NO": "133775589162091020288",
-            "POINT_X_VALUE": "",
-            "MATCH_STA": "未匹配",
-            "POINT_ID": "",
-            "POINT_NAM": "",
-            "PT_Y_VALUE": "",
-            "PT_NAM": "环境温度",
-            "PT_NO": "128681301465683722240",
-            "MATCH_TYP": "",
-            "DALTA_XY": "",
-            "PT_ID": "61080201921101MN000300000200",
-            "PT_X_VALUE": "",
-            "POINT_Y_VALUE": "",
-            "POINT_NO": ""
-        }
-    ]
-    this.entity = {
-                "TZPZ_ID": "",
-                "TZXX_NO": "11",
-                "TZPZ_USR": "111",
-                "TZPZ_DAT": "2026-11-12",
-                "TZPZ_STA": "04",
-                "resourceUrl": "",
-                "TZXX_ID": "",
-                "TZLX_NAM": "",
-                "TZ_VERSION": "",
-                TZPZ_NO: "",
-            }
+        // this.pointList = [
+        //     {
+        //         "X_VALUE": 23369467.890141826,
+        //         "Y_VALUE": -30382998.077860042,
+        //         "z": 0,
+        //         "LAYER_ID": "288127",
+        //         "LAYER_NAM": "A通风系统图",
+        //         "POINT_NAM": "A$C379E0320",
+        //         "POINT_ID": "58a6"
+        //     },
+        //     {
+        //         "X_VALUE": 23369439.109730206,
+        //         "Y_VALUE": -30382957.704416513,
+        //         "z": 0,
+        //         "LAYER_ID": "288127",
+        //         "LAYER_NAM": "A通风系统图",
+        //         "POINT_NAM": "A$C379E0320",
+        //         "POINT_ID": "58a7"
+        //     },
+        //     {
+        //         "X_VALUE": 23114724.227396417,
+        //         "Y_VALUE": -28141241.35896348,
+        //         "z": 0,
+        //         "LAYER_ID": "288125",
+        //         "LAYER_NAM": "底图",
+        //         "POINT_NAM": "栅栏2",
+        //         "POINT_ID": "6472"
+        //     },
+        //     {
+        //         "X_VALUE": 23114953.04550457,
+        //         "Y_VALUE": -28137480.675759755,
+        //         "z": 0,
+        //         "LAYER_ID": "288125",
+        //         "LAYER_NAM": "底图",
+        //         "POINT_NAM": "栅栏2",
+        //         "POINT_ID": "6666"
+        //     },
+        //     {
+        //         "X_VALUE": 23369400.29165956,
+        //         "Y_VALUE": -30383083.760237556,
+        //         "z": 0,
+        //         "LAYER_ID": "288125",
+        //         "LAYER_NAM": "底图",
+        //         "POINT_NAM": "A$C095F2CEC",
+        //         "POINT_ID": "7b38"
+        //     },
+        //     {
+        //         "X_VALUE": 23372829.43129492,
+        //         "Y_VALUE": -30382923.520400725,
+        //         "z": 0,
+        //         "LAYER_ID": "288125",
+        //         "LAYER_NAM": "底图",
+        //         "POINT_NAM": "A$C095F2CEC",
+        //         "POINT_ID": "7b45"
+        //     },
+        //     {
+        //         "X_VALUE": 23372754.41310084,
+        //         "Y_VALUE": -30382938.718711346,
+        //         "z": 0,
+        //         "LAYER_ID": "288125",
+        //         "LAYER_NAM": "底图",
+        //         "POINT_NAM": "A$C095F2CEC",
+        //         "POINT_ID": "7b48"
+        //     },
+        //     {
+        //         "X_VALUE": 23370027.331389386,
+        //         "Y_VALUE": -30382984.480325278,
+        //         "z": 0,
+        //         "LAYER_ID": "288125",
+        //         "LAYER_NAM": "底图",
+        //         "POINT_NAM": "A$C095F2CEC",
+        //         "POINT_ID": "7b4a"
+        //     },
+        //     {
+        //         "X_VALUE": 23366674.88328121,
+        //         "Y_VALUE": -30383334.350133996,
+        //         "z": 0,
+        //         "LAYER_ID": "288125",
+        //         "LAYER_NAM": "底图",
+        //         "POINT_NAM": "A$C38615BD1",
+        //         "POINT_ID": "7b61"
+        //     },
+        //     {
+        //         "X_VALUE": 23366674.583281208,
+        //         "Y_VALUE": -30384035.850133996,
+        //         "z": 0,
+        //         "LAYER_ID": "288125",
+        //         "LAYER_NAM": "底图",
+        //         "POINT_NAM": "A$C38615BD1",
+        //         "POINT_ID": "7b62"
+        //     }
+        // ].map(item => {
+        //     item.pointName = item.POINT_NAM
+        //     item.pointNo = item.POINT_ID
+        //     item.x = item.X_VALUE
+        //     item.y = item.Y_VALUE
+        //     return item
+        // })
+        // this.points = [
+        //     {
+        //         "I2P_NO": "133777110241938767871",
+        //         "TZPZ_NO": "133775589162091020281",
+        //         "POINT_X_VALUE": "",
+        //         "MATCH_STA": "匹配",
+        //         "POINT_ID": "",
+        //         "POINT_NAM": "",
+        //         "PT_Y_VALUE": "-30388651.27496908",
+        //         "PT_NAM": "氧气1",
+        //         "PT_NO": "128681301464609980416",
+        //         "MATCH_TYP": "",
+        //         "DALTA_XY": "",
+        //         "PT_ID": "61080201921101MN001200001816",
+        //         "PT_X_VALUE": "23372898.909408778",
+        //         "POINT_Y_VALUE": "",
+        //         "POINT_NO": ""
+        //     },
+        //     {
+        //         "I2P_NO": "133777110241938767872",
+        //         "TZPZ_NO": "133775589162091020288",
+        //         "POINT_X_VALUE": "",
+        //         "MATCH_STA": "未匹配",
+        //         "POINT_ID": "",
+        //         "POINT_NAM": "",
+        //         "PT_Y_VALUE": "-30382999.282143094",
+        //         "PT_NAM": "氧气",
+        //         "PT_NO": "128681301464609980416",
+        //         "MATCH_TYP": "",
+        //         "DALTA_XY": "",
+        //         "PT_ID": "61080201921101MN001200001818",
+        //         "PT_X_VALUE": "23369467.220270775",
+        //         "POINT_Y_VALUE": "",
+        //         "POINT_NO": ""
+        //     },
+        //     {
+        //         "I2P_NO": "133777112498138775552",
+        //         "TZPZ_NO": "133775589162091020288",
+        //         "POINT_X_VALUE": "",
+        //         "MATCH_STA": "未匹配",
+        //         "POINT_ID": "",
+        //         "POINT_NAM": "",
+        //         "PT_Y_VALUE": "39394974.134983465",
+        //         "PT_NAM": "环境温度",
+        //         "PT_NO": "128681301465683722240",
+        //         "MATCH_TYP": "",
+        //         "DALTA_XY": "",
+        //         "PT_ID": "61080201921101MN000300000200",
+        //         "PT_X_VALUE": "-63240812.58022698",
+        //         "POINT_Y_VALUE": "",
+        //         "POINT_NO": ""
+        //     },
+        //     {
+        //         "I2P_NO": "133777112498138775552",
+        //         "TZPZ_NO": "133775589162091020288",
+        //         "POINT_X_VALUE": "",
+        //         "MATCH_STA": "未匹配",
+        //         "POINT_ID": "",
+        //         "POINT_NAM": "",
+        //         "PT_Y_VALUE": "",
+        //         "PT_NAM": "环境温度",
+        //         "PT_NO": "128681301465683722240",
+        //         "MATCH_TYP": "",
+        //         "DALTA_XY": "",
+        //         "PT_ID": "61080201921101MN000300000200",
+        //         "PT_X_VALUE": "",
+        //         "POINT_Y_VALUE": "",
+        //         "POINT_NO": ""
+        //     }
+        // ]
+        // this.entity = {
+        //     "TZPZ_ID": "",
+        //     "TZXX_NO": "11",
+        //     "TZPZ_USR": "111",
+        //     "TZPZ_DAT": "2026-11-12",
+        //     "TZPZ_STA": "04",
+        //     "resourceUrl": "",
+        //     "TZXX_ID": "",
+        //     "TZLX_NAM": "",
+        //     "TZ_VERSION": "",
+        //     TZPZ_NO: "",
+        // }
         const params = new URLSearchParams(location.search)
         if (params.get('TZPZ_NO')) {
             this.entity.TZPZ_NO = params.get('TZPZ_NO')
@@ -275,7 +276,7 @@ export default {
         // _bindMarkerClickEvent 在 initViewer 内部调用（mxdraw 就绪后）
     },
     computed: {
-        ...mapState(['tzInfo'])
+        // ...mapState(['tzInfo'])
     },
     watch: {
         // '$store.state.tzInfo': {
@@ -306,6 +307,9 @@ export default {
             this.entity.TZXX_NO = data.TZXX_NO
             this.entity.TZXX_ID = data.TZXX_ID
             this.entity.TZ_VERSION = data.TZ_VERSION
+            if (this.lastFileUrl !== data.resourceUrl) {
+                this.fileUrlInput = data.resourceUrl
+            }
             // this.entity.TZLX_NAM = data.TZLX_NAM
         },
         setForceShow(id) {
@@ -514,7 +518,8 @@ export default {
                 "TZPZ_NO": this.entity.TZPZ_NO
             }).then(data => {
                 this.entity = data.data
-                this.fileUrlInput = data.data.resourceUrl || './models/YTSF-001.mxweb'
+                this.fileUrlInput = data.data.resourceUrl || ''
+                this.lastFileUrl = this.fileUrlInput
             })
         },
         upsertLayer(data) {
@@ -525,6 +530,10 @@ export default {
         upsertPoint(data) {
             this.postData('/api/scaqyzt/upsertPoint', data).then(data => {
                 this.getPoint()
+                this.upsertTzpp({
+                    "TZPZ_STA": '02',
+                    "TZPZ_NO": this.entity.TZPZ_NO
+                })
             })
         },
         getPoint() {
@@ -587,7 +596,7 @@ export default {
             })
         },
         save() {
-            if (this.currentStep === 0) {
+            if (this.currentStep === 0 && this.entity.TZPZ_STA==='01') {
                 this.$refs.sForm.validate((valid) => {
                     if (!valid) {
                         this.$Message.error('请填写信息后再保存')
@@ -614,7 +623,7 @@ export default {
                 })
             }
         },
-        onStep(index) {
+        async onStep(index) {
             if (this.currentStep > index) {
                 this.currentStep = index
                 return
@@ -653,6 +662,30 @@ export default {
                 })
             } else {
                 this.currentStep = index
+            }
+            if (index === 1 && this.fileUrlInput !== this.lastFileUrl) {
+                this.save()
+                await this.mxcad.openWebFile(this.fileUrlInput)
+                this.lastFileUrl = this.fileUrlInput;
+            }
+            if (index == 2 && this.entity.ZTPZ_STA === '01') {
+                this.upsertPoint(
+                    {
+                        "TZPZ_NO": this.entity.TZPZ_NO,
+                        data: this.pointList.map(item => {
+                            return {
+                                "POINT_NO": "",
+                                "POINT_ID": item.no,
+                                "POINT_NAM": item.name,
+                                "X_VALUE": item.x,
+                                "Y_VALUE": item.y,
+                                "LAYER_NO": "",
+                                "LAYER_ID": item.LAYER_ID,
+                                "LAYER_NAM": item.LAYER_NAM
+                            }
+                        })
+                    }
+                )
             }
         },
         onChoose() {
@@ -975,9 +1008,7 @@ export default {
             }
             // 收集点位数据
             if (this.entity.TZPZ_STA === '01') {
-                const allPointEntities = this.getAllMcDbPoint();
-                console.log(allPointEntities, 111)
-                this.upsertPoint(allPointEntities)
+                this.pointList = this.getAllMcDbPoint();
             }
             if (this.pointList.length) {
                 this.pointList.forEach(item => {
@@ -1134,7 +1165,7 @@ export default {
                 const target = e.target.closest('.marker-icon');
                 if (!target) return;
                 if (this.matchMode === 'manual-place-pick' && this.selectedSurveyPoint) {
-                    return this._handleManualPlaceCanvasClick(event);
+                    return this._handleManualPlaceCanvasClick(e);
                 }
                 if (this.matchMode === 'manual-match' && this.selectedSurveyPoint) {
                     this.setForceShow(target.id)
@@ -1147,7 +1178,7 @@ export default {
                     return
                 }
                 if (this.matchMode === 'manual-place' && this.selectedSurveyPoint) {
-                    return this._handleManualPlaceCanvasClick(event);
+                    return this._handleManualPlaceCanvasClick(e);
                 }
                 e.stopPropagation(); // ✅阻止下发canvas mousedown
             }
@@ -1754,45 +1785,218 @@ export default {
             this.manualPlaceVisible = false
         },
 
+        // getAllMcDbPoint() {
+        //     const cadApp = MxCpp.getCurrentMxCAD();
+        //     if (!cadApp) {
+        //         console.warn("CAD实例未初始化");
+        //         return [];
+        //     }
+
+        //     const db = cadApp.getDatabase();
+        //     const currentSpace = db.currentSpace;
+        //     if (!currentSpace) return [];
+
+        //     const entityIds = currentSpace.getAllEntityId();
+        //     const result = [];
+
+        //     for (const id of entityIds) {
+        //         if (!id.isValid()) continue;
+
+        //         // 检查是否为 POINT 实体
+        //         const isPoint = id.isKindOf && id.isKindOf('McDbPoint');
+        //         // 检查是否为块引用（块引用也可以视为点位）
+        //         const isBlockRef = id.isKindOf && id.isKindOf('McDbBlockReference');
+
+        //         if (!isBlockRef) continue;
+
+        //         const ent = id.getMcDbEntity();
+        //         const pos = ent.position;
+        //         if (!pos) continue;
+        //         result.push({
+        //             x: pos.x,
+        //             y: pos.y,
+        //             z: pos.z,
+        //             LAYER_ID: ent.layerId ? (ent.layerId.getMcDbLayerTableRecord().getHandle() || '') : '',
+        //             LAYER_NAM: ent.layer || '',
+        //             // 点位名称从块名取
+        //             pointName: ent.blockName || '',
+        //             pointNo: ent.getHandle()
+        //         });
+        //     }
+        //     return result
+        // },
+
         getAllMcDbPoint() {
-            const cadApp = MxCpp.getCurrentMxCAD();
-            if (!cadApp) {
-                console.warn("CAD实例未初始化");
-                return [];
+            try {
+                if (this.mxcad && this.mxcad.getDatabase) {
+                    const blockTable = this.mxcad.getDatabase().getBlockTable();
+                    const blockRecordIds = blockTable.getAllRecordId();
+                    console.log("块表记录数量:", blockRecordIds.length);
+
+                    let modelSpace = null;
+
+                    // 查找模型空间
+                    for (let i = 0; i < blockRecordIds.length; i++) {
+                        const blkRecId = blockRecordIds[i];
+                        try {
+                            const blkRec = blkRecId.getMcDbBlockTableRecord();
+                            if (blkRec) {
+                                const name = blkRec.name || blkRec.getName?.() || "";
+                                if (name === "*Model_Space" || name === "Model_Space" || name.includes("Model")) {
+                                    modelSpace = blkRec;
+                                    console.log("找到模型空间:", name);
+                                    break;
+                                }
+                            }
+                        } catch (e) { }
+                    }
+
+                    if (modelSpace) {
+                        const entityIds = modelSpace.getAllEntityId();
+                        console.log("模型空间实体数量:", entityIds.length);
+
+                        const pointList = [];
+                        let pointIndex = 0;
+                        let blockIndex = 0;
+
+                        for (let i = 0; i < entityIds.length; i++) {
+                            const entId = entityIds[i];
+                            try {
+                                // 1. 处理点实体（McDbPoint）
+                                if (entId.isKindOf("McDbPoint")) {
+                                    const pointEnt = entId.getMcDbEntity();
+                                    if (pointEnt && pointEnt.position) {
+                                        const pos = pointEnt.position;
+                                        // 获取图层名称
+                                        let layerName = "未知图层";
+                                        let layerId = ''
+                                        try {
+                                            const layerId = pointEnt.layerId;
+                                            if (layerId) {
+                                                const layerRec = layerId.getMcDbLayerTableRecord();
+                                                if (layerRec) {
+                                                    layerName = layerRec.name;
+                                                    layerId = layerRec.getHandle() || ''
+                                                }
+                                            }
+                                        } catch (e) { }
+
+                                        pointIndex++;
+                                        pointList.push({
+                                            id: entId,
+                                            type: "point",
+                                            name: `点${pointIndex}`,
+                                            x: pos.x,
+                                            y: pos.y,
+                                            z: pos.z,
+                                            LAYER_NAM: layerName,
+                                            LAYER_ID: layerId,
+                                            description: `图层: ${layerName}`,
+                                            visible: true,
+                                            index: pointList.length + 1,
+                                            no: entId.getMcDbEntity().getHandle()
+                                        });
+                                    }
+                                }
+
+                                // 2. 处理块引用（McDbBlockReference）- 从属性中获取名称和描述
+                                if (entId.isKindOf("McDbBlockReference")) {
+                                    const blkRef = entId.getMcDbEntity();
+                                    if (blkRef && blkRef.position) {
+                                        const pos = blkRef.position;
+                                        const blockName = blkRef.blockName || "未知块";
+
+                                        // 获取图层名称
+                                        let layerName = "未知图层";
+                                        let layerId = ''
+                                        try {
+                                            const layerId = blkRef.layerId;
+                                            if (layerId) {
+                                                const layerRec = layerId.getMcDbLayerTableRecord();
+                                                if (layerRec) {
+                                                    layerName = layerRec.name;
+                                                    layerId = layerRec.getHandle() || ''
+                                                }
+                                            }
+                                        } catch (e) { }
+
+                                        // 获取块引用的所有属性
+                                        let attributes = [];
+                                        let pointName = "";
+                                        let pointDesc = "";
+
+                                        try {
+                                            if (blkRef.getAllAttribute) {
+                                                const attrIds = blkRef.getAllAttribute();
+                                                if (attrIds && attrIds.length > 0) {
+                                                    for (let j = 0; j < attrIds.length; j++) {
+                                                        try {
+                                                            const attr = attrIds[j].getMcDbEntity();
+                                                            if (attr) {
+                                                                const tag = attr.tag || "";
+                                                                const value = attr.textString || "";
+                                                                attributes.push({ tag, value });
+
+                                                                // 尝试找名称属性
+                                                                if (!pointName && (tag.includes("名称") || tag.includes("编号") ||
+                                                                    tag.toLowerCase().includes("name") || tag.toLowerCase().includes("code") ||
+                                                                    tag.toLowerCase().includes("id") || tag.includes("号"))) {
+                                                                    pointName = value;
+                                                                }
+                                                            }
+                                                        } catch (e) { }
+                                                    }
+                                                }
+                                            }
+                                        } catch (e) { }
+
+                                        // 构建描述信息
+                                        if (attributes.length > 0) {
+                                            pointDesc = attributes.map((a) => `${a.tag}: ${a.value}`).join(", ");
+                                        } else {
+                                            pointDesc = `块: ${blockName}, 图层: ${layerName}`;
+                                        }
+
+                                        // 如果没有找到名称属性，用块名称
+                                        if (!pointName) {
+                                            blockIndex++;
+                                            pointName = `${blockName}${blockIndex}`;
+                                        }
+
+                                        pointList.push({
+                                            id: entId,
+                                            type: "block",
+                                            blockName: blockName,
+                                            name: pointName,
+                                            x: pos.x,
+                                            y: pos.y,
+                                            z: pos.z,
+                                            LAYER_NAM: layerName,
+                                            LAYER_ID: layerId,
+                                            description: pointDesc,
+                                            attributes: attributes,
+                                            visible: true,
+                                            no: entId.getMcDbEntity().getHandle(),
+                                            index: pointList.length + 1
+                                        });
+                                    }
+                                }
+                            } catch (e) { }
+                        }
+
+                        return pointList
+                        console.log("获取点位数据成功，点位总数:", this.pointCount);
+                        console.log("其中点实体:", pointIndex, "个，块引用:", blockIndex, "个");
+                        if (this.pointCount > 0) {
+                            console.log("前10个点位:", this.points.slice(0, 10));
+                        }
+                    } else {
+                        console.warn("未找到模型空间");
+                    }
+                }
+            } catch (e) {
+                console.warn("获取点位数据失败:", e);
             }
-
-            const db = cadApp.getDatabase();
-            const currentSpace = db.currentSpace;
-            if (!currentSpace) return [];
-
-            const entityIds = currentSpace.getAllEntityId();
-            const result = [];
-
-            for (const id of entityIds) {
-                if (!id.isValid()) continue;
-
-                // 检查是否为 POINT 实体
-                const isPoint = id.isKindOf && id.isKindOf('McDbPoint');
-                // 检查是否为块引用（块引用也可以视为点位）
-                const isBlockRef = id.isKindOf && id.isKindOf('McDbBlockReference');
-
-                if (!isBlockRef) continue;
-
-                const ent = id.getMcDbEntity();
-                const pos = ent.position;
-                if (!pos) continue;
-                result.push({
-                    x: pos.x,
-                    y: pos.y,
-                    z: pos.z,
-                    LAYER_ID: ent.layerId ? (ent.layerId.getMcDbLayerTableRecord().getHandle() || '') : '',
-                    LAYER_NAM: ent.layer || '',
-                    // 点位名称从块名取
-                    pointName: ent.blockName || '',
-                    pointNo: ent.getHandle()
-                });
-            }
-            return result
         },
 
         // ============== Ctrl+左键平移 ==============

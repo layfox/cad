@@ -129,6 +129,7 @@
     font-weight: bold;
     font-size: 18px;
     color: #333333;
+    z-index: 100;
 }
 
 .step-content-header:before {

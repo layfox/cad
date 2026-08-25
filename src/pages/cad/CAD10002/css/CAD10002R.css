@@ -155,3 +155,20 @@
     filter: drop-shadow(0 0 14px #ff2222);
   }
 }
+
+/* 告警 tooltip 样式 */
+.alarm-tooltip {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #ffd5cc;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 14px;
+  color: #ed4014;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(237, 64, 20, 0.15);
+  pointer-events: none;
+  z-index: 1000;
+  white-space: nowrap;
+  line-height: 1.4;
+}

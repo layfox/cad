@@ -62,6 +62,9 @@
                             </div>
                         </div>
                 <div ref="markerLayer" class="marker-layer"></div>
+                <div ref="alarmTooltip" class="alarm-tooltip" v-show="tooltipVisible">
+                    {{ tooltipContent }}
+                </div>
             </div>
         </div>
       </div>
