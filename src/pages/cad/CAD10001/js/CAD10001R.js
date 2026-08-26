@@ -97,6 +97,7 @@ export default {
             },
             pointInfo: '',
             showPointInfoModal: false,
+            pointInfoTimer: null,
             detailPos: { x: 0, y: 0 },
             bloomComposer: null,
             // 辉光相关
@@ -327,6 +328,7 @@ export default {
         // }
     },
     beforeDestroy() {
+        clearTimeout(this.pointInfoTimer);
         this.destroyAnnotationEvent();
         this.destroyAnnotationBloom();
         // this.unlistenPostRender();
@@ -679,8 +681,10 @@ export default {
                                 this.markNeedUpdate();
                                 this.pointInfo = bindItem.type === '1' ? `图纸点位：${bindItem.name}` : `实时测点：${bindItem.name}`;
                                 this.showPointInfoModal = true;
-                                setTimeout(() => {
+                                clearTimeout(this.pointInfoTimer);
+                                this.pointInfoTimer = setTimeout(() => {
                                     this.showPointInfoModal = false;
+                                    this.pointInfoTimer = null;
                                 }, 3000)
                                 return;
                             }
@@ -933,6 +937,50 @@ export default {
             });
 
             // 清空hover缓存，防止残留状态
+            this.lastHoverGroup = null;
+            mxObj.updateDisplay(true);
+        },
+        /**
+         * 按 ID 批量删除画布上的绑定点位（3D mesh）
+         * @param {string[]} ids - 要删除的 annotationId（即 PT_NO）
+         */
+        clearBindMarkersByIds(ids) {
+            if (!ids || ids.length === 0) return;
+            const idSet = new Set(ids);
+            const mxObj = MxFun.getCurrentDraw();
+            if (!mxObj) return;
+            const scene = mxObj.getScene?.();
+            if (!scene) return;
+
+            const toRemove = [];
+            scene.traverse((obj) => {
+                if (obj.userData && obj.userData.isAnnotationPoint && idSet.has(obj.userData.annotationId)) {
+                    toRemove.push(obj);
+                }
+            });
+
+            toRemove.forEach(group => {
+                this.stopRingWave(group);
+                group.traverse(child => {
+                    if (child.isMesh) {
+                        if (child.geometry) child.geometry.dispose();
+                        if (child.material) {
+                            if (Array.isArray(child.material)) {
+                                child.material.forEach(mat => mat.dispose());
+                            } else {
+                                child.material.dispose();
+                            }
+                        }
+                    }
+                });
+                mxObj.removeObject(group);
+                // 同步从 annotationPoints 中移除
+                const idx = this.annotationPoints.findIndex(item => item.id === group.userData.annotationId);
+                if (idx !== -1) {
+                    this.annotationPoints.splice(idx, 1);
+                }
+            });
+
             this.lastHoverGroup = null;
             mxObj.updateDisplay(true);
         },
@@ -1360,7 +1408,12 @@ export default {
             })
         },
         setDefault() {
-
+            this.setDefaultTZPZ({TZPZ_NO: this.entity.TZPZ_NO})
+        },
+        setDefaultTZPZ(data) {
+            this.postData('/api/scaqyzt/setDefaultTZPZ', data).then(data => {
+                
+            })
         },
         upsertTzpp(data) {
             this.postData('/api/scaqyzt/upsertTzpp', data).then(data => {
@@ -1417,8 +1470,12 @@ export default {
                 this.getIot()
             })
         },
-        deleteIot(data) {
-            this.postData('/api/scaqyzt/deleteIot', data).then(data => {
+        deleteIot(data, ptNos) {
+            this.postData('/api/scaqyzt/deleteIot', data).then(() => {
+                // 清理画布上对应点位
+                if (ptNos && ptNos.length) {
+                    this.clearBindMarkersByIds(ptNos);
+                }
                 this.getIot();
             })
         },
@@ -1459,9 +1516,9 @@ export default {
         onFabu() {
             this.postData('/api/scaqyzt/upsertTzpp', {
                 "TZPZ_NO": this.entity.TZPZ_NO,
-                "TZPZ_STA": this.entity.TZPZ_STA,
+                "TZPZ_STA": '04',
             }).then(data => {
-                if (flag) {
+                if (data.data.flag) {
                     this.getTzpzInfo()
                 } else {
                     this.$Message.error('请完成点位绑定')
@@ -2037,12 +2094,11 @@ export default {
                 title: '提示',
                 content: '确定要删除所选测点嘛？',
                 onOk: () => {
-                    //if (parent && parent.deleteIot) {
+                    const ptNos = points.map(item => item.PT_NO);
                     this.deleteIot({
                         TZPZ_NO: this.entity.TZPZ_NO,
                         I2P_NOs: points.map(item => item.I2P_NO)
-                    })
-                    //}
+                    }, ptNos);
                 }
             })
         },
@@ -2914,9 +2970,6 @@ export default {
                         return pointList
                         console.log("获取点位数据成功，点位总数:", this.pointCount);
                         console.log("其中点实体:", pointIndex, "个，块引用:", blockIndex, "个");
-                        if (this.pointCount > 0) {
-                            console.log("前10个点位:", this.points.slice(0, 10));
-                        }
                     } else {
                         console.warn("未找到模型空间");
                     }

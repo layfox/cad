@@ -1,7 +1,7 @@
 <template>
     <div class="viewer-panel-wrapper">
         <!-- 工具栏 -->
-        <div class="vp-toolbar" >
+        <div class="vp-toolbar" v-if="status!=='04'&&status!='05'">
             <Button type="primary" @click="onAdd" size="large" ghost><img src="../../css/images/icon1.png" alt="">添加测点</Button>
             <span class="vp-toolbar-label">坐标匹配容差</span>
             <InputNumber v-model="tolerance" :min="0" :precision="2" style="width: 80px" />
