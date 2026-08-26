@@ -7,6 +7,9 @@
     </div>
     <div class="page-main">
     <!-- 搜索栏 -->
+     <div class="c3-search-bar">
+      <Input placeholder="请输入" suffix="ios-search" v-model="searchText" @input="onSearch"></Input>
+     </div>
     <!-- <div class="c3-search-bar">
       <div class="filter-container">
       <div class="c3-search-item">
@@ -127,7 +130,8 @@ export default {
       showDetail: false,
       showDeleteConfirm: false,
       currentDetail: {},
-      deleteTargetCount: 0
+      deleteTargetCount: 0,
+      searchText: ''
     }
   },
   computed: {
@@ -180,9 +184,16 @@ export default {
   },
   mounted() {
     this.fetchData()
+    const params = new URLSearchParams(location.search)
+    this.orgNo = params.get('orgNo')
   },
   methods: {
+    onSearch() {
+      this.pageNum = 1;
+      this.fetchData()
+    },
     async postData(url, data) {
+      data.param_orgNo = this.orgNo
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -196,7 +207,7 @@ export default {
         const res = await this.postData('/api/scaqyzt/getTzpzList', {
           pageSize: String(this.pageSize),
           pageNum: String(this.pageNum),
-          ...this.form
+          searchText: this.searchText
         })
         const body = res.data
         if (body && body.data) {
@@ -249,6 +260,10 @@ export default {
       }
     },
     onDelete(row) {
+      if (row.TZPZ_STA && row.TZPZ_STA != '01') {
+        this.$Message.error('只能删除未解析的配置图纸')
+        return
+      }
       this.deleteTargetCount = 1
       this.showDeleteConfirm = true
     },
@@ -332,11 +347,16 @@ export default {
 .c3-search-bar {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   background-color: #FFF;
   padding: 16px;
   border-radius: 2px;
   position: relative;
   gap: 24px;
+}
+
+.c3-search-bar >>> .ivu-input-wrapper {
+  width:320px;
 }
 
 .filter-container {

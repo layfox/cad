@@ -32,6 +32,7 @@
                     :border="false"
                     size="small"
                     no-data-text=""
+                    @on-row-click="onPointRowClick1"
                 >
                     <template slot-scope="{ row, $index }" slot="seq">
                         {{ (currentPage - 1) * pageSize + $index + 1 }}
@@ -110,13 +111,14 @@ export default {
                 } },
                 { title: '图层名称', key: 'name', minWidth: 120 },
                 { title: '状态', key: 'status', width: 80, align: 'center', render: (h, { row, index}) => {
+                    return h('Icon', {
+                        props: {
+                            type: row.off ? 'md-eye-off' : 'md-eye'
+                        },
+                        class: 'layer-eye-icon'
+                    })
                     return h('span', {
                         class: ['vp-status', 'vp-status-clickable', !row.off ? 'status-matched' : 'status-unmatched'],
-                        on: {
-                            click: () => {
-                                this.$emit('toggle-layer', (this.layerPage.current -1) * this.layerPage.pageSize + index + 1, row.off)
-                            }
-                        }
                     }, row.off ? '隐藏' : '显示')
                 }}
             ],
@@ -125,7 +127,14 @@ export default {
                 { slot: 'seq', title: '序号', key: 'seq', width: 60, align: 'center', render: (h, { row, index }) => {
                     return h('span', (this.pointPage.current - 1) * this.pointPage.pageSize + index + 1)
                 } },
-                { title: '图纸点位名称', key: 'pointName', minWidth: 160 },
+                { title: '图纸点位名称', key: 'pointName', minWidth: 160, render: (h, {row}) => {
+                    return h('span', {
+                        style: {
+                            color: '#1764e8',
+                            cursor: 'pointer'
+                        }
+                    }, row.pointName)
+                } },
                 { title: '图纸点位编码', key: 'pointNo', width: 130 },
                 // { title: 'X 坐标', key: 'x', width: 120, align: 'right',  render: (h, { row, index}) => {
                 //     return h('span', {}, row.x ? (+row.x).toFixed(2): '')
@@ -250,6 +259,9 @@ export default {
         },
         onPointRowClick(row) {
             this.$emit('zoom-to-point', row.x, row.y)
+        },
+        onPointRowClick1(row, index) {
+            this.$emit('toggle-layer', (this.layerPage.current -1) * this.layerPage.pageSize + index + 1, row.off)
         },
         onAddPoint() {
             this.$Message.info('添加点位功能待实现')
@@ -430,6 +442,13 @@ export default {
 
 .vp-status-clickable:hover {
     opacity: 0.7;
+}
+
+.iv-cad-viewer .layer-eye-icon {
+  font-size: 14px;
+  color: #999;
+  margin-left: 8px;
+  flex-shrink: 0;
 }
 
 /* 颜色圆点 */

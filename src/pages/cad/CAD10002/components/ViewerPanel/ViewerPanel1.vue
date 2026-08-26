@@ -78,6 +78,10 @@ export default {
             type: Array,
             default: () => []
             // 每项结构: { name, points: [{ id, pointName, value }] }
+        },
+        panelKey: {
+            type: String,
+            default: ''
         }
     },
     data() {
@@ -219,6 +223,7 @@ export default {
                     cat.selectedPoints.push(row)
                 }
             })
+            this.$emit('select-change', { panelKey: this.panelKey, category: cat.name, selected: cat.selectedPoints })
         },
         
         // ============ 分类全选/取消全选 ============
@@ -238,7 +243,8 @@ export default {
                 // 取消全选：清空该分类的选中列表
                 cat.selectedPoints = []
             }
-            
+
+            this.$emit('select-change', { panelKey: this.panelKey, category: cat.name, selected: cat.selectedPoints })
             // 刷新表格显示
             this.$nextTick(() => this.refreshSelection())
         },

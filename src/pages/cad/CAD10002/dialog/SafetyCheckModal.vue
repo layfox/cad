@@ -56,13 +56,8 @@
       <div class="scm-trend-header">
         <span class="scm-trend-title">历史趋势</span>
         <div class="scm-trend-tabs">
-          <span
-            v-for="(tab, idx) in timeTabs"
-            :key="tab"
-            class="scm-trend-tab"
-            :class="{ active: activeTimeTab === idx }"
-            @click="onTimeTabClick(idx)"
-          >{{ tab }}</span>
+          <span v-for="(tab, idx) in timeTabs" :key="tab" class="scm-trend-tab"
+            :class="{ active: activeTimeTab === idx }" @click="onTimeTabClick(idx)">{{ tab }}</span>
         </div>
       </div>
       <div class="scm-chart-container">
@@ -95,69 +90,135 @@ export default {
     alarm: {
       type: Object,
       default: () => ({})
+    },
+    data: {
+      type: String,
+      default: () => { }
     }
   },
   data() {
     return {
       activeTimeTab: 0,
       timeTabs: ['近24小时', '近7天'],
-      chartInstance: null
-    }
-  },
-  computed: {
-    sensor() {
-      return {
-        name: '13203胶运4100米移变硐室激光甲烷2-T6',
-        currentValue: '1.26',
+      chartInstance: null,
+      orgNo: '',
+      sensor: {
+        name: '',
+        currentValue: '',
         currentColor: '#F53F3F',
-        highAlarm: '1',
-        lowAlarm: '0'
+        highAlarm: '',
+        lowAlarm: ''
+      },
+      sensorInfo: {
+        sensorNo: '',
+        dataTime: '',
+        areaGroup: '',
+        type: ''
+      },
+      chartData: {
+        hours: [],
+        currentData: [],
+        highAlarm: '',
+        lowAlarm: ''
       }
-    },
-    sensorInfo() {
-      return {
-        sensorNo: '14042300201MN001',
-        dataTime: '2026-08-23 16:23:19',
-        areaGroup: '13203工作面',
-        type: '甲烷'
-      }
-    },
-    chartData() {
-      const hours = this.activeTimeTab === 0
-        ? ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00']
-        : ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-      const lowData = this.activeTimeTab === 0
-        ? [0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02]
-        : [0.01, 0.02, 0.01, 0.03, 0.02, 0.01, 0.02]
-      const highData = this.activeTimeTab === 0
-        ? [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-        : [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-      const currentData = this.activeTimeTab === 0
-        ? [0.6, 0.62, 0.65, 0.68, 0.72, 0.78, 0.88]
-        : [0.7, 0.75, 0.68, 0.82, 0.79, 0.85, 0.9]
-      return { hours, lowData, highData, currentData }
     }
   },
   watch: {
     visible(val) {
       if (val) {
-        this.$nextTick(() => {
-          this.initChart()
-        })
+        if (this.data) {
+          this.getRealTime()
+          this.getHistory()
+        }
       }
     }
   },
   mounted() {
+    const params = new URLSearchParams(location.search)
+
+    this.orgNo = params.get('orgNo')
     if (this.visible) {
-      this.$nextTick(() => {
-        this.initChart()
-      })
+      if (this.data) {
+          this.getRealTime()
+          this.getHistory()
+        }
     }
   },
   beforeDestroy() {
     this.destroyChart()
   },
   methods: {
+    async postData(url = "", data = {}) {
+      data.orgNo = this.orgNo
+      const response = await fetch(url, {
+        method: "POST",
+
+        body: JSON.stringify(data),
+      });
+      return response.json();
+    },
+    getRealTime() {
+      this.postData('/api/scaqyzt/getRealTime', {
+        LOT_DOMAIN: this.data.LOT_DOMAIN,
+        GZBH_DSC: this.data.GZBH_DSC,
+        CDBM_DSC: this.data.CDBM_DSC,
+        LOT_TYPE_NAM: this.data.LOT_TYPE_NAM,
+        LOT_NAM: this.data.LOT_NAM,
+        AREA_GROUP: this.data.AREA_GROUP
+      }).then(res => {
+        const data = res.data;
+        this.sensor = {
+          name: data.LOT_NAM,
+          currentValue: data.deviceValue,
+          currentColor: '#F53F3F',
+          highAlarm: data.gbValue,
+          lowAlarm: data.dbValue
+        }
+        this.sensorInfo = {
+          sensorNo: data.GZBH_DSC,
+          dataTime: data.dataTime,
+          areaGroup: data.AREA_GROUP,
+          type: data.LOT_TYPE_NAM
+        }
+        this.chartData.highAlarm = data.gbValue,
+        this.chartData.lowAlarm = data.dbValue
+      })
+    },
+    getDateYmd(date = new Date()) {
+      const d = new Date(date);
+      const year = d.getFullYear();
+      const month = d.getMonth() + 1;
+      const day = d.getDate();
+      const m = month < 10 ? '0' + month : month;
+      const dd = day < 10 ? '0' + day : day;
+      return `${year}${m}${dd}`;
+    },
+    getHistory() {
+      const end = this.getDateYmd()
+      let start = ''
+      if (this.activeTimeTab === 0) {
+        start = this.getDateYmd(new Date(new Date().getTime() - 24 * 60 * 60 * 1000))
+      } else {
+        start = this.getDateYmd(new Date(new Date().getTime() - 24 * 7 * 60 * 60 * 1000))
+      }
+      this.postData('/api/scaqyzt/History', {
+        dimType: 'd',
+        GZBH_DSC: this.data.GZBH_DSC,
+        CDBM_DSC: this.data.CDBM_DSC,
+        LOT_TYPE_NAM: this.data.LOT_TYPE_NAM,
+        start,
+        end
+      }).then(res => {
+        const data = res.data
+        this.chartData = {
+          hours: Object.keys(data),
+          currentData: Object.values(data)
+        }
+        this.$nextTick(() => {
+          this.initChart()
+        })
+      })
+    },
     onClose() {
       this.$emit('update:visible', false)
       this.$emit('close')
@@ -174,8 +235,30 @@ export default {
     },
     initChart() {
       if (!this.$refs.chartRef) return
-      this.chartInstance = echarts.init(this.$refs.chartRef)
-      const { hours, lowData, highData, currentData } = this.chartData
+      if (!this.chartInstance) {
+        this.chartInstance = echarts.init(this.$refs.chartRef)
+      }
+
+      const { hours, highAlarm, lowAlarm, currentData } = this.chartData
+      // 动态构建 markLine：有值才绘制
+      const markLineData = []
+      if (highAlarm != null && highAlarm !== '') {
+        markLineData.push({
+          yAxis: highAlarm,
+          name: '高报',
+          lineStyle: { color: '#EC3000', type: 'dashed' },
+          label: { position: 'end', formatter: '{c}%' }
+        })
+      }
+      if (lowAlarm != null && lowAlarm !== '') {
+        markLineData.push({
+          yAxis: lowAlarm,
+          name: '低报',
+          lineStyle: { color: '#1764E8', type: 'dashed' },
+          label: { position: 'end', formatter: '{c}%' }
+        })
+      }
+
       this.chartInstance.setOption({
         grid: {
           top: 36,
@@ -197,32 +280,7 @@ export default {
           splitLine: { lineStyle: { color: '#f0f0f0' } },
           axisLabel: { color: '#888', fontSize: 11, formatter: '{value}%' }
         },
-        legend: {
-          data: ['低报', '高报'],
-          top: 4,
-          right: 0,
-          itemWidth: 16,
-          itemHeight: 3,
-          textStyle: { color: '#666', fontSize: 12 }
-        },
         series: [
-          {
-            name: '低报',
-            type: 'line',
-            data: lowData,
-            smooth: true,
-            symbol: 'none',
-            lineStyle: { color: '#1764e8', width: 2 },
-            areaStyle: { color: 'rgba(23,100,232,0.06)' }
-          },
-          {
-            name: '高报',
-            type: 'line',
-            data: highData,
-            smooth: true,
-            symbol: 'none',
-            lineStyle: { color: '#F53F3F', width: 2 }
-          },
           {
             name: '当前值',
             type: 'line',
@@ -231,7 +289,11 @@ export default {
             symbol: 'circle',
             symbolSize: 4,
             lineStyle: { color: '#52c41a', width: 2 },
-            areaStyle: { color: 'rgba(82,196,26,0.06)' }
+            areaStyle: { color: 'rgba(82,196,26,0.06)' },
+            markLine: {
+              silent: true,
+              data: markLineData
+            }
           }
         ]
       })
@@ -272,8 +334,8 @@ export default {
   display: flex;
   align-items: center;
   font-weight: bold;
-font-size: 16px;
-color: #333333;
+  font-size: 16px;
+  color: #333333;
 }
 
 .scm-title-arrow {
@@ -380,8 +442,8 @@ color: #333333;
 .scm-info-value {
   font-family: D-DIN;
   font-weight: bold;
-font-size: 20px;
-color: #4A8DFF;
+  font-size: 20px;
+  color: #4A8DFF;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

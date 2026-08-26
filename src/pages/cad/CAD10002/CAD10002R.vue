@@ -14,34 +14,46 @@
           <div class="viewer-panel" :style="{width: panelCollapsed ? '' : '545px'}" :class="panelCollapsed?'':'expand'">
             <template v-if="tabIndex === 0">
                 <ViewerPanel
+                    ref="panelSafety"
                     v-show="!panelCollapsed"
                     :categories="categories"
                     title="安全检测"
+                    panel-key="safety"
                     style="height: calc(100% - 36px); margin-bottom: 16px;"
+                    @select-change="onPanelSelectChange"
                 />
             </template>
             <template v-if="tabIndex === 1">
                 <ViewerPanel
+                    ref="panelHydro"
                     v-show="!panelCollapsed"
                     title="水文检测"
                     :categories="categories1"
+                    panel-key="hydro"
                     style="height: calc(100% - 36px); margin-bottom: 16px;"
+                    @select-change="onPanelSelectChange"
                 />
             </template>
             <template v-if="tabIndex === 2">
                 <ViewerPanel
+                    ref="panelGas"
                     v-show="!panelCollapsed"
                     title="瓦斯抽采"
                     :categories="categories2"
+                    panel-key="gas"
                     style="height: calc(100% - 36px); margin-bottom: 16px;"
+                    @select-change="onPanelSelectChange"
                 />
             </template>
             <template v-if="tabIndex === 3">
                 <ViewerPanel
+                    ref="panelPerson"
                     v-show="!panelCollapsed"
                     :categories="categories3"
                     title="人员定位"
+                    panel-key="person"
                     style="height: calc(100% - 36px); margin-bottom: 16px;"
+                    @select-change="onPanelSelectChange"
                 />
             </template>
               <div v-if="panelCollapsed" class="viewer-panel-btn" @click="panelCollapsed = false">
@@ -116,6 +128,7 @@
           @update:visible="showSafetyCheckModal = $event"
           @close="showSafetyCheckModal = false"
           @alarm-handle="onAlarmHandle"
+          :data="currentData"
         />
       </Modal>
 
@@ -144,6 +157,7 @@
           :visible="showTz"
           @update:visible="showTz = $event"
           @close="showTz = false"
+          @confirm="onConfirmTz"
         />
       </Modal>
     </div>

@@ -6,6 +6,9 @@ import { MxFun, MrxDbgUiPrPoint, MrxDbgUtils, McEdGetPointWorldDrawObject, MxDbL
 import { RegistMxCommands, RxInitMxEntity } from "@/test/command";
 import { MyRect } from "@/test/DrawRect";
 import * as THREE from "three";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { mapState } from 'vuex'
 let rafPending = false
 export default {
@@ -22,7 +25,8 @@ export default {
                 '01': '待解析',
                 '02': '待绑定',
                 '03': '待发布',
-                '04': '发布'
+                '04': '已发布',
+                '05': '已停用'
             },
             pointList: [],
             layers: [],
@@ -95,6 +99,19 @@ export default {
             showPointInfoModal: false,
             detailPos: { x: 0, y: 0 },
             bloomComposer: null,
+            // 辉光相关
+            bloomComposer: null,
+            bloomPass: null,
+            bloomRenderCb: null,
+            bloomResizeCb: null,
+            // 辉光参数（可微调）
+            bloomStrength: 0.6,
+            bloomRadius: 0.5,
+            bloomThreshold: 0.2,
+            popoverTargetObj: null, // ✅ 直接存marker对象，不再存popoverWorldPos
+            detailTargetObj: null, // ✅ 直接存marker对象，不再存detailWorldPos
+            rafId: null,
+            needUpdatePop: false
         }
     },
     components: {
@@ -102,186 +119,186 @@ export default {
         ViewerPanel1
     },
     mounted() {
-        this.pointList = [
-            {
-                "X_VALUE": 23369467.890141826,
-                "Y_VALUE": -30382998.077860042,
-                "z": 0,
-                "LAYER_ID": "288127",
-                "LAYER_NAM": "A通风系统图",
-                "POINT_NAM": "A$C379E0320",
-                "POINT_ID": "58a6"
-            },
-            {
-                "X_VALUE": 23369439.109730206,
-                "Y_VALUE": -30382957.704416513,
-                "z": 0,
-                "LAYER_ID": "288127",
-                "LAYER_NAM": "A通风系统图",
-                "POINT_NAM": "A$C379E0320",
-                "POINT_ID": "58a7"
-            },
-            {
-                "X_VALUE": 23114724.227396417,
-                "Y_VALUE": -28141241.35896348,
-                "z": 0,
-                "LAYER_ID": "288125",
-                "LAYER_NAM": "底图",
-                "POINT_NAM": "栅栏2",
-                "POINT_ID": "6472"
-            },
-            {
-                "X_VALUE": 23114953.04550457,
-                "Y_VALUE": -28137480.675759755,
-                "z": 0,
-                "LAYER_ID": "288125",
-                "LAYER_NAM": "底图",
-                "POINT_NAM": "栅栏2",
-                "POINT_ID": "6666"
-            },
-            {
-                "X_VALUE": 23369400.29165956,
-                "Y_VALUE": -30383083.760237556,
-                "z": 0,
-                "LAYER_ID": "288125",
-                "LAYER_NAM": "底图",
-                "POINT_NAM": "A$C095F2CEC",
-                "POINT_ID": "7b38"
-            },
-            {
-                "X_VALUE": 23372829.43129492,
-                "Y_VALUE": -30382923.520400725,
-                "z": 0,
-                "LAYER_ID": "288125",
-                "LAYER_NAM": "底图",
-                "POINT_NAM": "A$C095F2CEC",
-                "POINT_ID": "7b45"
-            },
-            {
-                "X_VALUE": 23372754.41310084,
-                "Y_VALUE": -30382938.718711346,
-                "z": 0,
-                "LAYER_ID": "288125",
-                "LAYER_NAM": "底图",
-                "POINT_NAM": "A$C095F2CEC",
-                "POINT_ID": "7b48"
-            },
-            {
-                "X_VALUE": 23370027.331389386,
-                "Y_VALUE": -30382984.480325278,
-                "z": 0,
-                "LAYER_ID": "288125",
-                "LAYER_NAM": "底图",
-                "POINT_NAM": "A$C095F2CEC",
-                "POINT_ID": "7b4a"
-            },
-            {
-                "X_VALUE": 23366674.88328121,
-                "Y_VALUE": -30383334.350133996,
-                "z": 0,
-                "LAYER_ID": "288125",
-                "LAYER_NAM": "底图",
-                "POINT_NAM": "A$C38615BD1",
-                "POINT_ID": "7b61"
-            },
-            {
-                "X_VALUE": 23366674.583281208,
-                "Y_VALUE": -30384035.850133996,
-                "z": 0,
-                "LAYER_ID": "288125",
-                "LAYER_NAM": "底图",
-                "POINT_NAM": "A$C38615BD1",
-                "POINT_ID": "7b62"
-            }
-        ].map(item => {
-            item.pointName = item.POINT_NAM
-            item.pointNo = item.POINT_ID
-            item.x = item.X_VALUE
-            item.y = item.Y_VALUE
-            return item
-        })
-        this.points = [
-            {
-                "I2P_NO": "133777110241938767871",
-                "TZPZ_NO": "133775589162091020281",
-                "POINT_X_VALUE": "",
-                "MATCH_STA": "匹配",
-                "POINT_ID": "",
-                "POINT_NAM": "",
-                "PT_Y_VALUE": "-30388651.27496908",
-                "PT_NAM": "氧气1",
-                "PT_NO": "128681301464609980416",
-                "MATCH_TYP": "",
-                "DALTA_XY": "",
-                "PT_ID": "61080201921101MN001200001816",
-                "PT_X_VALUE": "23372898.909408778",
-                "POINT_Y_VALUE": "",
-                "POINT_NO": ""
-            },
-            {
-                "I2P_NO": "133777110241938767872",
-                "TZPZ_NO": "133775589162091020288",
-                "POINT_X_VALUE": "",
-                "MATCH_STA": "未匹配",
-                "POINT_ID": "",
-                "POINT_NAM": "",
-                "PT_Y_VALUE": "-30382999.282143094",
-                "PT_NAM": "氧气",
-                "PT_NO": "128681301464609980416",
-                "MATCH_TYP": "",
-                "DALTA_XY": "",
-                "PT_ID": "61080201921101MN001200001818",
-                "PT_X_VALUE": "23369467.220270775",
-                "POINT_Y_VALUE": "",
-                "POINT_NO": ""
-            },
-            {
-                "I2P_NO": "133777112498138775552",
-                "TZPZ_NO": "133775589162091020288",
-                "POINT_X_VALUE": "",
-                "MATCH_STA": "未匹配",
-                "POINT_ID": "",
-                "POINT_NAM": "",
-                "PT_Y_VALUE": "39394974.134983465",
-                "PT_NAM": "环境温度",
-                "PT_NO": "128681301465683722240",
-                "MATCH_TYP": "",
-                "DALTA_XY": "",
-                "PT_ID": "61080201921101MN000300000200",
-                "PT_X_VALUE": "-63240812.58022698",
-                "POINT_Y_VALUE": "",
-                "POINT_NO": ""
-            },
-            {
-                "I2P_NO": "133777112498138775552",
-                "TZPZ_NO": "133775589162091020288",
-                "POINT_X_VALUE": "",
-                "MATCH_STA": "未匹配",
-                "POINT_ID": "",
-                "POINT_NAM": "",
-                "PT_Y_VALUE": "",
-                "PT_NAM": "环境温度",
-                "PT_NO": "128681301465683722240",
-                "MATCH_TYP": "",
-                "DALTA_XY": "",
-                "PT_ID": "61080201921101MN000300000200",
-                "PT_X_VALUE": "",
-                "POINT_Y_VALUE": "",
-                "POINT_NO": ""
-            }
-        ]
-        this.entity = {
-            "TZPZ_ID": "",
-            "TZXX_NO": "11",
-            "TZPZ_USR": "111",
-            "TZPZ_DAT": "2026-11-12",
-            "TZPZ_STA": "04",
-            "resourceUrl": "",
-            "TZXX_ID": "",
-            "TZLX_NAM": "",
-            "TZ_VERSION": "",
-            TZPZ_NO: "",
-        }
+        // this.pointList = [
+        //     {
+        //         "X_VALUE": 23369467.890141826,
+        //         "Y_VALUE": -30382998.077860042,
+        //         "z": 0,
+        //         "LAYER_ID": "288127",
+        //         "LAYER_NAM": "A通风系统图",
+        //         "POINT_NAM": "A$C379E0320",
+        //         "POINT_ID": "58a6"
+        //     },
+        //     {
+        //         "X_VALUE": 23369439.109730206,
+        //         "Y_VALUE": -30382957.704416513,
+        //         "z": 0,
+        //         "LAYER_ID": "288127",
+        //         "LAYER_NAM": "A通风系统图",
+        //         "POINT_NAM": "A$C379E0320",
+        //         "POINT_ID": "58a7"
+        //     },
+        //     {
+        //         "X_VALUE": 23114724.227396417,
+        //         "Y_VALUE": -28141241.35896348,
+        //         "z": 0,
+        //         "LAYER_ID": "288125",
+        //         "LAYER_NAM": "底图",
+        //         "POINT_NAM": "栅栏2",
+        //         "POINT_ID": "6472"
+        //     },
+        //     {
+        //         "X_VALUE": 23114953.04550457,
+        //         "Y_VALUE": -28137480.675759755,
+        //         "z": 0,
+        //         "LAYER_ID": "288125",
+        //         "LAYER_NAM": "底图",
+        //         "POINT_NAM": "栅栏2",
+        //         "POINT_ID": "6666"
+        //     },
+        //     {
+        //         "X_VALUE": 23369400.29165956,
+        //         "Y_VALUE": -30383083.760237556,
+        //         "z": 0,
+        //         "LAYER_ID": "288125",
+        //         "LAYER_NAM": "底图",
+        //         "POINT_NAM": "A$C095F2CEC",
+        //         "POINT_ID": "7b38"
+        //     },
+        //     {
+        //         "X_VALUE": 23372829.43129492,
+        //         "Y_VALUE": -30382923.520400725,
+        //         "z": 0,
+        //         "LAYER_ID": "288125",
+        //         "LAYER_NAM": "底图",
+        //         "POINT_NAM": "A$C095F2CEC",
+        //         "POINT_ID": "7b45"
+        //     },
+        //     {
+        //         "X_VALUE": 23372754.41310084,
+        //         "Y_VALUE": -30382938.718711346,
+        //         "z": 0,
+        //         "LAYER_ID": "288125",
+        //         "LAYER_NAM": "底图",
+        //         "POINT_NAM": "A$C095F2CEC",
+        //         "POINT_ID": "7b48"
+        //     },
+        //     {
+        //         "X_VALUE": 23370027.331389386,
+        //         "Y_VALUE": -30382984.480325278,
+        //         "z": 0,
+        //         "LAYER_ID": "288125",
+        //         "LAYER_NAM": "底图",
+        //         "POINT_NAM": "A$C095F2CEC",
+        //         "POINT_ID": "7b4a"
+        //     },
+        //     {
+        //         "X_VALUE": 23366674.88328121,
+        //         "Y_VALUE": -30383334.350133996,
+        //         "z": 0,
+        //         "LAYER_ID": "288125",
+        //         "LAYER_NAM": "底图",
+        //         "POINT_NAM": "A$C38615BD1",
+        //         "POINT_ID": "7b61"
+        //     },
+        //     {
+        //         "X_VALUE": 23366674.583281208,
+        //         "Y_VALUE": -30384035.850133996,
+        //         "z": 0,
+        //         "LAYER_ID": "288125",
+        //         "LAYER_NAM": "底图",
+        //         "POINT_NAM": "A$C38615BD1",
+        //         "POINT_ID": "7b62"
+        //     }
+        // ].map(item => {
+        //     item.pointName = item.POINT_NAM
+        //     item.pointNo = item.POINT_ID
+        //     item.x = item.X_VALUE
+        //     item.y = item.Y_VALUE
+        //     return item
+        // })
+        // this.points = [
+        //     {
+        //         "I2P_NO": "133777110241938767871",
+        //         "TZPZ_NO": "133775589162091020281",
+        //         "POINT_X_VALUE": "",
+        //         "MATCH_STA": "匹配",
+        //         "POINT_ID": "",
+        //         "POINT_NAM": "",
+        //         "PT_Y_VALUE": "-30388651.27496908",
+        //         "PT_NAM": "氧气1",
+        //         "PT_NO": "128681301464609980416",
+        //         "MATCH_TYP": "",
+        //         "DALTA_XY": "",
+        //         "PT_ID": "61080201921101MN001200001816",
+        //         "PT_X_VALUE": "23372898.909408778",
+        //         "POINT_Y_VALUE": "",
+        //         "POINT_NO": ""
+        //     },
+        //     {
+        //         "I2P_NO": "133777110241938767872",
+        //         "TZPZ_NO": "133775589162091020288",
+        //         "POINT_X_VALUE": "",
+        //         "MATCH_STA": "未匹配",
+        //         "POINT_ID": "",
+        //         "POINT_NAM": "",
+        //         "PT_Y_VALUE": "-30382999.282143094",
+        //         "PT_NAM": "氧气",
+        //         "PT_NO": "128681301464609980416",
+        //         "MATCH_TYP": "",
+        //         "DALTA_XY": "",
+        //         "PT_ID": "61080201921101MN001200001818",
+        //         "PT_X_VALUE": "23369467.220270775",
+        //         "POINT_Y_VALUE": "",
+        //         "POINT_NO": ""
+        //     },
+        //     {
+        //         "I2P_NO": "133777112498138775552",
+        //         "TZPZ_NO": "133775589162091020288",
+        //         "POINT_X_VALUE": "",
+        //         "MATCH_STA": "未匹配",
+        //         "POINT_ID": "",
+        //         "POINT_NAM": "",
+        //         "PT_Y_VALUE": "39394974.134983465",
+        //         "PT_NAM": "环境温度",
+        //         "PT_NO": "128681301465683722240",
+        //         "MATCH_TYP": "",
+        //         "DALTA_XY": "",
+        //         "PT_ID": "61080201921101MN000300000200",
+        //         "PT_X_VALUE": "-63240812.58022698",
+        //         "POINT_Y_VALUE": "",
+        //         "POINT_NO": ""
+        //     },
+        //     {
+        //         "I2P_NO": "133777112498138775552",
+        //         "TZPZ_NO": "133775589162091020288",
+        //         "POINT_X_VALUE": "",
+        //         "MATCH_STA": "未匹配",
+        //         "POINT_ID": "",
+        //         "POINT_NAM": "",
+        //         "PT_Y_VALUE": "",
+        //         "PT_NAM": "环境温度",
+        //         "PT_NO": "128681301465683722240",
+        //         "MATCH_TYP": "",
+        //         "DALTA_XY": "",
+        //         "PT_ID": "61080201921101MN000300000200",
+        //         "PT_X_VALUE": "",
+        //         "POINT_Y_VALUE": "",
+        //         "POINT_NO": ""
+        //     }
+        // ]
+        // this.entity = {
+        //     "TZPZ_ID": "",
+        //     "TZXX_NO": "11",
+        //     "TZPZ_USR": "111",
+        //     "TZPZ_DAT": "2026-11-12",
+        //     "TZPZ_STA": "04",
+        //     "resourceUrl": "",
+        //     "TZXX_ID": "",
+        //     "TZLX_NAM": "",
+        //     "TZ_VERSION": "",
+        //     TZPZ_NO: "",
+        // }
         const params = new URLSearchParams(location.search)
         if (params.get('TZPZ_NO')) {
             this.entity.TZPZ_NO = params.get('TZPZ_NO')
@@ -312,23 +329,133 @@ export default {
     beforeDestroy() {
         this.destroyAnnotationEvent();
         this.destroyAnnotationBloom();
+        // this.unlistenPostRender();
+        this.unlistenViewChange()
+        if (this.rafId) {
+            cancelAnimationFrame(this.rafId);
+            this.rafId = null;
+        }
         this.matchMode = null;
         this.selectedSurveyPoint = null;
         this.manualPlaceVisible = false;
         this.manualPlaceHasCoordFill = false;
     },
     methods: {
-        initAnnotationBloom() {
-            if (!this.annotationBloomEnabled) return;
+        world2Screen(worldPos) {
+            if (!worldPos) return null;
             const mxObj = MxFun.getCurrentDraw();
+            if (!mxObj) return null;
+            const canvas = document.getElementById("mxcad");
+            if (!canvas) return null;
+            const screenPt = MxFun.worldCoord2Screen(worldPos.x, worldPos.y, worldPos.z || 0);
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: screenPt.x,
+                y: screenPt.y,
+                rect
+            };
+        },
+        adjustPopBoundary(screenX, screenY, rect, popW = 160, popH = 80) {
+            let x = screenX;
+            let y = screenY;
+            // canvas容器内边界
+            const maxX = rect.width - popW;
+            const maxY = rect.height - popH;
+            if (x > maxX) x = maxX;
+            if (y > maxY) y = maxY;
+            if (x < 0) x = 0;
+            if (y < 0) y = 0;
+            return { x, y };
+        },
+        // 统一更新标记，放入raf节流
+        markNeedUpdate() {
+            this.needUpdatePop = true;
+            if (!this.rafId) {
+                this.rafId = requestAnimationFrame(() => {
+                    this.refreshAllPopPos();
+                    this.rafId = null;
+                    this.needUpdatePop = false;
+                });
+            }
+        },
+        refreshAllPopPos() {
+            // 匹配弹窗
+            if (this.showManualMatchPop && this.popoverTargetObj) {
+                const worldPos = new THREE.Vector3();
+                worldPos.setFromMatrixPosition(this.popoverTargetObj.matrixWorld); // ✅ 实时读取最新矩阵
+                const res = this.world2Screen(worldPos);
+                console.log(res)
+                if (res) {
+                    const rawX = res.x;
+                    const rawY = res.y + 24;
+                    // 不做边界溢出处理，直接赋值
+                    this.popoverPos = { x: rawX, y: rawY }
+                }
+            }
+            // 详情弹窗
+            if (this.showPointInfoModal && this.detailTargetObj) {
+                const worldPos = new THREE.Vector3();
+                worldPos.setFromMatrixPosition(this.detailTargetObj.matrixWorld);
+                const res = this.world2Screen(worldPos);
+                console.log(res)
+                if (res) {
+                    const rawX = res.x + 24;
+                    const rawY = res.y - 15;
+                    const pos = this.adjustPopBoundary(rawX, rawY, res.rect, 140, 60);
+                    this.detailPos = { x: rawX, y: rawY }
+                }
+            }
+            // tooltip
+            //   if (this.lastHoverGroup) {
+            //     const worldPos = new THREE.Vector3();
+            //     worldPos.setFromMatrixPosition(this.lastHoverGroup.matrixWorld);
+            //     const res = this.world2Screen(worldPos);
+            //     if (res) {
+            //       const rawX = res.x + 12;
+            //       const rawY = res.y;
+            //       const pos = this.adjustPopBoundary(rawX, rawY, res.rect, 120, 32);
+            //       this.tooltip.x = pos.x;
+            //       this.tooltip.y = pos.y;
+            //     }
+            //   }
+        },
+        listenCanvasViewChange() {
+            const mxObj = MxFun.getCurrentDraw();
+            // mxdraw视图变化事件（平移、滚轮缩放都会触发）
+            this.viewChangeHandler = () => {
+                console.log(1111)
+                this.markNeedUpdate();
+            };
+            mxObj.on("viewchange", this.viewChangeHandler);
+            // 浏览器窗口大小变化
+            this.winResizeHandler = () => {
+                this.markNeedUpdate();
+            };
+            window.addEventListener("resize", this.winResizeHandler);
+        },
+        unlistenViewChange() {
+            const mxObj = MxFun.getCurrentDraw();
+            if (this.viewChangeHandler && mxObj) {
+                mxObj.off("viewchange", this.viewChangeHandler);
+            }
+            if (this.winResizeHandler) {
+                window.removeEventListener("resize", this.winResizeHandler);
+            }
+        },
+        initAnnotationBloom() {
+            const mxObj = MxFun.getCurrentDraw();
+            if (!mxObj) return;
             const scene = mxObj.getScene();
             const camera = mxObj.getCamera();
             const renderer = mxObj.getRenderer();
             if (!scene || !camera || !renderer) return;
             if (this.bloomComposer) return;
+
+            // 创建辉光合成器
             this.bloomComposer = new EffectComposer(renderer);
             const renderPass = new RenderPass(scene, camera);
             this.bloomComposer.addPass(renderPass);
+
             this.bloomPass = new UnrealBloomPass(
                 new THREE.Vector2(window.innerWidth, window.innerHeight),
                 this.bloomStrength,
@@ -336,31 +463,50 @@ export default {
                 this.bloomThreshold
             );
             this.bloomComposer.addPass(this.bloomPass);
+
+            // 关键：关闭自动清屏，让 mxdraw 先画 CAD，再叠加辉光
+            renderer.autoClear = false;
+
+            // 注册 mxdraw 渲染后回调，叠加辉光
             this.bloomRenderCb = () => {
-                this.bloomComposer.render();
+                if (this.bloomComposer) {
+                    this.bloomComposer.render();
+                }
             };
             mxObj.on("postRender", this.bloomRenderCb);
-            this.handleBloomResize = () => {
-                if (this.bloomPass) this.bloomPass.setSize(window.innerWidth, window.innerHeight);
+
+            // 窗口大小变化
+            this.bloomResizeCb = () => {
+                if (this.bloomPass) {
+                    this.bloomPass.setSize(window.innerWidth, window.innerHeight);
+                }
             };
-            window.addEventListener("resize", this.handleBloomResize);
+            window.addEventListener("resize", this.bloomResizeCb);
+
             mxObj.updateDisplay(true);
+            console.log("✅ 辉光初始化完成");
         },
         destroyAnnotationBloom() {
             const mxObj = MxFun.getCurrentDraw();
             if (this.bloomRenderCb && mxObj) {
                 mxObj.off("postRender", this.bloomRenderCb);
+                this.bloomRenderCb = null;
             }
-            if (this.handleBloomResize) {
-                window.removeEventListener("resize", this.handleBloomResize);
+            if (this.bloomResizeCb) {
+                window.removeEventListener("resize", this.bloomResizeCb);
+                this.bloomResizeCb = null;
             }
             if (this.bloomComposer) {
-                this.bloomComposer.passes.forEach(pass => {
+                this.bloomComposer.passes.forEach((pass) => {
                     if (pass.dispose) pass.dispose();
                 });
                 this.bloomComposer = null;
             }
             this.bloomPass = null;
+            // 恢复渲染器默认状态
+            if (mxObj && mxObj.getRenderer()) {
+                mxObj.getRenderer().autoClear = true;
+            }
         },
         initAnnotationClick() {
             const canvas = document.getElementById("mxcad");
@@ -378,7 +524,7 @@ export default {
                 canvas.removeEventListener("mousedown", this.handleAnnotationClick, true);
                 canvas.removeEventListener("mousemove", this.handleAnnotationHover);
             }
-            this.tooltip.show = false;
+            // this.tooltip.show = false;
         },
         handleAnnotationHover(e) {
             try {
@@ -402,6 +548,7 @@ export default {
 
                 let hoverTargetGroup = null;
                 for (const intersect of intersects) {
+                    if (intersect.object.userData?.isWaveRing) continue;
                     let curObj = intersect.object;
                     while (curObj) {
                         if (curObj.userData && curObj.userData.isAnnotationPoint) {
@@ -413,16 +560,12 @@ export default {
                     if (hoverTargetGroup) break;
                 }
 
-                // 恢复上一个hover节点大小和发光
+                // 上一个hover对象：清除光晕 + 恢复原始大小
                 if (this.lastHoverGroup) {
+                    this.stopRingWave(this.lastHoverGroup);
                     if (this.lastHoverGroup.userData.originScale) {
                         this.lastHoverGroup.scale.copy(this.lastHoverGroup.userData.originScale);
                     }
-                    this.lastHoverGroup.traverse((obj) => {
-                        if (obj.material && obj.material.emissiveIntensity !== undefined) {
-                            obj.material.emissiveIntensity = 0.2;
-                        }
-                    });
                     this.lastHoverGroup = null;
                 }
 
@@ -430,22 +573,17 @@ export default {
                     if (!hoverTargetGroup.userData.originScale) {
                         hoverTargetGroup.userData.originScale = hoverTargetGroup.scale.clone();
                     }
-                    // 放大1.4倍
-                    hoverTargetGroup.scale.copy(hoverTargetGroup.userData.originScale).multiplyScalar(1.4);
+                    // 图标放大1.4倍
+                    hoverTargetGroup.scale.copy(hoverTargetGroup.userData.originScale).multiplyScalar(1.2);
                     this.lastHoverGroup = hoverTargetGroup;
-                    // 悬浮增强自发光，模拟辉光
-                    hoverTargetGroup.traverse((obj) => {
-                        if (obj.material && obj.material.emissiveIntensity !== undefined) {
-                            obj.material.emissiveIntensity = 0.9;
-                        }
-                    });
-                } else {
-
+                    // ✅ 启动外圈扩散光晕
+                    this.startRingWave(hoverTargetGroup, mxObj);
                 }
+
                 canvas.style.cursor = hoverTargetGroup ? "pointer" : "";
                 mxObj.updateDisplay(true);
             } catch (err) {
-                console.error('hover异常', err);
+                console.error("hover异常", err);
             }
         },
 
@@ -474,6 +612,7 @@ export default {
                     if (!this.selectedSurveyPoint) return;
 
                     for (const inter of intersects) {
+                        if (inter.object.userData?.isWaveRing) continue;
                         let curObj = inter.object;
                         while (curObj) {
                             if (curObj.userData && curObj.userData.isAnnotationPoint) {
@@ -509,10 +648,9 @@ export default {
                                     drawPoint: targetDrawPoint,
                                     // matchGap: Number(gap.toFixed(2))
                                 };
-                                this.popoverPos = {
-                                    x: clickX,
-                                    y: clickY + 26
-                                };
+                                this.popoverTargetObj = curObj;
+                                // 立刻计算一次屏幕位置
+                                this.markNeedUpdate();
                                 this.popData = {
                                     realPoint: this.selectedSurveyPoint,
                                     drawPoint: targetDrawPoint,
@@ -527,6 +665,7 @@ export default {
                     return;
                 }
                 for (const intersect of intersects) {
+                    if (intersect.object.userData?.isWaveRing) continue;
                     let curObj = intersect.object;
                     // =========关键：向上遍历父节点，找到标记根group=========
                     while (curObj) {
@@ -536,10 +675,8 @@ export default {
                             if (bindItem) {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                this.detailPos = {
-                                    x: clickX + 24,
-                                    y: clickY - 16
-                                };
+                                this.detailTargetObj = curObj;
+                                this.markNeedUpdate();
                                 this.pointInfo = bindItem.type === '1' ? `图纸点位：${bindItem.name}` : `实时测点：${bindItem.name}`;
                                 this.showPointInfoModal = true;
                                 setTimeout(() => {
@@ -585,102 +722,95 @@ export default {
             });
             this.closeManualPop();
         },
-        createTempLine(startVec, endVec) {
-            this.destroyTempLine();
-            const mxObj = MxFun.getCurrentDraw();
-            const scene = mxObj.getScene();
-            const camera = mxObj.getCamera();
-            const renderer = mxObj.getRenderer();
+        createTempLine(startWorld, endWorld) {
+  this.destroyTempLine();
+  const mxObj = MxFun.getCurrentDraw();
+  if (!mxObj) return;
 
-            const start = new THREE.Vector3(startVec.x, startVec.y, startVec.z);
-            const end = new THREE.Vector3(endVec.x, endVec.y, endVec.z);
+  const start = new THREE.Vector3(startWorld.x, startWorld.y, startWorld.z || 0);
+  const end = new THREE.Vector3(endWorld.x, endWorld.y, endWorld.z || 0);
+  const p2Rel = end.clone().sub(start);
+  const dist = p2Rel.length();
+  if (dist < 0.05) {
+    console.warn("两点距离过小，跳过绘制连线");
+    return;
+  }
+  const dir = p2Rel.clone().normalize();
 
-            const dir = new THREE.Vector3().subVectors(end, start);
-            const dist = dir.length();
-            if (dist < 0.05) {
-                console.warn("两点距离过小，跳过绘制连线");
-                return;
-            }
-            dir.normalize();
+  // 线段
+  const points = [new THREE.Vector3(0,0,0), p2Rel];
+  const geoLine = new THREE.BufferGeometry().setFromPoints(points);
+  const matLine = new THREE.LineBasicMaterial({
+    color: 0xff7700,
+    depthTest: false,
+    depthWrite: false
+  });
+  const line = new THREE.Line(geoLine, matLine);
+  line.renderOrder = 9997; // ✅ 置顶层级，和你marker保持统一
 
-            // =====大坐标偏移核心：以start为基准，顶点使用相对坐标=====
-            const basePos = start.clone();
-            const p1Rel = new THREE.Vector3(0, 0, 0);
-            const p2Rel = end.clone().sub(basePos);
+  // 箭头圆锥
+  const arrowSize = 6; // ✅ 调大默认尺寸，世界坐标，可视性更好
+  const coneGeo = new THREE.ConeGeometry(arrowSize * 0.4, arrowSize, 4);
+  const coneMat = new THREE.MeshBasicMaterial({
+    color: 0xff7700,
+    depthTest: false,
+    depthWrite: false
+  });
+  const cone = new THREE.Mesh(coneGeo, coneMat);
+  cone.renderOrder = 9997;
+  const quat = new THREE.Quaternion().setFromUnitVectors(
+    new THREE.Vector3(0, 1, 0),
+    dir
+  );
+  cone.quaternion.copy(quat);
+  cone.position.copy(p2Rel).addScaledVector(dir, -arrowSize / 2);
 
-            // 主线(原生Line，仅1px)
-            const points = [p1Rel, p2Rel];
-            const geoLine = new THREE.BufferGeometry().setFromPoints(points);
-            const matLine = new THREE.LineBasicMaterial({
-                color: 0xff7700,
-                depthTest: false,
-                depthWrite: false
-            });
-            const line = new THREE.Line(geoLine, matLine);
+  this.tempLineGroup = new THREE.Group();
+  this.tempLineGroup.position.copy(start);
+  this.tempLineGroup.add(line);
+  this.tempLineGroup.add(cone);
 
-            // 箭头圆锥
-            const arrowSize = 2.2;
-            const coneGeo = new THREE.ConeGeometry(arrowSize * 0.4, arrowSize, 4);
-            const coneMat = new THREE.MeshBasicMaterial({
-                color: 0xff7700,
-                depthTest: false,
-                depthWrite: false
-            });
-            const cone = new THREE.Mesh(coneGeo, coneMat);
+  // ✅ 关键！不用 scene.add，使用 mxObj.addObject 托管（mxdraw标准写法）
+  mxObj.addObject(this.tempLineGroup);
 
-            // 朝向：Cone默认尖向+Y；旋转到dir方向
-            const quat = new THREE.Quaternion().setFromUnitVectors(
-                new THREE.Vector3(0, 1, 0),
-                dir
-            );
-            cone.quaternion.copy(quat);
-            // ✅关键：向线段反方向偏移半个圆锥高度，锥尖正好落在end点
-            cone.position.copy(p2Rel).addScaledVector(dir, -arrowSize / 2);
+  // ✅ 删掉手动render、autoClear=false 这套逻辑！不再使用postRender二次渲染
+  // this.postRenderCb = () => { renderer.render(scene, camera); };
+  // mxObj.on("postRender", this.postRenderCb);
 
-            // group整体放置到CAD真实世界位置
-            this.tempLineGroup = new THREE.Group();
-            this.tempLineGroup.position.copy(basePos);
-            this.tempLineGroup.add(line);
-            this.tempLineGroup.add(cone);
-            scene.add(this.tempLineGroup);
+  // 视口刷新监听（平移缩放同步）
+  this.viewChangeCb = () => {
+    mxObj.updateDisplay(true);
+  };
+  mxObj.on("viewChange", this.viewChangeCb);
 
-            // =====叠加渲染，解决被CAD画布遮挡=====
-            renderer.autoClear = false;
-            this.postRenderCb = () => {
-                renderer.render(scene, camera);
-            };
-            mxObj.on("postRender", this.postRenderCb);
+  mxObj.updateDisplay(true);
+},
 
-            mxObj.updateDisplay(true);
-        },
-        destroyTempLine() {
-            const mxObj = MxFun.getCurrentDraw();
-            const scene = mxObj?.getScene?.();
-            const renderer = mxObj?.getRenderer?.();
+// 配套销毁方法，避免残留
+destroyTempLine() {
+  const mxObj = MxFun.getCurrentDraw();
+  if (!mxObj || !this.tempLineGroup) return;
 
-            // 解绑渲染回调
-            if (this.postRenderCb) {
-                mxObj.off("postRender", this.postRenderCb);
-                this.postRenderCb = null;
-            }
+  // 解绑viewChange
+  if (this.viewChangeCb) {
+    mxObj.off("viewChange", this.viewChangeCb);
+    this.viewChangeCb = null;
+  }
+  // 如果你之前保留了postRender，这里也要解绑
+  if (this.postRenderCb) {
+    mxObj.off("postRender", this.postRenderCb);
+    this.postRenderCb = null;
+  }
 
-            // 销毁group下所有几何体材质
-            if (this.tempLineGroup && scene) {
-                this.tempLineGroup.traverse((obj) => {
-                    if (obj.geometry) obj.geometry.dispose();
-                    if (obj.material) obj.material.dispose();
-                });
-                scene.remove(this.tempLineGroup);
-                this.tempLineGroup = null;
-            }
-
-            // 恢复渲染器默认状态，不干扰mxdraw自身绘制
-            if (renderer) {
-                renderer.autoClear = true;
-            }
-
-            mxObj?.updateDisplay(true);
-        },
+  // 释放资源
+  this.tempLineGroup.traverse((obj) => {
+    if (obj.geometry) obj.geometry.dispose();
+    if (obj.material) obj.material.dispose();
+  });
+  mxObj.removeObject(this.tempLineGroup);
+  this.tempLineGroup = null;
+  mxObj.updateDisplay(true);
+},
         // createTempLine(startVec, endVec) {
         //     this.destroyTempLine();
         //     const mxObj = MxFun.getCurrentDraw();
@@ -768,7 +898,52 @@ export default {
             this.currentEditPoint = bindItem;
             this.showPointInfoModal = true;
         },
+        clearAllBindMarkers() {
+            const mxObj = MxFun.getCurrentDraw();
+            if (!mxObj) return;
+            const scene = mxObj.getScene?.();
+            if (!scene) return;
+
+            // 遍历场景全部子物体，找到所有标注组
+            const toRemove = [];
+            scene.traverse((obj) => {
+                if (obj.userData && obj.userData.isAnnotationPoint) {
+                    toRemove.push(obj);
+                }
+            });
+
+            toRemove.forEach(group => {
+                // 停止波纹动画，清理光晕资源
+                this.stopRingWave(group);
+                // 释放group内部所有mesh的geometry、material
+                group.traverse(child => {
+                    if (child.isMesh) {
+                        if (child.geometry) child.geometry.dispose();
+                        if (child.material) {
+                            if (Array.isArray(child.material)) {
+                                child.material.forEach(mat => mat.dispose());
+                            } else {
+                                child.material.dispose();
+                            }
+                        }
+                    }
+                });
+                // 从场景移除
+                mxObj.removeObject(group);
+            });
+
+            // 清空hover缓存，防止残留状态
+            this.lastHoverGroup = null;
+            mxObj.updateDisplay(true);
+        },
+        hasMarkerById(id) {
+            return this.annotationPoints.some(item => item.id === id);
+        },
         createBindMarker(bindItem) {
+            if (this.hasMarkerById(bindItem.id)) {
+                console.log(`点位${bindItem.id}已存在，跳过创建`);
+                return null;
+            }
             const mxObj = MxFun.getCurrentDraw();
             if (!mxObj) return null;
             const docX = bindItem.x;
@@ -782,16 +957,19 @@ export default {
                 annotationId: bindItem.id,
                 originScale: new THREE.Vector3(baseSize, baseSize, 1),
                 type: bindItem.type,
-                bindItem: bindItem
+                bindItem: bindItem,
+                // 存储光晕实例和动画帧ID
+                ringMesh: null,
+                ringAnimId: null
             };
 
-            if (bindItem.type === '2') {
-                // 绿色方块 + 白色边框
+            if (bindItem.type === "2") {
+                // 绿色方块 #26C557 + 白色边框
                 const geoSquare = new THREE.PlaneGeometry(1, 1);
                 const matSquare = new THREE.MeshStandardMaterial({
-                    color: 0x26C557,
-                    emissive: 0x26C557,
-                    emissiveIntensity: 0.2,
+                    color: 0x26c557,
+                    emissive: 0x26c557,
+                    emissiveIntensity: 0.4,
                     transparent: true,
                     depthTest: false,
                     depthWrite: false,
@@ -799,12 +977,11 @@ export default {
                 });
                 const squareMesh = new THREE.Mesh(geoSquare, matSquare);
                 squareMesh.renderOrder = 9999;
-
                 const geoBorder = new THREE.PlaneGeometry(1.2, 1.2);
                 const matBorder = new THREE.MeshStandardMaterial({
                     color: 0xffffff,
                     emissive: 0xffffff,
-                    emissiveIntensity: 0.1,
+                    emissiveIntensity: 0.2,
                     transparent: true,
                     depthTest: false,
                     depthWrite: false,
@@ -815,12 +992,12 @@ export default {
                 group.add(borderMesh);
                 group.add(squareMesh);
             } else {
-                // 红色圆点
+                // 红色圆点 #EC3000
                 const geoCircle = new THREE.CircleGeometry(0.5, 32);
                 const matCircle = new THREE.MeshStandardMaterial({
                     color: 0xec3000,
                     emissive: 0xec3000,
-                    emissiveIntensity: 0.2,
+                    emissiveIntensity: 0.4,
                     transparent: true,
                     depthTest: false,
                     depthWrite: false,
@@ -830,10 +1007,77 @@ export default {
                 circleMesh.renderOrder = 9999;
                 group.add(circleMesh);
             }
+
             group.scale.set(baseSize, baseSize, 1);
             mxObj.addObject(group);
             mxObj.updateDisplay(true);
             return group;
+        },
+        startRingWave(targetGroup, mxObj) {
+  if (!targetGroup || !targetGroup.userData) return;
+  const user = targetGroup.userData;
+  if (user.ringAnimId) return;
+  const ringColor = user.type === "2" ? 0x26c557 : 0xec3000;
+  const ringGeo = new THREE.RingGeometry(0.5, 0.9, 32);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: ringColor,
+    transparent: true,
+    opacity: 0.6,
+    side: THREE.DoubleSide,
+    depthTest: false,
+    depthWrite: false
+  });
+  const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+  ringMesh.renderOrder = 9997;
+  ringMesh.raycast = () => {};
+  ringMesh.userData.isWaveRing = true;
+
+  targetGroup.add(ringMesh);
+  user.ringMesh = ringMesh;
+
+  let scaleVal = 1;
+  let dir = 1; // 1放大，-1缩小，实现连续呼吸，没有顿挫
+  const speed = 0.03;
+  const maxScale = 1.2;
+  const minScale = 1;
+  let lastRenderTs = 0;
+  const fps = 30;
+  const interval = 1000 / fps;
+
+  function animateWave(timestamp) {
+    // 节流控制，最多30帧刷新一次画布，减少阻塞鼠标事件
+    if (timestamp - lastRenderTs < interval) {
+      user.ringAnimId = requestAnimationFrame(animateWave);
+      return;
+    }
+    lastRenderTs = timestamp;
+
+    scaleVal += speed * dir;
+    if (scaleVal >= maxScale) dir = -1;
+    if (scaleVal <= minScale) dir = 1;
+
+    ringMesh.scale.set(scaleVal, scaleVal, 1);
+    ringMat.opacity = 0.6 * (scaleVal / maxScale);
+    // 老版本只能用updateDisplay，但是已经节流了
+    mxObj.updateDisplay(true);
+
+    user.ringAnimId = requestAnimationFrame(animateWave);
+  }
+  user.ringAnimId = requestAnimationFrame(animateWave);
+  mxObj.updateDisplay(true);
+},
+        stopRingWave(targetGroup) {
+            const user = targetGroup.userData;
+            if (user.ringAnimId) {
+                cancelAnimationFrame(user.ringAnimId);
+                user.ringAnimId = null;
+            }
+            if (user.ringMesh) {
+                targetGroup.remove(user.ringMesh);
+                user.ringMesh.geometry.dispose();
+                user.ringMesh.material.dispose();
+                user.ringMesh = null;
+            }
         },
         createBindMarker1(bindItem) {
             const mxObj = MxFun.getCurrentDraw();
@@ -904,9 +1148,9 @@ export default {
             return group;
         },
         renderMarkersByList(data) {
+            console.log(data, 11111)
             data.forEach(bind => {
-                const mesh = this.createBindMarker(bind);
-                this.annotationPoints.push({ ...bind, mesh: mesh });
+                this.addBindMarker(bind);
             });
         },
         onSelectTz(data) {
@@ -1108,7 +1352,10 @@ export default {
                 title: '提示',
                 content: '停用后前台将无法展示，确定停用吗？停用后，页面跳转至点位绑定页面',
                 onOk: () => {
-
+                    this.upsertTzpp({
+                        "TZPZ_STA": '05',
+                        "TZPZ_NO": this.entity.TZPZ_NO
+                    })
                 }
             })
         },
@@ -1117,7 +1364,7 @@ export default {
         },
         upsertTzpp(data) {
             this.postData('/api/scaqyzt/upsertTzpp', data).then(data => {
-                this.TZPZ_NO = data.data
+                this.entity.TZPZ_NO = data.data.TZPZ_NO
                 this.getTzpzInfo()
             })
         },
@@ -1137,14 +1384,14 @@ export default {
         },
         upsertPoint(data) {
             this.postData('/api/scaqyzt/upsertPoint', data).then(data => {
-                this.getPoint()
+                this.getPoint(true)
                 this.upsertTzpp({
                     "TZPZ_STA": '02',
                     "TZPZ_NO": this.entity.TZPZ_NO
                 })
             })
         },
-        getPoint() {
+        getPoint(flag) {
             this.postData('/api/scaqyzt/getPoint', {
                 "pageSize": "10000",
                 "pageNum": "1",
@@ -1157,6 +1404,12 @@ export default {
                     item.y = item.Y_VALUE
                     return item
                 })
+                this.renderMarkersByList(this.pointList.map(item => {
+                    item.id = item.POINT_NO,
+                        item.name = item.pointName,
+                        item.type = '1'
+                    return item
+                }));
             })
         },
         upsertIot(data) {
@@ -1201,6 +1454,19 @@ export default {
         cancelMatch(data) {
             this.postData('/api/scaqyzt/cancelMatch', data).then(data => {
                 this.getIot()
+            })
+        },
+        onFabu() {
+            this.postData('/api/scaqyzt/upsertTzpp', {
+                "TZPZ_NO": this.entity.TZPZ_NO,
+                "TZPZ_STA": this.entity.TZPZ_STA,
+            }).then(data => {
+                if (flag) {
+                    this.getTzpzInfo()
+                } else {
+                    this.$Message.error('请完成点位绑定')
+                }
+                
             })
         },
         save() {
@@ -1249,13 +1515,19 @@ export default {
                 }
                 this.currentStep = index
             } else if (index == 1) {
-                this.$refs.sForm.validate((valid) => {
+                this.$refs.sForm.validate(async (valid) => {
                     if (!valid) {
                         this.$Message.error('请填写信息保存后再进行下一步操作')
                         return
                     }
                     if (this.entity.TZPZ_STA === '01' || !this.entity.TZPZ_STA) {
                         this.save()
+                    }
+                    if (this.fileUrlInput !== this.lastFileUrl) {
+                        if (this.mxcad) {
+                            await this.mxcad.openWebFile(this.fileUrlInput)
+                        }
+                        this.lastFileUrl = this.fileUrlInput;
                     }
                     this.currentStep = index
                 })
@@ -1269,32 +1541,6 @@ export default {
                         this.initCtrlPan();
                     });
                 }
-            }
-            if (index === 1 && this.fileUrlInput !== this.lastFileUrl) {
-                this.save()
-                if (this.mxcad) {
-                    await this.mxcad.openWebFile(this.fileUrlInput)
-                }
-                this.lastFileUrl = this.fileUrlInput;
-            }
-            if (index == 2 && this.entity.ZTPZ_STA === '01') {
-                this.upsertPoint(
-                    {
-                        "TZPZ_NO": this.entity.TZPZ_NO,
-                        data: this.pointList.map(item => {
-                            return {
-                                "POINT_NO": "",
-                                "POINT_ID": item.no,
-                                "POINT_NAM": item.name,
-                                "X_VALUE": item.x,
-                                "Y_VALUE": item.y,
-                                "LAYER_NO": "",
-                                "LAYER_ID": item.LAYER_ID,
-                                "LAYER_NAM": item.LAYER_NAM
-                            }
-                        })
-                    }
-                )
             }
         },
         onChoose() {
@@ -1442,16 +1688,16 @@ export default {
                     this.layerCount = this.layers.length;
                 });
 
-                this.viewChangeHandler = () => {
-                    // 已有排队渲染，直接跳过，防止重复入队
-                    if (this.isRenderPending) return;
-                    this.isRenderPending = true;
-                    requestAnimationFrame(() => {
-                        this.renderDomMarkers();
-                        this.isRenderPending = false;
-                    })
-                };
-                mxcad.mxdraw.on("viewchange", this.viewChangeHandler);
+                // this.viewChangeHandler = () => {
+                //     // 已有排队渲染，直接跳过，防止重复入队
+                //     if (this.isRenderPending) return;
+                //     this.isRenderPending = true;
+                //     requestAnimationFrame(() => {
+                //         this.renderDomMarkers();
+                //         this.isRenderPending = false;
+                //     })
+                // };
+                // mxcad.mxdraw.on("viewchange", this.viewChangeHandler);
 
                 // 监听命令行输入
                 MxFun.listenForCommandLineInput((msg) => {
@@ -1474,6 +1720,9 @@ export default {
                 this.$Message.error("MxCAD 查看器初始化失败: " + error.message);
             }
             this.initAnnotationClick()
+            this.initAnnotationBloom();
+            this.listenCanvasViewChange();
+            // this.initPostRenderUpdate()
             // this._bindMarkerClickEvent();
         },
         /**
@@ -1618,17 +1867,42 @@ export default {
             }
             // 收集点位数据
             if (this.entity.TZPZ_STA === '01') {
-                this.pointList = this.getAllMcDbPoint();
+                const pointList = this.getAllMcDbPoint();
+                this.upsertPoint(
+                    {
+                        "TZPZ_NO": this.entity.TZPZ_NO,
+                        data: pointList.map(item => {
+                            return {
+                                "POINT_NO": "",
+                                "POINT_ID": item.no,
+                                "POINT_NAM": item.name,
+                                "X_VALUE": item.x,
+                                "Y_VALUE": item.y,
+                                "LAYER_NO": "",
+                                "LAYER_ID": item.LAYER_ID,
+                                "LAYER_NAM": item.LAYER_NAM
+                            }
+                        })
+                    }
+                )
+            } else {
+                // this.renderMarkersByList(this.pointList.map(item => {
+                //     item.id = item.POINT_NO || item.pointNo,
+                //         item.name = item.pointName,
+                //         item.type = '1'
+                //     return item
+                // }));
+                this.getPoint()
             }
-            if (this.pointList.length) {
-                // this.renderDomMarkers();
-                this.renderMarkersByList(this.pointList.map(item => {
-                    item.id = item.pointNo,
-                        item.name = item.pointName,
-                        item.type = '1'
-                    return item
-                }));
-            }
+            // if (this.pointList.length) {
+            //     // this.renderDomMarkers();
+            //     this.renderMarkersByList(this.pointList.map(item => {
+            //         item.id = item.POINT_NO || item.pointNo,
+            //             item.name = item.pointName,
+            //             item.type = '1'
+            //         return item
+            //     }));
+            // }
         },
 
         /**
@@ -1671,14 +1945,54 @@ export default {
          * @param {number} zoomFactor - 放大倍数，默认 3
          */
         zoomToPoint(x, y, zoomFactor = 3) {
-            if (!x || !y) {
-                return
+            const strX = String(x ?? '').trim();
+            const strY = String(y ?? '').trim();
+            if (strX === '' || strY === '') {
+                console.warn(`[zoomToPoint] 坐标为空字符串，跳过 x=${x},y=${y}`);
+                return;
             }
+            // 转为数字
+            const numX = Number(x);
+            const numY = Number(y);
+            // 判断是否是有效数字（修复0被误拦截问题）
+            if (isNaN(numX) || isNaN(numY)) {
+                console.warn(`[zoomToPoint] 坐标无效，非数字 x=${x},y=${y}`);
+                return;
+            }
+            if (!this.mxcad || !this.mxcad.zoomCenter || !this.mxcad.zoomScale) return;
+
             try {
-                if (!this.mxcad || !this.mxcad.zoomCenter || !this.mxcad.zoomScale) return;
-                this.mxcad.zoomCenter(x, y);
+                // 获取图纸实体包围盒，校验坐标是否在图纸范围内
+                const { minPt, maxPt } = this.mxcad.getDatabase().currentSpace.getBoundingBox();
+                // 超出图纸边界直接拒绝定位
+                if (numX < minPt.x || numX > maxPt.x || numY < minPt.y || numY > maxPt.y) {
+                    console.warn(`[zoomToPoint] 坐标(${numX},${numY})超出图纸范围，放弃定位`);
+                    return;
+                }
+
+                this.mxcad.zoomCenter(numX, numY);
                 this.mxcad.zoomScale(zoomFactor);
-                console.log(`[zoomToPoint] 定位到 (${x}, ${y}) scale=${zoomFactor}`);
+                this.mxcad.updateDisplay(); // 强制刷新画布，重要
+                console.log(`[zoomToPoint] 定位到 (${numX}, ${numY}) scale=${zoomFactor}`);
+            } catch (e) {
+                console.error('[zoomToPoint] 失败:', e);
+            }
+        },
+
+        zoomToPoint1(row, zoomFactor = 3) {
+            try {
+                if (!this.hasMarkerById(row.id)) {
+                    this.addBindMarker({
+                        id: row.PT_NO,
+                        name: row.PT_NAM,
+                        x: row.PT_X_VALUE,
+                        y: row.PT_Y_VALUE,
+                        z: 0,
+                        type: '2',
+                        ...row
+                    })
+                }
+                this.zoomToPoint(row.PT_X_VALUE, row.PT_Y_VALUE)
             } catch (e) {
                 console.error('[zoomToPoint] 失败:', e);
             }
@@ -2112,7 +2426,12 @@ export default {
             this.$Message.success('匹配成功')
             //}
         },
-
+        async addBindMarker(data) {
+            const mesh = await this.createBindMarker(data)
+            this.annotationPoints.push({
+                ...data, mesh: mesh
+            });
+        },
         /**
          * 四、人工匹配
          */
@@ -2132,7 +2451,7 @@ export default {
                 return;
             }
             this.zoomToPoint(this.selectedSurveyPoint.PT_X_VALUE, this.selectedSurveyPoint.PT_Y_VALUE);
-            const mesh = await this.createBindMarker({
+            this.addBindMarker({
                 id: this.selectedSurveyPoint.PT_NO,
                 name: this.selectedSurveyPoint.PT_NAM,
                 x: this.selectedSurveyPoint.PT_X_VALUE,
@@ -2141,17 +2460,6 @@ export default {
                 type: '2',
                 ...this.selectedSurveyPoint
             })
-            this.annotationPoints.push({
-                ...{
-                    id: this.selectedSurveyPoint.PT_NO,
-                    name: this.selectedSurveyPoint.PT_NAM,
-                    x: this.selectedSurveyPoint.PT_X_VALUE,
-                    y: this.selectedSurveyPoint.PT_Y_VALUE,
-                    z: 0,
-                    type: '2',
-                    ...this.selectedSurveyPoint
-                }, mesh: mesh
-            });
 
             this.matchMode = 'manual-match';
             this._hidePanel1();
@@ -2357,7 +2665,7 @@ export default {
             const survey = this.selectedSurveyPoint;
             const { x, y } = coords;
             // 添加标记
-            const mesh = await this.createBindMarker({
+            this.addBindMarker({
                 id: survey.PT_NO,
                 name: survey.PT_NAM,
                 x: x,
@@ -2366,17 +2674,6 @@ export default {
                 type: '2',
                 ...survey
             })
-            this.annotationPoints.push({
-                ...{
-                    id: survey.PT_NO,
-                    name: survey.PT_NAM,
-                    x: x,
-                    y: y,
-                    z: 0,
-                    type: '2',
-                    ...survey
-                }, mesh: mesh
-            });
             //if (parent && parent.manualAddAndMatch) {
             this.manualAddAndMatch({
                 "TZPZ_NO": this.entity.TZPZ_NO,
@@ -2403,21 +2700,10 @@ export default {
          * 弹窗取消
          */
         onAddPoints(points) {
-            points.forEach(pt => {
-                this.points.push({
-                    ...pt,
-                    MATCH_STA: '未匹配',
-                    POINT_X_VALUE: '',
-                    POINT_Y_VALUE: '',
-                    MATCH_TYP: '',
-                    DALTA_XY: '',
-                    POINT_NAM: '',
-                    POINT_ID: '',
-                    I2P_NO: '',
-                    POINT_NO: ''
-                })
+            this.upsertIot({
+                TZPZ_NO: this.entity.TZPZ_NO,
+                PT_NOs: points.map(item => item.PT_NO)
             })
-            this.$Message.success(`已添加 ${points.length} 个测点`)
         },
         onManualPlaceCancel() {
             this.matchMode = null;

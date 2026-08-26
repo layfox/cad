@@ -10,10 +10,8 @@
                     class="vp-search-input"
                     placeholder="请输入搜索关键词"
                     @input="onSearch"
+                    suffix="ios-search"
                 />
-                <svg class="vp-search-icon" viewBox="0 0 1024 1024" width="14" height="14">
-                    <path d="M909.6 854.5L649.9 594.8c69.2-73.2 111.1-171 111.1-279C761 178.2 582.8 0 360.5 0S-1.9 178.2-1.9 402.5c0 107 41.9 204.8 111.1 279l-259.7 259.7c-5.1 5.1-5.1 13.3 0 18.4l63.6 63.6c5.1 5.1 13.3 5.1 18.4 0l264.2-264.2c5.1-5.1 13.3-5.1 18.4 0l63.6 63.6c5.1 5.1 13.3 5.1 18.4 0l298.9-298.9c5.1-5.1 5.1-13.3 0-18.4zM360.5 661c-143.4 0-259.7-116.3-259.7-259.7S217.1 141.6 360.5 141.6s259.7 116.3 259.7 259.7S503.9 661 360.5 661z" fill="currentColor"/>
-                </svg>
             </div>
         </div>
 
@@ -80,6 +78,10 @@ export default {
             // 每项结构: { name, points: [{ id, LOT_NAM, value }] }
         },
         title: {
+            type: String,
+            default: ''
+        },
+        panelKey: {
             type: String,
             default: ''
         }
@@ -223,6 +225,7 @@ export default {
                     cat.selectedPoints.push(row)
                 }
             })
+            this.$emit('select-change', { panelKey: this.panelKey, category: cat.name, selected: cat.selectedPoints })
         },
         
         // ============ 分类全选/取消全选 ============
@@ -242,7 +245,8 @@ export default {
                 // 取消全选：清空该分类的选中列表
                 cat.selectedPoints = []
             }
-            
+
+            this.$emit('select-change', { panelKey: this.panelKey, category: cat.name, selected: cat.selectedPoints })
             // 刷新表格显示
             this.$nextTick(() => this.refreshSelection())
         },

@@ -11,7 +11,7 @@
     <!-- 搜索框 -->
     <div class="psm-search">
       <Input
-        v-model="searchKeyword"
+        v-model="searchText"
         placeholder="输入测点名称搜索"
         clearable
         class="psm-search-input"
@@ -72,135 +72,14 @@ export default {
   },
   data() {
     return {
-      searchKeyword: '',
+      searchText: '', // 传给后端的搜索字段
       currentPage: 1,
       pageSize: 10,
       total: 0,
-      allPoints: [],
+      pageData: [],
       selectedPoints: [],
-      pageData: [
-            {
-                "PT_NAM": "氧气",
-                "PT_NO": "128681301464609980416",
-                "LOT_DOMAIN": "yzt",
-                "LOT_TYPE_ID": "o2_safety_station",
-                "PT_ID": "61080201921101MN001200001818",
-                "IOT_X_VALUE": "109.46253274572706",
-                "BJ54_Y": "39397856.95983429",
-                "BJ54_X": "-63245095.97823564",
-                "LOT_TYPE_NAM": "氧气",
-                "IOT_Y_VALUE": "38.45194032852703"
-            },
-            {
-                "PT_NAM": "一氧化碳",
-                "PT_NO": "128681301464878415872",
-                "LOT_DOMAIN": "yzt",
-                "LOT_TYPE_ID": "co_safety_station",
-                "PT_ID": "61080201921101MN000400026418",
-                "IOT_X_VALUE": "109.49882300133737",
-                "BJ54_Y": "39608240.38278022",
-                "BJ54_X": "-63543092.34775634",
-                "LOT_TYPE_NAM": "一氧化碳",
-                "IOT_Y_VALUE": "38.45240268791582"
-            },
-            {
-                "PT_NAM": "环境温度",
-                "PT_NO": "128681301465415286784",
-                "LOT_DOMAIN": "yzt",
-                "LOT_TYPE_ID": "temperature_safety_station",
-                "PT_ID": "61080201921101MN000300001828",
-                "IOT_X_VALUE": "109.49882470415503",
-                "BJ54_Y": "39608206.72356261",
-                "BJ54_X": "-63542995.00974646",
-                "LOT_TYPE_NAM": "温度",
-                "IOT_Y_VALUE": "38.45246002917702"
-            },
-            {
-                "PT_NAM": "环境温度",
-                "PT_NO": "128681301465683722240",
-                "LOT_DOMAIN": "yzt",
-                "LOT_TYPE_ID": "temperature_safety_station",
-                "PT_ID": "61080201921101MN000300000200",
-                "IOT_X_VALUE": "109.46206440540152",
-                "BJ54_Y": "39394974.134983465",
-                "BJ54_X": "-63240812.58022698",
-                "LOT_TYPE_NAM": "温度",
-                "IOT_Y_VALUE": "38.45216071096826"
-            },
-            {
-                "PT_NAM": "甲烷",
-                "PT_NO": "128681301466220593152",
-                "LOT_DOMAIN": "yzt",
-                "LOT_TYPE_ID": "ch4_safety_station",
-                "PT_ID": "61080201921101MN004300003452",
-                "IOT_X_VALUE": "",
-                "BJ54_Y": "",
-                "BJ54_X": "",
-                "LOT_TYPE_NAM": "甲烷",
-                "IOT_Y_VALUE": ""
-            },
-            {
-                "PT_NAM": "风筒状态",
-                "PT_NO": "128681301466489028608",
-                "LOT_DOMAIN": "yzt",
-                "LOT_TYPE_ID": "air_duct_switch_safety_station",
-                "PT_ID": "61080201921101KG100300000333",
-                "IOT_X_VALUE": "",
-                "BJ54_Y": "",
-                "BJ54_X": "",
-                "LOT_TYPE_NAM": "风筒开关传感器",
-                "IOT_Y_VALUE": ""
-            },
-            {
-                "PT_NAM": "负压",
-                "PT_NO": "128681301467025899520",
-                "LOT_DOMAIN": "yzt",
-                "LOT_TYPE_ID": "negative_pressure_safety_station",
-                "PT_ID": "61080201921101MN000600001831",
-                "IOT_X_VALUE": "109.46268275821501",
-                "BJ54_Y": "39398725.62143619",
-                "BJ54_X": "-63246327.793799624",
-                "LOT_TYPE_NAM": "负压",
-                "IOT_Y_VALUE": "38.451942223353825"
-            },
-            {
-                "PT_NAM": "风门",
-                "PT_NO": "128681301467294334976",
-                "LOT_DOMAIN": "yzt",
-                "LOT_TYPE_ID": "wind_switch_safety_station",
-                "PT_ID": "61080201921101KG100200002865",
-                "IOT_X_VALUE": "109.46051079388712",
-                "BJ54_Y": "39387140.34862165",
-                "BJ54_X": "-63231030.51489214",
-                "LOT_TYPE_NAM": "风门开关传感器",
-                "IOT_Y_VALUE": "38.45060248176688"
-            },
-            {
-                "PT_NAM": "烟雾",
-                "PT_NO": "128681301467562770432",
-                "LOT_DOMAIN": "yzt",
-                "LOT_TYPE_ID": "smoke_safety_station",
-                "PT_ID": "61080201921101KG100800000913",
-                "IOT_X_VALUE": "109.46734712950382",
-                "BJ54_Y": "39425890.29436574",
-                "BJ54_X": "-63285015.676458225",
-                "LOT_TYPE_NAM": "烟雾传感器",
-                "IOT_Y_VALUE": "38.45180136966843"
-            },
-            {
-                "PT_NAM": "环境温度",
-                "PT_NO": "128681301468099641344",
-                "LOT_DOMAIN": "yzt",
-                "LOT_TYPE_ID": "temperature_safety_station",
-                "PT_ID": "61080201921101MN000300000268",
-                "IOT_X_VALUE": "",
-                "BJ54_Y": "",
-                "BJ54_X": "",
-                "LOT_TYPE_NAM": "温度",
-                "IOT_Y_VALUE": ""
-            }
-        ],
-      loading: false
+      loading: false,
+      orgNo: ''
     }
   },
   computed: {
@@ -211,92 +90,95 @@ export default {
         { title: '测点编码', key: 'PT_NO', minWidth: 180 },
         { title: '测点类型', key: 'LOT_TYPE_NAM', width: 120, align: 'center' },
         { title: '公司', key: 'LOT_DOMAIN', width: 100, align: 'center' },
-        
       ]
     }
   },
   watch: {
     visible(val) {
       if (val) {
+        // 弹窗打开重置状态
         this.currentPage = 1
+        this.searchText = ''
         this.selectedPoints = []
-        this.searchKeyword = ''
-        this.$refs.pointTable.clearSelection()
-        // this.fetchData()
+        this.fetchData()
       }
     }
   },
+  mounted() {
+    const params = new URLSearchParams(location.search)
+    this.orgNo = params.get('orgNo')
+  },
   methods: {
     async postData(url = '', data = {}) {
+      data.param_orgNo = this.orgNo
       const response = await fetch(url, {
         method: 'POST',
         body: JSON.stringify(data)
       })
       return response.json()
     },
+    // 请求后端分页接口，携带searchText
     async fetchData() {
       this.loading = true
       try {
+        
         const res = await this.postData('/api/scaqyzt/getIotSelect', {
           pageSize: String(this.pageSize),
-          pageNum: String(this.currentPage)
+          pageNum: String(this.currentPage),
+          searchText: this.searchText?.trim() || ''
         })
         if (res.success && res.data) {
-          this.allPoints = res.data.data || []
-          this.total = res.data.pageInfo ? res.data.pageInfo.totalCount : this.allPoints.length
-          this.pageData = this.allPoints
+          const list = res.data.data || []
+          this.total = res.data.pageInfo ? res.data.pageInfo.totalCount : list.length
+          // 自动绑定 _isChecked，翻页自动回显勾选
+          this.pageData = list.map(item => ({
+            ...item,
+            _isChecked: this.selectedPoints.some(p => p.PT_ID === item.PT_ID)
+          }))
         }
       } finally {
         this.loading = false
       }
     },
+    // 搜索触发：重置到第一页，请求后端
     onSearch() {
-      if (!this.searchKeyword.trim()) {
-        this.pageData = this.allPoints
-        this.$refs.pointTable.clearSelection()
-        return
-      }
-      const kw = this.searchKeyword.trim().toLowerCase()
-      this.pageData = this.allPoints.filter(item =>
-        (item.PT_NAM || '').toLowerCase().includes(kw)
-      )
-      this.$refs.pointTable.clearSelection()
+      this.currentPage = 1
+      this.fetchData()
     },
+    // 切换页码
     onPageChange(page) {
       this.currentPage = page
-      this.fetchData().then(() => {
-        this.$refs.pointTable.clearSelection()
-      })
+      this.fetchData()
     },
+    // 修改每页条数
     onPageSizeChange(size) {
       this.pageSize = size
       this.currentPage = 1
-      this.fetchData().then(() => {
-        this.$refs.pointTable.clearSelection()
-      })
+      this.fetchData()
     },
-    onSelect(row) {
+    // iview3 @on-select(selection, row)
+    onSelect(selection, row) {
       const idx = this.selectedPoints.findIndex(p => p.PT_ID === row.PT_ID)
       if (idx === -1) {
         this.selectedPoints.push(row)
       }
     },
-    onSelectCancel(row) {
+    onSelectCancel(selection, row) {
       const idx = this.selectedPoints.findIndex(p => p.PT_ID === row.PT_ID)
       if (idx > -1) {
         this.selectedPoints.splice(idx, 1)
       }
     },
-    onSelectAll(rows) {
-      rows.forEach(row => {
+    onSelectAll(selection) {
+      this.pageData.forEach(row => {
         const idx = this.selectedPoints.findIndex(p => p.PT_ID === row.PT_ID)
         if (idx === -1) {
           this.selectedPoints.push(row)
         }
       })
     },
-    onSelectAllCancel(rows) {
-      rows.forEach(row => {
+    onSelectAllCancel(selection) {
+      this.pageData.forEach(row => {
         const idx = this.selectedPoints.findIndex(p => p.PT_ID === row.PT_ID)
         if (idx > -1) {
           this.selectedPoints.splice(idx, 1)
@@ -308,6 +190,7 @@ export default {
         this.$Message.warning('请选择至少一个测点')
         return
       }
+      console.log(this.selectedPoints, 1111)
       this.$emit('confirm', this.selectedPoints)
       this.onCancel()
     },
@@ -438,7 +321,6 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 8px 16px;
-  border-top: 1px solid #f0f0f0;
   flex-shrink: 0;
 }
 

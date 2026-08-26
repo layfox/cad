@@ -70,6 +70,10 @@ export default {
             type: Array,
             default: () => []
             // 每项结构: { name, points: [{ pointName, value }] }
+        },
+        panelKey: {
+            type: String,
+            default: ''
         }
     },
     data() {
@@ -159,6 +163,7 @@ export default {
         onCatSelectionChange(catIdx, rows) {
             const cat = this.filteredCategories[catIdx]
             if (cat) cat.selectedPoints = rows || []
+            this.$emit('select-change', { panelKey: this.panelKey, category: cat?.name, selected: cat?.selectedPoints || [] })
         },
         onCatPageChange(catIdx, page) {
             const cat = this.filteredCategories[catIdx]

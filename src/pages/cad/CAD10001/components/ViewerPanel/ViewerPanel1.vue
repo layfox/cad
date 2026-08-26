@@ -1,7 +1,7 @@
 <template>
     <div class="viewer-panel-wrapper">
         <!-- 工具栏 -->
-        <div class="vp-toolbar">
+        <div class="vp-toolbar" >
             <Button type="primary" @click="onAdd" size="large" ghost><img src="../../css/images/icon1.png" alt="">添加测点</Button>
             <span class="vp-toolbar-label">坐标匹配容差</span>
             <InputNumber v-model="tolerance" :min="0" :precision="2" style="width: 80px" />
@@ -115,6 +115,10 @@ export default {
         points: {
             type: Array,
             default: () => []
+        },
+        status: {
+            type: String,
+            default: ''
         }
     },
     emits: ['zoom-to-point', 'delete-points', 'auto-match', 'manual-match', 'auto-place', 'manual-place', 'unmatch', 'add-points'],
@@ -215,7 +219,9 @@ export default {
             this.isIndeterminate = false
         },
         onPointRowClick(row) {
-            this.$emit('zoom-to-point', row.x, row.y)
+            if (row.PT_X_VALUE && row.PT_Y_VALUE) {
+                this.$emit('zoom-to-point', row)
+            }
         },
         onDeletePoints(points) {
             this.$emit('delete-points', points)

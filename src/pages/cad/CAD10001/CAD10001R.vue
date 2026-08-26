@@ -2,11 +2,11 @@
     <div id="CAD10001R">
         <div class="page-body">
             <div class="page-header">
-                <Button type="primary" v-if="currentStep == 0" @click="save">保存</Button>
+                <Button type="primary" v-if="currentStep == 0&&entity.TZPZ_STA=='01'" @click="save">保存</Button>
                 <Button type="primary" @click="onStep(1)" v-if="currentStep == 0">图纸解析</Button>
                 <Button type="primary" @click="onStep(2)" v-if="currentStep == 1">点位绑定</Button>
                 <Button type="primary" v-if="currentStep == 2">复制旧版本测点</Button>
-                <Button type="primary" @click="onStep(3)" v-if="currentStep == 2 && entity.TZPZ_STA === '03'">发布版本</Button>
+                <Button type="primary" @click="onFabu" v-if="currentStep == 2 && (entity.TZPZ_STA === '03'||entity.TZPZ_STA === '02')">发布版本</Button>
                 <Button type="primary" @click="stopVersion" v-if="currentStep == 3">停用版本</Button>
                 <Button type="primary" @click="setDefault" v-if="currentStep == 3">设置默认页</Button>
                 <Button v-if="currentStep > 0" @click="onStep(currentStep - 1)">返回上一步</Button>
@@ -90,7 +90,7 @@
                             </div>
                             <div class="viewer-panel panel1" :class="panelCollapsed1 ? '' : 'expand'"
                                 v-show="currentStep == 2">
-                                <ViewerPanel1 v-show="!panelCollapsed1" :points="points" @zoom-to-point="zoomToPoint"
+                                <ViewerPanel1 :status="entity.TZPZ_STA" v-show="!panelCollapsed1" :points="points" @zoom-to-point="zoomToPoint1"
                                     @delete-points="onDeletePoints" @auto-match="onAutoMatch"
                                     @manual-match="onManualMatch" @auto-place="onAutoPlace"
                                     @manual-place="onManualPlace" @unmatch="onUnmatch" @add-points="onAddPoints"
