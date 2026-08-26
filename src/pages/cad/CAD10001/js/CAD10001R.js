@@ -723,94 +723,94 @@ export default {
             this.closeManualPop();
         },
         createTempLine(startWorld, endWorld) {
-  this.destroyTempLine();
-  const mxObj = MxFun.getCurrentDraw();
-  if (!mxObj) return;
+            this.destroyTempLine();
+            const mxObj = MxFun.getCurrentDraw();
+            if (!mxObj) return;
 
-  const start = new THREE.Vector3(startWorld.x, startWorld.y, startWorld.z || 0);
-  const end = new THREE.Vector3(endWorld.x, endWorld.y, endWorld.z || 0);
-  const p2Rel = end.clone().sub(start);
-  const dist = p2Rel.length();
-  if (dist < 0.05) {
-    console.warn("两点距离过小，跳过绘制连线");
-    return;
-  }
-  const dir = p2Rel.clone().normalize();
+            const start = new THREE.Vector3(startWorld.x, startWorld.y, startWorld.z || 0);
+            const end = new THREE.Vector3(endWorld.x, endWorld.y, endWorld.z || 0);
+            const p2Rel = end.clone().sub(start);
+            const dist = p2Rel.length();
+            if (dist < 0.05) {
+                console.warn("两点距离过小，跳过绘制连线");
+                return;
+            }
+            const dir = p2Rel.clone().normalize();
 
-  // 线段
-  const points = [new THREE.Vector3(0,0,0), p2Rel];
-  const geoLine = new THREE.BufferGeometry().setFromPoints(points);
-  const matLine = new THREE.LineBasicMaterial({
-    color: 0xff7700,
-    depthTest: false,
-    depthWrite: false
-  });
-  const line = new THREE.Line(geoLine, matLine);
-  line.renderOrder = 9997; // ✅ 置顶层级，和你marker保持统一
+            // 线段
+            const points = [new THREE.Vector3(0, 0, 0), p2Rel];
+            const geoLine = new THREE.BufferGeometry().setFromPoints(points);
+            const matLine = new THREE.LineBasicMaterial({
+                color: 0xff7700,
+                depthTest: false,
+                depthWrite: false
+            });
+            const line = new THREE.Line(geoLine, matLine);
+            line.renderOrder = 9997; // ✅ 置顶层级，和你marker保持统一
 
-  // 箭头圆锥
-  const arrowSize = 6; // ✅ 调大默认尺寸，世界坐标，可视性更好
-  const coneGeo = new THREE.ConeGeometry(arrowSize * 0.4, arrowSize, 4);
-  const coneMat = new THREE.MeshBasicMaterial({
-    color: 0xff7700,
-    depthTest: false,
-    depthWrite: false
-  });
-  const cone = new THREE.Mesh(coneGeo, coneMat);
-  cone.renderOrder = 9997;
-  const quat = new THREE.Quaternion().setFromUnitVectors(
-    new THREE.Vector3(0, 1, 0),
-    dir
-  );
-  cone.quaternion.copy(quat);
-  cone.position.copy(p2Rel).addScaledVector(dir, -arrowSize / 2);
+            // 箭头圆锥
+            const arrowSize = 6; // ✅ 调大默认尺寸，世界坐标，可视性更好
+            const coneGeo = new THREE.ConeGeometry(arrowSize * 0.4, arrowSize, 4);
+            const coneMat = new THREE.MeshBasicMaterial({
+                color: 0xff7700,
+                depthTest: false,
+                depthWrite: false
+            });
+            const cone = new THREE.Mesh(coneGeo, coneMat);
+            cone.renderOrder = 9997;
+            const quat = new THREE.Quaternion().setFromUnitVectors(
+                new THREE.Vector3(0, 1, 0),
+                dir
+            );
+            cone.quaternion.copy(quat);
+            cone.position.copy(p2Rel).addScaledVector(dir, -arrowSize / 2);
 
-  this.tempLineGroup = new THREE.Group();
-  this.tempLineGroup.position.copy(start);
-  this.tempLineGroup.add(line);
-  this.tempLineGroup.add(cone);
+            this.tempLineGroup = new THREE.Group();
+            this.tempLineGroup.position.copy(start);
+            this.tempLineGroup.add(line);
+            this.tempLineGroup.add(cone);
 
-  // ✅ 关键！不用 scene.add，使用 mxObj.addObject 托管（mxdraw标准写法）
-  mxObj.addObject(this.tempLineGroup);
+            // ✅ 关键！不用 scene.add，使用 mxObj.addObject 托管（mxdraw标准写法）
+            mxObj.addObject(this.tempLineGroup);
 
-  // ✅ 删掉手动render、autoClear=false 这套逻辑！不再使用postRender二次渲染
-  // this.postRenderCb = () => { renderer.render(scene, camera); };
-  // mxObj.on("postRender", this.postRenderCb);
+            // ✅ 删掉手动render、autoClear=false 这套逻辑！不再使用postRender二次渲染
+            // this.postRenderCb = () => { renderer.render(scene, camera); };
+            // mxObj.on("postRender", this.postRenderCb);
 
-  // 视口刷新监听（平移缩放同步）
-  this.viewChangeCb = () => {
-    mxObj.updateDisplay(true);
-  };
-  mxObj.on("viewChange", this.viewChangeCb);
+            // 视口刷新监听（平移缩放同步）
+            this.viewChangeCb = () => {
+                mxObj.updateDisplay(true);
+            };
+            mxObj.on("viewChange", this.viewChangeCb);
 
-  mxObj.updateDisplay(true);
-},
+            mxObj.updateDisplay(true);
+        },
 
-// 配套销毁方法，避免残留
-destroyTempLine() {
-  const mxObj = MxFun.getCurrentDraw();
-  if (!mxObj || !this.tempLineGroup) return;
+        // 配套销毁方法，避免残留
+        destroyTempLine() {
+            const mxObj = MxFun.getCurrentDraw();
+            if (!mxObj || !this.tempLineGroup) return;
 
-  // 解绑viewChange
-  if (this.viewChangeCb) {
-    mxObj.off("viewChange", this.viewChangeCb);
-    this.viewChangeCb = null;
-  }
-  // 如果你之前保留了postRender，这里也要解绑
-  if (this.postRenderCb) {
-    mxObj.off("postRender", this.postRenderCb);
-    this.postRenderCb = null;
-  }
+            // 解绑viewChange
+            if (this.viewChangeCb) {
+                mxObj.off("viewChange", this.viewChangeCb);
+                this.viewChangeCb = null;
+            }
+            // 如果你之前保留了postRender，这里也要解绑
+            if (this.postRenderCb) {
+                mxObj.off("postRender", this.postRenderCb);
+                this.postRenderCb = null;
+            }
 
-  // 释放资源
-  this.tempLineGroup.traverse((obj) => {
-    if (obj.geometry) obj.geometry.dispose();
-    if (obj.material) obj.material.dispose();
-  });
-  mxObj.removeObject(this.tempLineGroup);
-  this.tempLineGroup = null;
-  mxObj.updateDisplay(true);
-},
+            // 释放资源
+            this.tempLineGroup.traverse((obj) => {
+                if (obj.geometry) obj.geometry.dispose();
+                if (obj.material) obj.material.dispose();
+            });
+            mxObj.removeObject(this.tempLineGroup);
+            this.tempLineGroup = null;
+            mxObj.updateDisplay(true);
+        },
         // createTempLine(startVec, endVec) {
         //     this.destroyTempLine();
         //     const mxObj = MxFun.getCurrentDraw();
@@ -1014,58 +1014,58 @@ destroyTempLine() {
             return group;
         },
         startRingWave(targetGroup, mxObj) {
-  if (!targetGroup || !targetGroup.userData) return;
-  const user = targetGroup.userData;
-  if (user.ringAnimId) return;
-  const ringColor = user.type === "2" ? 0x26c557 : 0xec3000;
-  const ringGeo = new THREE.RingGeometry(0.5, 0.9, 32);
-  const ringMat = new THREE.MeshBasicMaterial({
-    color: ringColor,
-    transparent: true,
-    opacity: 0.6,
-    side: THREE.DoubleSide,
-    depthTest: false,
-    depthWrite: false
-  });
-  const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-  ringMesh.renderOrder = 9997;
-  ringMesh.raycast = () => {};
-  ringMesh.userData.isWaveRing = true;
+            if (!targetGroup || !targetGroup.userData) return;
+            const user = targetGroup.userData;
+            if (user.ringAnimId) return;
+            const ringColor = user.type === "2" ? 0x26c557 : 0xec3000;
+            const ringGeo = new THREE.RingGeometry(0.5, 0.9, 32);
+            const ringMat = new THREE.MeshBasicMaterial({
+                color: ringColor,
+                transparent: true,
+                opacity: 0.6,
+                side: THREE.DoubleSide,
+                depthTest: false,
+                depthWrite: false
+            });
+            const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+            ringMesh.renderOrder = 9997;
+            ringMesh.raycast = () => { };
+            ringMesh.userData.isWaveRing = true;
 
-  targetGroup.add(ringMesh);
-  user.ringMesh = ringMesh;
+            targetGroup.add(ringMesh);
+            user.ringMesh = ringMesh;
 
-  let scaleVal = 1;
-  let dir = 1; // 1放大，-1缩小，实现连续呼吸，没有顿挫
-  const speed = 0.03;
-  const maxScale = 1.2;
-  const minScale = 1;
-  let lastRenderTs = 0;
-  const fps = 30;
-  const interval = 1000 / fps;
+            let scaleVal = 1;
+            let dir = 1; // 1放大，-1缩小，实现连续呼吸，没有顿挫
+            const speed = 0.03;
+            const maxScale = 1.2;
+            const minScale = 1;
+            let lastRenderTs = 0;
+            const fps = 30;
+            const interval = 1000 / fps;
 
-  function animateWave(timestamp) {
-    // 节流控制，最多30帧刷新一次画布，减少阻塞鼠标事件
-    if (timestamp - lastRenderTs < interval) {
-      user.ringAnimId = requestAnimationFrame(animateWave);
-      return;
-    }
-    lastRenderTs = timestamp;
+            function animateWave(timestamp) {
+                // 节流控制，最多30帧刷新一次画布，减少阻塞鼠标事件
+                if (timestamp - lastRenderTs < interval) {
+                    user.ringAnimId = requestAnimationFrame(animateWave);
+                    return;
+                }
+                lastRenderTs = timestamp;
 
-    scaleVal += speed * dir;
-    if (scaleVal >= maxScale) dir = -1;
-    if (scaleVal <= minScale) dir = 1;
+                scaleVal += speed * dir;
+                if (scaleVal >= maxScale) dir = -1;
+                if (scaleVal <= minScale) dir = 1;
 
-    ringMesh.scale.set(scaleVal, scaleVal, 1);
-    ringMat.opacity = 0.6 * (scaleVal / maxScale);
-    // 老版本只能用updateDisplay，但是已经节流了
-    mxObj.updateDisplay(true);
+                ringMesh.scale.set(scaleVal, scaleVal, 1);
+                ringMat.opacity = 0.6 * (scaleVal / maxScale);
+                // 老版本只能用updateDisplay，但是已经节流了
+                mxObj.updateDisplay(true);
 
-    user.ringAnimId = requestAnimationFrame(animateWave);
-  }
-  user.ringAnimId = requestAnimationFrame(animateWave);
-  mxObj.updateDisplay(true);
-},
+                user.ringAnimId = requestAnimationFrame(animateWave);
+            }
+            user.ringAnimId = requestAnimationFrame(animateWave);
+            mxObj.updateDisplay(true);
+        },
         stopRingWave(targetGroup) {
             const user = targetGroup.userData;
             if (user.ringAnimId) {
@@ -1466,7 +1466,7 @@ destroyTempLine() {
                 } else {
                     this.$Message.error('请完成点位绑定')
                 }
-                
+
             })
         },
         save() {
