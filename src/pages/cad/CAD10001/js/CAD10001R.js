@@ -81,7 +81,7 @@ export default {
             matchSvgLine: null,
             matchLineIds: null,
             showTz: false,
-            points: [],
+            viewerPanel1Ref: null,
             orgNo: '',
             lastFileUrl: '',
             annotationPoints: [],
@@ -1466,8 +1466,8 @@ export default {
             })
         },
         upsertIot(data) {
-            this.postData('/api/scaqyzt/upsertIot', data).then(data => {
-                this.getIot()
+            this.postData('/api/scaqyzt/upsertIot', data).then(() => {
+                this.refreshViewer1Data()
             })
         },
         deleteIot(data, ptNos) {
@@ -1476,41 +1476,37 @@ export default {
                 if (ptNos && ptNos.length) {
                     this.clearBindMarkersByIds(ptNos);
                 }
-                this.getIot();
+                this.refreshViewer1Data();
             })
         },
-        getIot() {
-            this.postData('/api/scaqyzt/getIot', {
-                "pageSize": "10000",
-                "pageNum": "1",
-                "TZPZ_NO": this.entity.TZPZ_NO
-            }).then(data => {
-                this.points = data.data.data
-            })
+        refreshViewer1Data() {
+            if (this.viewerPanel1Ref) {
+                this.viewerPanel1Ref.refreshData();
+            }
         },
         autoMatch(data) {
-            this.postData('/api/scaqyzt/autoMatch', data).then(data => {
-                this.getIot()
+            this.postData('/api/scaqyzt/autoMatch', data).then(() => {
+                this.refreshViewer1Data()
             })
         },
         manualMatch(data) {
-            this.postData('/api/scaqyzt/manualMatch', data).then(data => {
-                this.getIot()
+            this.postData('/api/scaqyzt/manualMatch', data).then(() => {
+                this.refreshViewer1Data()
             })
         },
         autoAddAndMatch(data) {
-            this.postData('/api/scaqyzt/autoAddAndMatch', data).then(data => {
-                this.getIot()
+            this.postData('/api/scaqyzt/autoAddAndMatch', data).then(() => {
+                this.refreshViewer1Data()
             })
         },
         manualAddAndMatch(data) {
-            this.postData('/api/scaqyzt/manualAddAndMatch', data).then(data => {
-                this.getIot()
+            this.postData('/api/scaqyzt/manualAddAndMatch', data).then(() => {
+                this.refreshViewer1Data()
             })
         },
         cancelMatch(data) {
-            this.postData('/api/scaqyzt/cancelMatch', data).then(data => {
-                this.getIot()
+            this.postData('/api/scaqyzt/cancelMatch', data).then(() => {
+                this.refreshViewer1Data()
             })
         },
         onFabu() {
@@ -1518,8 +1514,9 @@ export default {
                 "TZPZ_NO": this.entity.TZPZ_NO,
                 "TZPZ_STA": '04',
             }).then(data => {
-                if (data.data.flag) {
-                    this.getTzpzInfo()
+                if (data.data.flg) {
+                    this.entity.TZPZ_STA = '04'
+                    this.onStep(3)
                 } else {
                     this.$Message.error('请完成点位绑定')
                 }

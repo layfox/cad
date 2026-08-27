@@ -112,9 +112,9 @@ import PointSelectModal from '../../dialog/PointSelectModal.vue'
 export default {
     name: 'ViewerPanel1',
     props: {
-        points: {
-            type: Array,
-            default: () => []
+        tzpzNo: {
+            type: String,
+            default: ''
         },
         status: {
             type: String,
@@ -127,15 +127,17 @@ export default {
             currentPage: 1,
             pageSize: 10,
             total: 0,
+            pageData: [],
             selectedPoints: [],
             checkAll: false,
             isIndeterminate: false,
             tolerance: 4,
             pointModalVisible: false,
+            orgNo: '',
             pointColumns: [
                 { type: 'selection', width: 60, align: 'center' },
-                { slot: 'seq', title: '序号', key: 'seq', width: 60, align: 'center', render: (h, { row,index }) => {
-                    return h('span',  (this.currentPage -1) * this.pageSize + index + 1)
+                { slot: 'seq', title: '序号', key: 'seq', width: 60, align: 'center', render: (h, { row, index }) => {
+                    return h('span', (this.currentPage - 1) * this.pageSize + index + 1)
                 } },
                 { title: '实时测点', key: 'PT_NAM', minWidth: 160 },
                 { title: '测点坐标', key: 'coordValue', minWidth: 160, align: 'center', slot: 'coordStatus' },
@@ -147,23 +149,19 @@ export default {
         }
     },
     computed: {
-        pointPageData() {
-            const start = (this.currentPage - 1) * this.pageSize
-            return this.points.slice(start, start + this.pageSize)
-        },
         summaryData() {
-            const total = this.points.length
-            const noCoord = this.points.filter(p => !(p.PT_X_VALUE && p.PT_Y_VALUE)).length
-            const matched = this.points.filter(p => p.MATCH_STA !== '未匹配').length
-            const unmatched = this.points.filter(p => p.MATCH_STA === '未匹配').length
-            const totalPoints = new Set(this.points.map(p => p.matchPoint).filter(Boolean)).size
-            const used = new Set(this.points.filter(p => p.MATCH_STA !== '未匹配').map(p => p.matchPoint).filter(Boolean)).size
-            return { total, noCoord, matched, unmatched, totalPoints, used }
+            return {
+                total: this.total,
+                noCoord: 0,
+                matched: 0,
+                unmatched: 0,
+                totalPoints: 0,
+                used: 0
+            }
         },
-        // 为每页数据添加全局序号
         pointPageDataWithSeq() {
             const start = (this.currentPage - 1) * this.pageSize
-            return this.points.slice(start, start + this.pageSize).map((item, index) => ({
+            return this.pageData.map((item, index) => ({
                 ...item,
                 _seq: start + index + 1
             }))
@@ -171,40 +169,60 @@ export default {
     },
     components: { PointSelectModal },
     watch: {
-        points() {
-            this.onDataChange()
+        tzpzNo() {
+            this.fetchData()
         }
     },
-    created() {
-        this.onDataChange()
+    mounted() {
+        const params = new URLSearchParams(location.search)
+        this.orgNo = params.get('orgNo')
+        this.fetchData()
     },
     methods: {
+        async postData(url, data) {
+            data.param_orgNo = this.orgNo
+            const response = await fetch(url, {
+                method: 'POST',
+                body: JSON.stringify(data)
+            })
+            return response.json()
+        },
+        async fetchData() {
+            if (!this.tzpzNo) return
+            const res = await this.postData('/api/scaqyzt/getIot', {
+                TZPZ_NO: this.tzpzNo,
+                pageSize: String(this.pageSize),
+                pageNum: String(this.currentPage)
+            })
+            if (res.success && res.data) {
+                this.pageData = res.data.data || []
+                this.total = res.data.pageInfo ? res.data.pageInfo.totalCount : 0
+            }
+        },
+        async refreshData() {
+            this.currentPage = 1
+            await this.fetchData()
+        },
         onAdd() {
             this.pointModalVisible = true
         },
         onPointSelectConfirm(points) {
             this.$emit('add-points', points)
         },
-        onDataChange() {
-            this.total = this.points.length
-            this.currentPage = 1
-            this.selectedPoints = []
-            this.checkAll = false
-            this.isIndeterminate = false
-        },
         handlePageChange(page) {
             this.currentPage = page
+            this.fetchData()
         },
         handlePageSizeChange(size) {
             this.pageSize = size
             this.currentPage = 1
+            this.fetchData()
         },
         onPointSelectionChange(rows) {
             this.selectedPoints = rows || []
             this.checkAll = false
             this.isIndeterminate = false
-            const pageData = this.pointPageData
-            if (pageData.length > 0 && this.selectedPoints.length === pageData.length) {
+            if (this.pageData.length > 0 && this.selectedPoints.length === this.pageData.length) {
                 this.checkAll = true
             } else if (this.selectedPoints.length > 0) {
                 this.isIndeterminate = true
@@ -212,7 +230,7 @@ export default {
         },
         onCheckAllChange(val) {
             if (val) {
-                this.selectedPoints = [...this.pointPageData]
+                this.selectedPoints = [...this.pageData]
             } else {
                 this.selectedPoints = []
             }

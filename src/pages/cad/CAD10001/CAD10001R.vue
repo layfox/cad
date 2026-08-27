@@ -75,7 +75,7 @@
                         </div>
                     </div>
                     <div class="step-content" v-show="currentStep == 1 || currentStep == 2 || currentStep == 3">
-                        <div class="step-content-header">{{ currentStep == 1 ? '图纸解析' : '点位绑定' }}</div>
+                        <div class="step-content-header">{{ currentStep == 1 ? '图纸解析' : (currentStep == 2 ? '点位绑定' : '绑定结果') }}</div>
                         <div class="viewer-container">
                             <div class="viewer-panel" :class="panelCollapsed ? '' : 'expand'" v-show="currentStep == 1">
                                 <ViewerPanel v-show="!panelCollapsed" :layers="layers" :points="pointList"
@@ -89,8 +89,8 @@
                                 </div>
                             </div>
                             <div class="viewer-panel panel1" :class="panelCollapsed1 ? '' : 'expand'"
-                                v-show="currentStep == 2">
-                                <ViewerPanel1 :status="entity.TZPZ_STA" v-show="!panelCollapsed1" :points="points" @zoom-to-point="zoomToPoint1"
+                                v-show="currentStep == 2||currentStep==3">
+                                <ViewerPanel1 ref="viewerPanel1" :tzpz-no="entity.TZPZ_NO" :status="entity.TZPZ_STA" v-show="!panelCollapsed1" @zoom-to-point="zoomToPoint1"
                                     @delete-points="onDeletePoints" @auto-match="onAutoMatch"
                                     @manual-match="onManualMatch" @auto-place="onAutoPlace"
                                     @manual-place="onManualPlace" @unmatch="onUnmatch" @add-points="onAddPoints"
