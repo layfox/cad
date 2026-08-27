@@ -190,7 +190,6 @@ export default {
         this.$Message.warning('请选择至少一个测点')
         return
       }
-      console.log(this.selectedPoints, 1111)
       this.$emit('confirm', this.selectedPoints)
       this.onCancel()
     },

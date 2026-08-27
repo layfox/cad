@@ -265,6 +265,7 @@ export default {
         return
       }
       this.deleteTargetCount = 1
+      this.currentDetail = row
       this.showDeleteConfirm = true
     },
     onBatchDelete() {

@@ -73,10 +73,9 @@
                                 <div class="loading-text">文件加载解析中，请稍候...</div>
                             </div>
                         </div>
-                <div ref="markerLayer" class="marker-layer"></div>
-                <div ref="alarmTooltip" class="alarm-tooltip" v-show="tooltipVisible">
-                    {{ tooltipContent }}
-                </div>
+                <div v-show="tooltip.show" class="mx-tooltip1" :style="{left: tooltip.x + 'px', top: tooltip.y + 'px'}">
+                    {{ tooltip.text }}
+                  </div>
             </div>
         </div>
       </div>

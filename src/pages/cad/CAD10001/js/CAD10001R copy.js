@@ -118,7 +118,9 @@ export default {
             highlightLineGroup: null,
             highlightMeshList: [],
             highlightUseTempLine: false,
-            isDev: false
+            isDev: true,
+            selectedPointIds: new Set(),
+            hoverPointId: null
         }
     },
     components: {
@@ -127,188 +129,119 @@ export default {
     },
     mounted() {
         if (this.isDev) {
-        this.pointList = [
-            {
-                "X_VALUE": 23369467.890141826,
-                "Y_VALUE": -30382998.077860042,
-                "z": 0,
-                "LAYER_ID": "288127",
-                "LAYER_NAM": "A通风系统图",
-                "POINT_NAM": "A$C379E0320",
-                "POINT_ID": "58a6"
-            },
-            {
-                "X_VALUE": 23369439.109730206,
-                "Y_VALUE": -30382957.704416513,
-                "z": 0,
-                "LAYER_ID": "288127",
-                "LAYER_NAM": "A通风系统图",
-                "POINT_NAM": "A$C379E0320",
-                "POINT_ID": "58a7"
-            },
-            {
-                "X_VALUE": 23114724.227396417,
-                "Y_VALUE": -28141241.35896348,
-                "z": 0,
-                "LAYER_ID": "288125",
-                "LAYER_NAM": "底图",
-                "POINT_NAM": "栅栏2",
-                "POINT_ID": "6472"
-            },
-            {
-                "X_VALUE": 23114953.04550457,
-                "Y_VALUE": -28137480.675759755,
-                "z": 0,
-                "LAYER_ID": "288125",
-                "LAYER_NAM": "底图",
-                "POINT_NAM": "栅栏2",
-                "POINT_ID": "6666"
-            },
-            {
-                "X_VALUE": 23369400.29165956,
-                "Y_VALUE": -30383083.760237556,
-                "z": 0,
-                "LAYER_ID": "288125",
-                "LAYER_NAM": "底图",
-                "POINT_NAM": "A$C095F2CEC",
-                "POINT_ID": "7b38"
-            },
-            {
-                "X_VALUE": 23372829.43129492,
-                "Y_VALUE": -30382923.520400725,
-                "z": 0,
-                "LAYER_ID": "288125",
-                "LAYER_NAM": "底图",
-                "POINT_NAM": "A$C095F2CEC",
-                "POINT_ID": "7b45"
-            },
-            {
-                "X_VALUE": 23372754.41310084,
-                "Y_VALUE": -30382938.718711346,
-                "z": 0,
-                "LAYER_ID": "288125",
-                "LAYER_NAM": "底图",
-                "POINT_NAM": "A$C095F2CEC",
-                "POINT_ID": "7b48"
-            },
-            {
-                "X_VALUE": 23370027.331389386,
-                "Y_VALUE": -30382984.480325278,
-                "z": 0,
-                "LAYER_ID": "288125",
-                "LAYER_NAM": "底图",
-                "POINT_NAM": "A$C095F2CEC",
-                "POINT_ID": "7b4a"
-            },
-            {
-                "X_VALUE": 23366674.88328121,
-                "Y_VALUE": -30383334.350133996,
-                "z": 0,
-                "LAYER_ID": "288125",
-                "LAYER_NAM": "底图",
-                "POINT_NAM": "A$C38615BD1",
-                "POINT_ID": "7b61"
-            },
-            {
-                "X_VALUE": 23366674.583281208,
-                "Y_VALUE": -30384035.850133996,
-                "z": 0,
-                "LAYER_ID": "288125",
-                "LAYER_NAM": "底图",
-                "POINT_NAM": "A$C38615BD1",
-                "POINT_ID": "7b62"
+            this.pointList = [
+                {
+                    "X_VALUE": 23369467.890141826,
+                    "Y_VALUE": -30382998.077860042,
+                    "z": 0,
+                    "LAYER_ID": "288127",
+                    "LAYER_NAM": "A通风系统图",
+                    "POINT_NAM": "A$C379E0320",
+                    "POINT_ID": "58a6"
+                },
+                {
+                    "X_VALUE": 23369439.109730206,
+                    "Y_VALUE": -30382957.704416513,
+                    "z": 0,
+                    "LAYER_ID": "288127",
+                    "LAYER_NAM": "A通风系统图",
+                    "POINT_NAM": "A$C379E0320",
+                    "POINT_ID": "58a7"
+                },
+                {
+                    "X_VALUE": 23114724.227396417,
+                    "Y_VALUE": -28141241.35896348,
+                    "z": 0,
+                    "LAYER_ID": "288125",
+                    "LAYER_NAM": "底图",
+                    "POINT_NAM": "栅栏2",
+                    "POINT_ID": "6472"
+                },
+                {
+                    "X_VALUE": 23114953.04550457,
+                    "Y_VALUE": -28137480.675759755,
+                    "z": 0,
+                    "LAYER_ID": "288125",
+                    "LAYER_NAM": "底图",
+                    "POINT_NAM": "栅栏2",
+                    "POINT_ID": "6666"
+                },
+                {
+                    "X_VALUE": 23369400.29165956,
+                    "Y_VALUE": -30383083.760237556,
+                    "z": 0,
+                    "LAYER_ID": "288125",
+                    "LAYER_NAM": "底图",
+                    "POINT_NAM": "A$C095F2CEC",
+                    "POINT_ID": "7b38"
+                },
+                {
+                    "X_VALUE": 23372829.43129492,
+                    "Y_VALUE": -30382923.520400725,
+                    "z": 0,
+                    "LAYER_ID": "288125",
+                    "LAYER_NAM": "底图",
+                    "POINT_NAM": "A$C095F2CEC",
+                    "POINT_ID": "7b45"
+                },
+                {
+                    "X_VALUE": 23372754.41310084,
+                    "Y_VALUE": -30382938.718711346,
+                    "z": 0,
+                    "LAYER_ID": "288125",
+                    "LAYER_NAM": "底图",
+                    "POINT_NAM": "A$C095F2CEC",
+                    "POINT_ID": "7b48"
+                },
+                {
+                    "X_VALUE": 23370027.331389386,
+                    "Y_VALUE": -30382984.480325278,
+                    "z": 0,
+                    "LAYER_ID": "288125",
+                    "LAYER_NAM": "底图",
+                    "POINT_NAM": "A$C095F2CEC",
+                    "POINT_ID": "7b4a"
+                },
+                {
+                    "X_VALUE": 23366674.88328121,
+                    "Y_VALUE": -30383334.350133996,
+                    "z": 0,
+                    "LAYER_ID": "288125",
+                    "LAYER_NAM": "底图",
+                    "POINT_NAM": "A$C38615BD1",
+                    "POINT_ID": "7b61"
+                },
+                {
+                    "X_VALUE": 23366674.583281208,
+                    "Y_VALUE": -30384035.850133996,
+                    "z": 0,
+                    "LAYER_ID": "288125",
+                    "LAYER_NAM": "底图",
+                    "POINT_NAM": "A$C38615BD1",
+                    "POINT_ID": "7b62"
+                }
+            ].map(item => {
+                item.pointName = item.POINT_NAM
+                item.pointNo = item.POINT_ID
+                item.x = item.X_VALUE
+                item.y = item.Y_VALUE
+                return item
+            })
+
+            this.entity = {
+                "TZPZ_ID": "",
+                "TZXX_NO": "11",
+                "TZPZ_USR": "111",
+                "TZPZ_DAT": "2026-11-12",
+                "TZPZ_STA": "03",
+                "resourceUrl": "",
+                "TZXX_ID": "11",
+                "TZLX_NAM": "11",
+                "TZ_VERSION": "",
+                TZPZ_NO: "",
             }
-        ].map(item => {
-            item.pointName = item.POINT_NAM
-            item.pointNo = item.POINT_ID
-            item.x = item.X_VALUE
-            item.y = item.Y_VALUE
-            return item
-        })
-        this.points = [
-            {
-                "I2P_NO": "133777110241938767871",
-                "TZPZ_NO": "133775589162091020281",
-                "POINT_X_VALUE": "",
-                "MATCH_STA": "匹配",
-                "POINT_ID": "",
-                "POINT_NAM": "",
-                "PT_Y_VALUE": "-30388651.27496908",
-                "PT_NAM": "氧气1",
-                "PT_NO": "128681301464609980416",
-                "MATCH_TYP": "",
-                "DALTA_XY": "",
-                "PT_ID": "61080201921101MN001200001816",
-                "PT_X_VALUE": "23372898.909408778",
-                "POINT_Y_VALUE": "",
-                "POINT_NO": ""
-            },
-            {
-                "I2P_NO": "133777110241938767872",
-                "TZPZ_NO": "133775589162091020288",
-                "POINT_X_VALUE": "",
-                "MATCH_STA": "未匹配",
-                "POINT_ID": "",
-                "POINT_NAM": "",
-                "PT_Y_VALUE": "-30382999.282143094",
-                "PT_NAM": "氧气",
-                "PT_NO": "128681301464609980416",
-                "MATCH_TYP": "",
-                "DALTA_XY": "",
-                "PT_ID": "61080201921101MN001200001818",
-                "PT_X_VALUE": "23369467.220270775",
-                "POINT_Y_VALUE": "",
-                "POINT_NO": ""
-            },
-            {
-                "I2P_NO": "133777112498138775552",
-                "TZPZ_NO": "133775589162091020288",
-                "POINT_X_VALUE": "",
-                "MATCH_STA": "未匹配",
-                "POINT_ID": "",
-                "POINT_NAM": "",
-                "PT_Y_VALUE": "39394974.134983465",
-                "PT_NAM": "环境温度",
-                "PT_NO": "128681301465683722240",
-                "MATCH_TYP": "",
-                "DALTA_XY": "",
-                "PT_ID": "61080201921101MN000300000200",
-                "PT_X_VALUE": "-63240812.58022698",
-                "POINT_Y_VALUE": "",
-                "POINT_NO": ""
-            },
-            {
-                "I2P_NO": "133777112498138775552",
-                "TZPZ_NO": "133775589162091020288",
-                "POINT_X_VALUE": "",
-                "MATCH_STA": "未匹配",
-                "POINT_ID": "",
-                "POINT_NAM": "",
-                "PT_Y_VALUE": "",
-                "PT_NAM": "环境温度",
-                "PT_NO": "128681301465683722240",
-                "MATCH_TYP": "",
-                "DALTA_XY": "",
-                "PT_ID": "61080201921101MN000300000200",
-                "PT_X_VALUE": "",
-                "POINT_Y_VALUE": "",
-                "POINT_NO": ""
-            }
-        ]
-        this.entity = {
-            "TZPZ_ID": "",
-            "TZXX_NO": "11",
-            "TZPZ_USR": "111",
-            "TZPZ_DAT": "2026-11-12",
-            "TZPZ_STA": "03",
-            "resourceUrl": "",
-            "TZXX_ID": "22",
-            "TZLX_NAM": "11",
-            "TZ_VERSION": "",
-            TZPZ_NO: "",
+            this.fileUrlInput = './models/YTSF-001.mxweb'
         }
-        this.fileUrlInput = './models/YTSF-001.mxweb'
-}
         const params = new URLSearchParams(location.search)
         this.orgNo = params.get('orgNo') || ''
         if (params.get('TZPZ_NO')) {
@@ -550,13 +483,11 @@ export default {
                 const scene = mxObj.getScene?.();
                 const camera = mxObj.getCamera?.();
                 if (!scene || !camera) return;
-
                 const ndcX = (mouseX / rect.width) * 2 - 1;
                 const ndcY = -(mouseY / rect.height) * 2 + 1;
                 const raycaster = new THREE.Raycaster();
                 raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
                 const intersects = raycaster.intersectObjects(scene.children, true);
-
                 let hoverTargetGroup = null;
                 for (const intersect of intersects) {
                     if (intersect.object.userData?.isWaveRing) continue;
@@ -570,27 +501,29 @@ export default {
                     }
                     if (hoverTargetGroup) break;
                 }
-
-                // 上一个hover对象：清除光晕 + 恢复原始大小
+                // ===== 上一个hover对象：清除光晕 + 恢复原始大小 + 关闭高亮靶心 =====
                 if (this.lastHoverGroup) {
                     this.stopRingWave(this.lastHoverGroup);
+                    // 关闭高亮，恢复基础图标
+                    this.setMarkerHighlight(this.lastHoverGroup, false);
                     if (this.lastHoverGroup.userData.originScale) {
                         this.lastHoverGroup.scale.copy(this.lastHoverGroup.userData.originScale);
                     }
                     this.lastHoverGroup = null;
                 }
-
                 if (hoverTargetGroup) {
                     if (!hoverTargetGroup.userData.originScale) {
                         hoverTargetGroup.userData.originScale = hoverTargetGroup.scale.clone();
                     }
-                    // 图标放大1.4倍
+                    // 图标放大1.2倍（你原有逻辑）
                     hoverTargetGroup.scale.copy(hoverTargetGroup.userData.originScale).multiplyScalar(1.2);
                     this.lastHoverGroup = hoverTargetGroup;
-                    // ✅ 启动外圈扩散光晕
-                    //this.startRingWave(hoverTargetGroup, mxObj);
+                    // ✅ 开启高亮靶心样式（红靶心/绿嵌套方框）
+                    this.setMarkerHighlight(hoverTargetGroup, true);
+                    this.updateMarkerRotation(hoverTargetGroup);
+                    // ✅ 启动外圈扩散光晕（原有动画保留）
+                    this.startRingWave(hoverTargetGroup, mxObj);
                 }
-
                 canvas.style.cursor = hoverTargetGroup ? "pointer" : "";
                 mxObj.updateDisplay(true);
             } catch (err) {
@@ -646,7 +579,7 @@ export default {
                                 const drawScreen = MxFun.docCoord2Screen(targetDrawPoint.x, targetDrawPoint.y);
                                 const startVec = { x: this.selectedSurveyPoint.PT_X_VALUE, y: this.selectedSurveyPoint.PT_Y_VALUE };
                                 const endVec = { x: targetDrawPoint.x, y: targetDrawPoint.y };
-                               this.createTempLine(startVec, endVec);
+                                this.createTempLine(startVec, endVec);
 
                                 // // 抛出事件，上层Vue弹出【人工匹配弹窗】
                                 // const gap = this.calcDocDistance({
@@ -803,7 +736,7 @@ export default {
             this.viewChangeCb = () => {
                 mxObj.updateDisplay(true);
             };
-            mxObj.on("viewChange", this.viewChangeCb);
+            mxObj.on("viewchange", this.viewChangeCb);
 
             mxObj.updateDisplay(true);
         },
@@ -815,7 +748,7 @@ export default {
 
             // 解绑viewChange
             if (this.viewChangeCb) {
-                mxObj.off("viewChange", this.viewChangeCb);
+                mxObj.off("viewchange", this.viewChangeCb);
                 this.viewChangeCb = null;
             }
             // 如果你之前保留了postRender，这里也要解绑
@@ -1006,80 +939,223 @@ export default {
             return this.annotationPoints.some(item => item.id === id);
         },
         createBindMarker(bindItem) {
-            if (this.hasMarkerById(bindItem.id)) {
-                console.log(`点位${bindItem.id}已存在，跳过创建`);
-                return null;
-            }
-            const mxObj = MxFun.getCurrentDraw();
-            if (!mxObj) return null;
-            const docX = bindItem.x;
-            const docY = bindItem.y;
-            const docZ = bindItem.z || 0;
-            const baseSize = 10;
-            const group = new THREE.Object3D();
-            group.position.set(docX, docY, docZ);
-            group.userData = {
-                isAnnotationPoint: true,
-                annotationId: bindItem.id,
-                originScale: new THREE.Vector3(baseSize, baseSize, 1),
-                type: bindItem.type,
-                bindItem: bindItem,
-                // 存储光晕实例和动画帧ID
-                ringMesh: null,
-                ringAnimId: null
-            };
+  if (this.hasMarkerById(bindItem.id)) {
+    console.log(`点位${bindItem.id}已存在，跳过创建`);
+    return null;
+  }
+  const mxObj = MxFun.getCurrentDraw();
+  if (!mxObj) return null;
 
-            if (bindItem.type === "2") {
-                // 绿色方块 #26C557 + 白色边框
-                const geoSquare = new THREE.PlaneGeometry(1, 1);
-                const matSquare = new THREE.MeshStandardMaterial({
-                    color: 0x26c557,
-                    emissive: 0x26c557,
-                    emissiveIntensity: 0.4,
-                    transparent: true,
-                    depthTest: false,
-                    depthWrite: false,
-                    side: THREE.DoubleSide
-                });
-                const squareMesh = new THREE.Mesh(geoSquare, matSquare);
-                squareMesh.renderOrder = 9999;
-                const geoBorder = new THREE.PlaneGeometry(1.2, 1.2);
-                const matBorder = new THREE.MeshStandardMaterial({
-                    color: 0xffffff,
-                    emissive: 0xffffff,
-                    emissiveIntensity: 0.2,
-                    transparent: true,
-                    depthTest: false,
-                    depthWrite: false,
-                    side: THREE.DoubleSide
-                });
-                const borderMesh = new THREE.Mesh(geoBorder, matBorder);
-                borderMesh.renderOrder = 9998;
-                group.add(borderMesh);
-                group.add(squareMesh);
-            } else {
-                // 红色圆点 #EC3000
-                const geoCircle = new THREE.CircleGeometry(0.5, 32);
-                const matCircle = new THREE.MeshStandardMaterial({
-                    color: 0xec3000,
-                    emissive: 0xec3000,
-                    emissiveIntensity: 0.4,
-                    transparent: true,
-                    depthTest: false,
-                    depthWrite: false,
-                    side: THREE.DoubleSide
-                });
-                const circleMesh = new THREE.Mesh(geoCircle, matCircle);
-                circleMesh.renderOrder = 9999;
-                group.add(circleMesh);
+  const docX = bindItem.x;
+  const docY = bindItem.y;
+  const docZ = bindItem.z || 0;
+  const baseSize = 10;
+
+  const group = new THREE.Object3D();
+  group.position.set(docX, docY, docZ);
+  group.userData = {
+    isAnnotationPoint: true,
+    annotationId: bindItem.id,
+    originScale: new THREE.Vector3(baseSize, baseSize, 1),
+    originRotation: group.rotation.clone(),
+    type: bindItem.type,
+    bindItem: bindItem,
+    ringMesh: null,
+    ringAnimId: null,
+    baseMeshes: [],
+    highlightGroup: null,
+    isHighlight: false,
+    __hoverLock: false // hover防抖锁
+  };
+
+  if (bindItem.type === "2") {
+    // ========== type=2 常态图形：绿色方块+白边 ==========
+    const geoSquare = new THREE.PlaneGeometry(1, 1);
+    const matSquare = new THREE.MeshStandardMaterial({
+      color: 0x26c557,
+      emissive: 0x26c557,
+      emissiveIntensity: 0.4,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const squareMesh = new THREE.Mesh(geoSquare, matSquare);
+    squareMesh.renderOrder = 9999;
+
+    const geoBorder = new THREE.PlaneGeometry(1.2, 1.2);
+    const matBorder = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      emissive: 0xffffff,
+      emissiveIntensity: 0.2,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const borderMesh = new THREE.Mesh(geoBorder, matBorder);
+    borderMesh.renderOrder = 9998;
+
+    group.add(borderMesh);
+    group.add(squareMesh);
+    group.userData.baseMeshes = [borderMesh, squareMesh];
+
+    // ========== type=2 高亮图形：内层和常态方块尺寸颜色完全一致，外层叠加方框 ==========
+    const highlightGroup = new THREE.Object3D();
+    // 最外层绿色方形环
+    const geoOut = this.createSquareRingGeo(1, 0.85);
+    const matOut = new THREE.MeshStandardMaterial({
+      color: 0x26c557,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const meshOut = new THREE.Mesh(geoOut, matOut);
+    meshOut.renderOrder = 9997;
+    // 中间白色方形环
+    const geoMid = this.createSquareRingGeo(0.85, 0.65);
+    const matMid = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const meshMid = new THREE.Mesh(geoMid, matMid);
+    meshMid.renderOrder = 9998;
+    // ✅ 内层方块 和常态核心方块尺寸、颜色完全一样
+    const geoInner = new THREE.PlaneGeometry(1, 1);
+    const matInner = new THREE.MeshStandardMaterial({
+      color: 0x26c557,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const meshInner = new THREE.Mesh(geoInner, matInner);
+    meshInner.renderOrder = 9999;
+
+    highlightGroup.add(meshOut, meshMid, meshInner);
+    highlightGroup.visible = false;
+    group.add(highlightGroup);
+    group.userData.highlightGroup = highlightGroup;
+  } else {
+    // ========== type=1 常态图形：红色实心圆 ==========
+    const geoCircle = new THREE.CircleGeometry(0.5, 32);
+    const matCircle = new THREE.MeshStandardMaterial({
+      color: 0xec3000,
+      emissive: 0xec3000,
+      emissiveIntensity: 0.4,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const circleMesh = new THREE.Mesh(geoCircle, matCircle);
+    circleMesh.renderOrder = 9999;
+    group.add(circleMesh);
+    group.userData.baseMeshes = [circleMesh];
+
+    // ========== type=1 高亮图形：内层圆心和常态尺寸颜色完全一致，外层靶心环 ==========
+    const highlightGroup = new THREE.Object3D();
+    // 外圈红环
+    const geoOutRing = new THREE.RingGeometry(0.8, 1, 32);
+    const matOutRing = new THREE.MeshStandardMaterial({
+      color: 0xec3000,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const meshOutRing = new THREE.Mesh(geoOutRing, matOutRing);
+    meshOutRing.renderOrder = 9997;
+    // 中间白色环
+    const geoMidRing = new THREE.RingGeometry(0.5, 0.8, 32);
+    const matMidRing = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const meshMidRing = new THREE.Mesh(geoMidRing, matMidRing);
+    meshMidRing.renderOrder = 9998;
+    // ✅ 内层圆形 和常态圆心尺寸、颜色完全一样
+    const geoInnerCircle = new THREE.CircleGeometry(0.5, 32);
+    const matInnerCircle = new THREE.MeshStandardMaterial({
+      color: 0xec3000,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const meshInnerCircle = new THREE.Mesh(geoInnerCircle, matInnerCircle);
+    meshInnerCircle.renderOrder = 9999;
+
+    highlightGroup.add(meshOutRing, meshMidRing, meshInnerCircle);
+    highlightGroup.visible = false;
+    group.add(highlightGroup);
+    group.userData.highlightGroup = highlightGroup;
+  }
+
+  group.scale.set(baseSize, baseSize, 1);
+  mxObj.addObject(group);
+  mxObj.updateDisplay(true);
+  return group;
+},
+
+/**
+ * 配套的高亮切换方法（直接复用）
+ */
+setMarkerHighlight(group, isHighlight) {
+  if (!group?.userData?.highlightGroup) return;
+  // 状态一致直接跳过
+  if (group.userData.isHighlight === isHighlight) return;
+  // 防抖锁，防止短时间高频切换
+  if (group.userData.__hoverLock) return;
+
+  group.userData.__hoverLock = true;
+  group.userData.highlightGroup.visible = isHighlight;
+  group.userData.isHighlight = isHighlight;
+
+  setTimeout(() => {
+    group.userData.__hoverLock = false;
+  }, 60);
+},
+        createSquareRingGeo(outer, inner) {
+            const shape = new THREE.Shape();
+            // 外正方形
+            shape.moveTo(-outer, -outer);
+            shape.lineTo(outer, -outer);
+            shape.lineTo(outer, outer);
+            shape.lineTo(-outer, outer);
+            shape.lineTo(-outer, -outer);
+
+            // 内正方形（挖空）
+            const holePath = new THREE.Path();
+            holePath.moveTo(-inner, -inner);
+            holePath.lineTo(inner, -inner);
+            holePath.lineTo(inner, inner);
+            holePath.lineTo(-inner, inner);
+            holePath.lineTo(-inner, -inner);
+            shape.holes.push(holePath);
+
+            return new THREE.ShapeGeometry(shape);
+        },
+        updateMarkerRotation(markerGroup) {
+            if (!markerGroup || !markerGroup.userData) return;
+
+            // 保持原始旋转，不跟随父级变化
+            if (markerGroup.userData.originRotation) {
+                markerGroup.rotation.copy(markerGroup.userData.originRotation);
             }
 
-            group.scale.set(baseSize, baseSize, 1);
-            mxObj.addObject(group);
-            mxObj.updateDisplay(true);
-            return group;
+            // 如果你的场景有全局旋转，这里可以固定抵消
+            // markerGroup.rotation.set(0, 0, 0);
         },
         startRingWave(targetGroup, mxObj) {
+            return
             if (!targetGroup || !targetGroup.userData) return;
             const user = targetGroup.userData;
             if (user.ringAnimId) return;
@@ -1133,6 +1209,7 @@ export default {
             mxObj.updateDisplay(true);
         },
         stopRingWave(targetGroup) {
+            return
             const user = targetGroup.userData;
             if (user.ringAnimId) {
                 cancelAnimationFrame(user.ringAnimId);
@@ -1220,12 +1297,14 @@ export default {
                 this.addBindMarker(bind);
             });
         },
-        setAnnotationHighlightById(targetId, bindMatchId) {
+        setAnnotationHighlightById(targetId) {
             // 先清上次高亮
             this.clearAnnotationHighlight();
             if (!targetId) return;
 
-            let targetPoint = this.annotationPoints.find(item => item.id === targetId);
+            const targetPoint = this.annotationPoints.find(item => item.id === targetId);
+            if (!targetPoint || !targetPoint.mesh) return;
+            const bindMatchId = targetPoint.POINT_NO;
             const mainMesh = targetPoint.mesh;
             const mxObj = MxFun.getCurrentDraw();
 
@@ -1235,7 +1314,7 @@ export default {
             }
             mainMesh.scale.copy(mainMesh.userData.originScale).multiplyScalar(1.5);
             this.highlightMeshList.push(mainMesh);
-            //if (mxObj) this.startRingWave(mainMesh, mxObj);
+            if (mxObj) this.startRingWave(mainMesh, mxObj);
 
             let bindMesh = null;
             if (bindMatchId) {
@@ -1248,7 +1327,7 @@ export default {
                     }
                     bindMesh.scale.copy(bindMesh.userData.originScale).multiplyScalar(1.5);
                     this.highlightMeshList.push(bindMesh);
-                    //if (mxObj) this.startRingWave(bindMesh, mxObj);
+                    if (mxObj) this.startRingWave(bindMesh, mxObj);
                 }
 
                 // 存在绑定关系，直接调用已有createTempLine绘制箭头连线
@@ -2127,7 +2206,7 @@ export default {
 
         zoomToPoint1(row, zoomFactor = 3) {
             try {
-                if (row.MATCH_STA == '匹配' && !this.hasMarkerById(row.PT_NO)) {
+                if (!this.hasMarkerById(row.PT_NO)) {
                     this.addBindMarker({
                         id: row.PT_NO,
                         name: row.PT_NAM,
@@ -2140,7 +2219,7 @@ export default {
                 }
                 this.zoomToPoint(row.PT_X_VALUE, row.PT_Y_VALUE)
                 this.$nextTick(() => {
-                    this.setAnnotationHighlightById(row.PT_NO, row.POINT_NO)
+                    this.setAnnotationHighlightById(row.PT_NO)
                 })
             } catch (e) {
                 console.error('[zoomToPoint] 失败:', e);

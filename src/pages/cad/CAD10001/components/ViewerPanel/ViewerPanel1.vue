@@ -134,17 +134,18 @@ export default {
             tolerance: 4,
             pointModalVisible: false,
             orgNo: '',
+            isDev: false,
             pointColumns: [
                 { type: 'selection', width: 60, align: 'center' },
                 { slot: 'seq', title: '序号', key: 'seq', width: 60, align: 'center', render: (h, { row, index }) => {
                     return h('span', (this.currentPage - 1) * this.pageSize + index + 1)
                 } },
-                { title: '实时测点', key: 'PT_NAM', minWidth: 160 },
-                { title: '测点坐标', key: 'coordValue', minWidth: 160, align: 'center', slot: 'coordStatus' },
-                { title: '匹配状态', key: 'MATCH_STA', width: 100, align: 'center', slot: 'MATCH_STA' },
-                { title: '坐标差', key: 'DALTA_XY', width: 80, align: 'center' },
-                { title: '匹配图纸点位', key: 'POINT_NAM', width: 140 },
-                { title: '匹配方式', key: 'MATCH_TYP', width: 100, align: 'center' }
+                { title: '实时测点', key: 'PT_NAM', minWidth: 120 },
+                { title: '测点坐标', key: 'coordValue', minWidth: 120, align: 'center', slot: 'coordStatus' },
+                { title: '匹配状态', key: 'MATCH_STA', width: 80, align: 'center', slot: 'MATCH_STA' },
+                { title: '坐标差', key: 'DALTA_XY', minWidth: 80, align: 'center' },
+                { title: '匹配图纸点位', key: 'POINT_NAM', minWidth: 120 },
+                { title: '匹配方式', key: 'MATCH_TYP', width: 90, align: 'center' }
             ]
         }
     },
@@ -176,6 +177,78 @@ export default {
     mounted() {
         const params = new URLSearchParams(location.search)
         this.orgNo = params.get('orgNo')
+        if (this.isDev) {
+            this.pageData =  [
+            {
+                "I2P_NO": "133777110241938767871",
+                "TZPZ_NO": "133775589162091020281",
+                "POINT_X_VALUE": "",
+                "MATCH_STA": "匹配",
+                "POINT_ID": "",
+                "POINT_NAM": "",
+                "PT_Y_VALUE": "-30388651.27496908",
+                "PT_NAM": "氧气1",
+                "PT_NO": "128681301464609980416",
+                "MATCH_TYP": "",
+                "DALTA_XY": "",
+                "PT_ID": "61080201921101MN001200001816",
+                "PT_X_VALUE": "23372898.909408778",
+                "POINT_Y_VALUE": "",
+                "POINT_NO": "58a6"
+            },
+            {
+                "I2P_NO": "133777110241938767872",
+                "TZPZ_NO": "133775589162091020288",
+                "POINT_X_VALUE": "",
+                "MATCH_STA": "未匹配",
+                "POINT_ID": "",
+                "POINT_NAM": "",
+                "PT_Y_VALUE": "-30382999.282143094",
+                "PT_NAM": "氧气",
+                "PT_NO": "128681301464609980416",
+                "MATCH_TYP": "",
+                "DALTA_XY": "",
+                "PT_ID": "61080201921101MN001200001818",
+                "PT_X_VALUE": "23369467.220270775",
+                "POINT_Y_VALUE": "",
+                "POINT_NO": ""
+            },
+            {
+                "I2P_NO": "133777112498138775552",
+                "TZPZ_NO": "133775589162091020288",
+                "POINT_X_VALUE": "",
+                "MATCH_STA": "未匹配",
+                "POINT_ID": "",
+                "POINT_NAM": "",
+                "PT_Y_VALUE": "39394974.134983465",
+                "PT_NAM": "环境温度",
+                "PT_NO": "128681301465683722240",
+                "MATCH_TYP": "",
+                "DALTA_XY": "",
+                "PT_ID": "61080201921101MN000300000200",
+                "PT_X_VALUE": "-63240812.58022698",
+                "POINT_Y_VALUE": "",
+                "POINT_NO": ""
+            },
+            {
+                "I2P_NO": "133777112498138775552",
+                "TZPZ_NO": "133775589162091020288",
+                "POINT_X_VALUE": "",
+                "MATCH_STA": "未匹配",
+                "POINT_ID": "",
+                "POINT_NAM": "",
+                "PT_Y_VALUE": "",
+                "PT_NAM": "环境温度",
+                "PT_NO": "128681301465683722240",
+                "MATCH_TYP": "",
+                "DALTA_XY": "",
+                "PT_ID": "61080201921101MN000300000200",
+                "PT_X_VALUE": "",
+                "POINT_Y_VALUE": "",
+                "POINT_NO": ""
+            }
+        ]
+        }
         this.fetchData()
     },
     methods: {

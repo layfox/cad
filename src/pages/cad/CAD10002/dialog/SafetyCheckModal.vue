@@ -149,7 +149,7 @@ export default {
   },
   methods: {
     async postData(url = "", data = {}) {
-      data.orgNo = this.orgNo
+      data.param_orgNo = this.orgNo
       const response = await fetch(url, {
         method: "POST",
 

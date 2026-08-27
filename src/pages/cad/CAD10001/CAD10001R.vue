@@ -35,11 +35,11 @@
                                     </FormItem>
                                     </Col>
                                     <Col :span="6">
-                                    <FormItem label="图纸信息名称" prop="TZXX_NO"
+                                    <FormItem label="图纸信息名称" prop="TZXX_ID"
                                         :rules="[{ required: true, message: '请选择图纸信息', trigger: 'change' }]">
                                         <Input :disabled="entity.TZPZ_STA && entity.TZPZ_STA !== '01'"
-                                            v-model="entity.TZXX_NO" @click="onChoose" style="cursor:pointer">
-                                        <Button @click="selectTz" slot="append" icon="ios-more"></Button>
+                                            v-model="entity.TZLX_NAM" style="cursor:pointer">
+                                        <Button @click="selectTz" :disabled="entity.TZPZ_STA && entity.TZPZ_STA !== '01'" slot="append" icon="ios-more"></Button>
                                         </Input>
                                     </FormItem>
                                     </Col>

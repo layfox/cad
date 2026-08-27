@@ -139,6 +139,34 @@
     animation: alarm-breath 1s infinite alternate;
 }
 
+.mx-tooltip1 {
+  position: absolute;
+  background: #fff;
+  height: 32px;
+  line-height: 32px;
+  font-weight: 400;
+font-size: 14px;
+color: #EC3000;
+transform: translateX(-50%);
+  padding: 0 16px;
+  box-shadow: 0px 0px 30px 0px rgba(0,0,0,0.1);
+  z-index: 9999;
+  pointer-events: none; /* 不阻挡鼠标事件 */
+  /* 小三角箭头（和截图气泡尖角一致） */
+}
+.mx-tooltip1::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid #fff;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
