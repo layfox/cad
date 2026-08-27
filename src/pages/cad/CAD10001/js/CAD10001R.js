@@ -1511,12 +1511,17 @@ export default {
         },
         setDefaultTZPZ(data) {
             this.postData('/api/scaqyzt/setDefaultTZPZ', data).then(data => {
-
+                if (data.data.flg) {
+                    this.$Message.success('设置默认页成功')
+                } else {
+                    this.$Message.error('设置默认页失败')
+                }
+                
             })
         },
         upsertTzpp(data) {
             this.postData('/api/scaqyzt/upsertTzpp', data).then(data => {
-                this.entity.TZPZ_NO = data.data.TZPZ_NO
+                this.entity.TZPZ_NO = data.data.TZPZ_NO || this.entity.TZPZ_NO
                 this.getTzpzInfo()
             })
         },
@@ -1524,7 +1529,7 @@ export default {
             this.postData('/api/scaqyzt/getTzpzInfo', {
                 "TZPZ_NO": this.entity.TZPZ_NO
             }).then(data => {
-                this.entity = data.data
+                this.entity = {...this.entity, ...data.data}
                 this.fileUrlInput = data.data.resourceUrl || ''
                 this.lastFileUrl = this.fileUrlInput
             })

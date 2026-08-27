@@ -92,12 +92,14 @@ export default {
             lastHoverGroup: null,
             currentData: null,
             markerTextureCache: new Map(),
-            isDev: true
+            isDev: false,
+            activeWarningGroups: new Set(),
+            globalAnimateRaf: null
         }
     },
     beforeDestroy() {
         this.destroyAnnotationEvent();
-        this.destroyAnnotationBloom();
+        // this.destroyAnnotationBloom();
         // this.unlistenPostRender();
         this.unlistenViewChange()
         if (this.rafId) {
@@ -130,7 +132,8 @@ export default {
                     "LAYER_NAM": "A通风系统图",
                     "POINT_NAM": "A$C379E0320",
                     "POINT_ID": "58a6",
-                    type: '1'
+                    type: '1',
+                    isWarning: true
                 },
                 {
                     "X_VALUE": 23369439.109730206,
@@ -140,7 +143,8 @@ export default {
                     "LAYER_NAM": "A通风系统图",
                     "POINT_NAM": "A$C379E0320",
                     "POINT_ID": "58a7",
-                    type: '2'
+                    type: '2',
+                    isWarning: true
                 },
                 {
                     "X_VALUE": 23114724.227396417,
@@ -244,11 +248,18 @@ export default {
                 }
             });
             toRemove.forEach(group => {
+                group.userData._destroyed = true;
+                if (group.userData.rippleList) {
+                    group.userData.rippleList.forEach(ripple => {
+                        ripple.mesh.geometry?.dispose();
+                        ripple.mesh.material?.dispose();
+                    })
+                    group.userData.rippleList = [];
+                }
                 group.traverse(child => {
                     if (child.isMesh) {
                         child.geometry?.dispose();
                         if (child.material) {
-                            console.log('[DEBUG-MARKER]【销毁材质】', child, child.material);
                             if (child.material.map) child.material.map.dispose();
                             if (Array.isArray(child.material)) {
                                 child.material.forEach(mat => mat.dispose());
@@ -256,7 +267,6 @@ export default {
                                 child.material.dispose();
                             }
                             child.material = null;
-                            console.log('[DEBUG-MARKER]【销毁后material】', child.material);
                         }
                     }
                 });
@@ -264,6 +274,10 @@ export default {
             });
             this.lastHoverGroup = null;
             this.annotationPoints = [];
+            // 清空告警动画集合
+            this.activeWarningGroups = new Set();
+            this.stopGlobalWarningAnimate();
+            this.currentData = null;
             mxObj.updateDisplay(true);
         },
         renderMarkersFullReset(newData) {
@@ -271,9 +285,10 @@ export default {
             if (!mxObj) return;
             const scene = mxObj.getScene?.();
             if (!scene) return;
-
-            // 1. 清空hover脏引用（重中之重，防止残留失效group）
+            // 1. 清空hover脏引用
             this.lastHoverGroup = null;
+            this.activeWarningGroups = new Set();
+            this.stopGlobalWarningAnimate();
             // 2. 收集场景内所有标注对象
             const toRemoveGroups = [];
             scene.traverse((obj) => {
@@ -281,10 +296,16 @@ export default {
                     toRemoveGroups.push(obj);
                 }
             });
-            // 3. 批量销毁资源、从场景移除
+            // 3. 批量销毁资源
             toRemoveGroups.forEach(group => {
-                
-                // 释放几何体、材质、纹理
+                group.userData._destroyed = true;
+                if (group.userData.rippleList) {
+                    group.userData.rippleList.forEach(ripple => {
+                        ripple.mesh.geometry?.dispose();
+                        ripple.mesh.material?.dispose();
+                    })
+                    group.userData.rippleList = [];
+                }
                 group.traverse(child => {
                     if (child.isMesh) {
                         child.geometry?.dispose();
@@ -303,17 +324,99 @@ export default {
                 });
                 mxObj.removeObject(group);
             });
-            // 4. 清空业务缓存数组
             this.annotationPoints = [];
-
-            // 5. 全新创建所有marker
+            // 新建marker，自动加入告警集合
             newData.forEach(bindItem => {
                 const group = this.createBindMarker1(bindItem);
                 if (group) {
                     this.annotationPoints.push({ ...bindItem, mesh: group });
                 }
             });
+            // 启动全局动画（如果有告警点位）
+            if (this.activeWarningGroups.size > 0) {
+                this.startGlobalWarningAnimate();
+            }
             mxObj.updateDisplay(true);
+        },
+        /**
+         * 全局单raf动画入口 ✅ 每个告警独立随机相位，错开闪烁
+         */
+        startGlobalWarningAnimate() {
+            if (this.globalAnimateRaf) return;
+            const mxObj = MxFun.getCurrentDraw();
+            const period = 1200; // 图标脉动周期
+            const maxScaleRate = 1.2;
+            const rippleSpawnInterval = 500; // 每隔多久生成一圈新波纹
+            let rippleSpawnTimer = 0;
+
+            const loop = () => {
+                if (this.activeWarningGroups.size === 0) {
+                    this.globalAnimateRaf = null;
+                    return;
+                }
+                const now = performance.now();
+                const deltaTime = 16; // 近似帧间隔ms
+
+                rippleSpawnTimer += deltaTime;
+                // 定时生成新波纹
+                const needSpawnRipple = rippleSpawnTimer > rippleSpawnInterval;
+                if (needSpawnRipple) rippleSpawnTimer = 0;
+
+                for (const group of this.activeWarningGroups) {
+                    if (group.userData._destroyed) {
+                        this.activeWarningGroups.delete(group);
+                        continue;
+                    }
+                    // hover直接跳过所有动画（图标+波纹都静止）
+                    if (this.lastHoverGroup === group) continue;
+
+                    // ========== 原有图标脉动逻辑 ==========
+                    const offset = group.userData.phaseOffset || 0;
+                    const t = ((now + offset) % period) / period;
+                    const factor = (Math.sin(t * Math.PI * 2) + 1) / 2;
+                    const currentRate = 1 + factor * (maxScaleRate - 1);
+                    const opacity = 0.5 + factor * 0.5;
+                    group.scale.copy(group.userData.originScale).multiplyScalar(currentRate);
+                    const mesh = group.userData.mesh;
+                    if (mesh?.material) {
+                        mesh.material.opacity = opacity;
+                    }
+
+                    // ========== 波纹更新逻辑 ==========
+                    const rippleList = group.userData.rippleList;
+                    // 生成新波纹
+                    if (needSpawnRipple) {
+                        rippleList.push(group.userData.createSingleRipple());
+                    }
+                    // 更新每一个波纹，生命周期走完销毁
+                    for (let i = rippleList.length - 1; i >= 0; i--) {
+                        const ripple = rippleList[i];
+                        ripple.life += deltaTime;
+                        const progress = ripple.life / ripple.maxLife;
+                        if (progress >= 1) {
+                            // 生命周期结束，销毁资源
+                            ripple.mesh.geometry?.dispose();
+                            ripple.mesh.material?.dispose();
+                            group.remove(ripple.mesh);
+                            rippleList.splice(i, 1);
+                            continue;
+                        }
+                        // 波纹持续放大 + 透明度衰减
+                        const rippleScale = 1 + progress * ripple.maxScale;
+                        ripple.mesh.scale.set(rippleScale, rippleScale, 1);
+                        ripple.mesh.material.opacity = 0.6 * (1 - progress);
+                    }
+                }
+                mxObj.updateDisplay(true);
+                this.globalAnimateRaf = requestAnimationFrame(loop);
+            }
+            this.globalAnimateRaf = requestAnimationFrame(loop);
+        },
+        stopGlobalWarningAnimate() {
+            if (this.globalAnimateRaf) {
+                cancelAnimationFrame(this.globalAnimateRaf);
+                this.globalAnimateRaf = null;
+            }
         },
         createBindMarker1(bindItem) {
             const mxObj = MxFun.getCurrentDraw();
@@ -324,7 +427,6 @@ export default {
             const group = new THREE.Object3D();
             group.position.set(docX, docY, docZ);
             let imgUrl = this.getImg(bindItem);
-            // 强制初始化材质，opacity显式赋值，杜绝undefined
             const geometry = new THREE.PlaneGeometry(1, 1);
             const material = new THREE.MeshBasicMaterial({
                 transparent: true,
@@ -339,23 +441,56 @@ export default {
             group.scale.set(14, 18, 1);
             mesh.renderOrder = 9999;
             group.add(mesh);
-            // 关键：group直接持有mesh和material，不要依赖外部缓存
             group.userData.isAnnotationPoint = true;
             group.userData.annotationId = bindItem.id;
             group.userData.originScale = group.scale.clone();
             group.userData.mesh = mesh;
             group.userData.material = material;
             group.userData.currentImgUrl = imgUrl;
+            group.userData._destroyed = false;
+            // ✅ 波纹数据池，存放当前活跃的波纹
+            group.userData.rippleList = [];
+            // ✅ 告警点位初始化相位偏移
+            if (bindItem.isWarning) {
+                group.userData.phaseOffset = Math.random() * 1200;
+                if (!this.activeWarningGroups) this.activeWarningGroups = new Set();
+                this.activeWarningGroups.add(group);
+            }
+
             mxObj.addObject(group);
-            // 异步加载图片，失败不影响点位本身显示（空白材质兜底）
+
+            // ========== 新增：创建波纹函数，后续动画循环自动生成波纹 ==========
+            const createSingleRipple = () => {
+                const ringGeo = new THREE.RingGeometry(0.4, 0.5, 32);
+                const ringMat = new THREE.MeshBasicMaterial({
+                    color: 0xff3333,
+                    transparent: true,
+                    opacity: 0.6,
+                    // blending: THREE.AdditiveBlending,
+                    depthTest: false,
+                    depthWrite: false,
+                    side: THREE.DoubleSide
+                });
+                const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+                ringMesh.renderOrder = 9998; // 在图标下层
+                ringMesh.raycast = () => { };
+                group.add(ringMesh);
+                return {
+                    mesh: ringMesh,
+                    life: 0,
+                    maxLife: 2200, // 波纹完整生命周期ms
+                    maxScale: 1.1
+                }
+            }
+            group.userData.createSingleRipple = createSingleRipple;
+
+            // 异步贴图
             if (imgUrl) {
                 const img = new Image();
                 img.crossOrigin = 'anonymous';
                 img.onload = () => {
                     try {
-                        // ⭐ 同样重新校验group和material，不能直接用外层闭包material
-                        if (!group?.userData?.material) {
-                            console.log('[DEBUG-MARKER]新建marker已销毁，跳过贴图');
+                        if (!group?.userData?.material || group.userData._destroyed) {
                             return;
                         }
                         const material = group.userData.material;
@@ -370,17 +505,88 @@ export default {
                         material.needsUpdate = true;
                         mxObj.updateDisplay(true);
                     } catch (e) {
-                        console.error('[DEBUG-MARKER]新建marker贴图onload异常', e)
+
                     }
                 };
                 img.onerror = (e) => {
-                    console.error("图片加载失败", imgUrl, e);
+
                 };
                 img.src = imgUrl;
             }
             mxObj.updateDisplay(true);
             return group;
         },
+        // createBindMarker1(bindItem) {
+        //     const mxObj = MxFun.getCurrentDraw();
+        //     if (!mxObj) return null;
+        //     const docX = bindItem.x;
+        //     const docY = bindItem.y;
+        //     const docZ = bindItem.z || 0;
+        //     const group = new THREE.Object3D();
+        //     group.position.set(docX, docY, docZ);
+        //     let imgUrl = this.getImg(bindItem);
+        //     const geometry = new THREE.PlaneGeometry(1, 1);
+        //     const material = new THREE.MeshBasicMaterial({
+        //         transparent: true,
+        //         depthTest: false,
+        //         depthWrite: false,
+        //         side: THREE.DoubleSide,
+        //         map: null,
+        //         opacity: 1
+        //     });
+        //     const mesh = new THREE.Mesh(geometry, material);
+        //     mesh.scale.set(1, 1, 1);
+        //     group.scale.set(14, 18, 1);
+        //     mesh.renderOrder = 9999;
+        //     group.add(mesh);
+        //     group.userData.isAnnotationPoint = true;
+        //     group.userData.annotationId = bindItem.id;
+        //     group.userData.originScale = group.scale.clone();
+        //     group.userData.mesh = mesh;
+        //     group.userData.material = material;
+        //     group.userData.currentImgUrl = imgUrl;
+        //     group.userData._destroyed = false;
+        //     // ✅ 告警点位生成随机相位偏移 0~800ms
+        //     if (bindItem.isWarning) {
+        //         group.userData.phaseOffset = Math.random() * 800;
+        //         if (!this.activeWarningGroups) this.activeWarningGroups = new Set();
+        //         this.activeWarningGroups.add(group);
+        //     }
+
+        //     mxObj.addObject(group);
+        //     // 异步贴图
+        //     if (imgUrl) {
+        //         const img = new Image();
+        //         img.crossOrigin = 'anonymous';
+        //         img.onload = () => {
+        //             try {
+        //                 if (!group?.userData?.material || group.userData._destroyed) {
+        //                     console.log('[DEBUG-MARKER]新建marker已销毁，跳过贴图');
+        //                     return;
+        //                 }
+        //                 const material = group.userData.material;
+        //                 const texture = new THREE.Texture(img);
+        //                 texture.flipY = true;
+        //                 texture.generateMipmaps = false;
+        //                 texture.minFilter = THREE.LinearFilter;
+        //                 texture.magFilter = THREE.LinearFilter;
+        //                 texture.needsUpdate = true;
+        //                 if (material.map) material.map.dispose();
+        //                 material.map = texture;
+        //                 material.needsUpdate = true;
+        //                 mxObj.updateDisplay(true);
+        //             } catch (e) {
+        //                 console.error('[DEBUG-MARKER]新建marker贴图onload异常', e)
+        //             }
+        //         };
+        //         img.onerror = (e) => {
+        //             console.error("图片加载失败", imgUrl, e);
+        //         };
+        //         img.src = imgUrl;
+        //     }
+        //     mxObj.updateDisplay(true);
+        //     return group;
+        // },
         renderMarkersByList(data) {
             this.clearAllBindMarkers();
             data.forEach(bind => {
@@ -389,22 +595,23 @@ export default {
                     this.annotationPoints.push({ ...bind, mesh: mesh });
                 }
             });
-        },
-        getImg(bindItem) {
-            let imgUrl = '/image/icon1.png'
-            if (bindItem.type === '1') {
-                imgUrl = bindItem.isWarning ? '/image/icon2.png' : '/image/icon1.png';
-            } else if (bindItem.type === '2') {
-                imgUrl = bindItem.isWarning ? '/image/icon4.png' : '/image/icon3.png';
-            } else if (bindItem.type === '3') {
-                imgUrl = bindItem.isWarning ? '/image/icon6.png' : '/image/icon5.png';
-            } else if (bindItem.type === '4') {
-                imgUrl = bindItem.isWarning ? '/image/icon8.png' : '/image/icon7.png';
+            if (this.activeWarningGroups.size > 0) {
+                this.startGlobalWarningAnimate();
             }
         },
-        /**
-         * ✅【核心优化版本】直接读取预存mesh，完全移除traverse遍历，从根源规避未知对象报错
-         */
+        getImg(bindItem) {
+            let imgUrl = './image/icon1.png'
+            if (bindItem.type === '1') {
+                imgUrl = bindItem.isWarning ? './image/icon2.png' : './image/icon1.png';
+            } else if (bindItem.type === '2') {
+                imgUrl = bindItem.isWarning ? './image/icon4.png' : './image/icon3.png';
+            } else if (bindItem.type === '3') {
+                imgUrl = bindItem.isWarning ? './image/icon6.png' : './image/icon5.png';
+            } else if (bindItem.type === '4') {
+                imgUrl = bindItem.isWarning ? './image/icon8.png' : './image/icon7.png';
+            }
+            return imgUrl;
+        },
         handleAnnotationHover(e) {
             try {
                 if (this.isAddingAnnotation) return;
@@ -435,31 +642,25 @@ export default {
                     }
                     if (hoverTargetGroup) break;
                 }
-                // 还原上一个hover状态：直接取预存mesh，不再traverse
                 if (this.lastHoverGroup) {
-                    console.log('[DEBUG-MARKER]【待还原lastHoverGroup】', this.lastHoverGroup);
                     if (this.lastHoverGroup.userData.originScale) {
                         this.lastHoverGroup.scale.copy(this.lastHoverGroup.userData.originScale);
                     }
                     const mesh = this.lastHoverGroup.userData.mesh;
                     if (mesh?.material) {
-                        console.log('[DEBUG-MARKER]【执行还原opacity】', mesh.material);
                         mesh.material.opacity = 1;
                     }
                     this.lastHoverGroup = null;
                 }
-                // 新hover高亮：直接取预存mesh，不再traverse
                 if (hoverTargetGroup) {
                     if (!hoverTargetGroup.userData.originScale) {
                         hoverTargetGroup.userData.originScale = hoverTargetGroup.scale.clone();
                     }
-                    hoverTargetGroup.scale.copy(hoverTargetGroup.userData.originScale).multiplyScalar(1.4);
+                    hoverTargetGroup.scale.copy(hoverTargetGroup.userData.originScale).multiplyScalar(1.2);
                     this.lastHoverGroup = hoverTargetGroup;
-                    console.log('[DEBUG-MARKER]【新hoverTargetGroup】', hoverTargetGroup);
                     const mesh = hoverTargetGroup.userData.mesh;
                     if (mesh?.material) {
-                        console.log('[DEBUG-MARKER]【执行高亮opacity】', mesh.material);
-                        mesh.material.opacity = 0.8;
+                        mesh.material.opacity = 1;
                     }
                     this.markNeedUpdate();
                 } else {
@@ -552,52 +753,48 @@ export default {
             if (!mxObj) return;
             const scene = mxObj.getScene?.();
             if (!scene) return;
-
-            // 清理hover脏引用
             this.lastHoverGroup = null;
-
-            // 构建新旧map
+            if (!this.activeWarningGroups) this.activeWarningGroups = new Set();
             const oldMap = new Map();
             this.annotationPoints.forEach(item => {
                 oldMap.set(item.id, item);
             });
             const newMap = new Map();
             newData.forEach(item => newMap.set(item.id, item));
-
-            // 用来存最终结果
             const finalPoints = [];
 
-            // 1. 遍历新数据
             for (const [id, newBind] of newMap) {
                 const oldItem = oldMap.get(id);
                 if (!oldItem) {
-                    // 👉 全新ID：直接新建
                     const newGroup = this.createBindMarker1(newBind);
                     if (newGroup) {
                         finalPoints.push({ ...newBind, mesh: newGroup });
                     }
                     continue;
                 }
-
-                // ✅ 判断数据是否发生变化（你可以按需扩展对比字段：x/y/z/type等）
                 const isDataChanged = (
                     oldItem.x !== newBind.x ||
                     oldItem.y !== newBind.y ||
                     oldItem.z !== (newBind.z || 0) ||
-                    oldItem.type !== newBind.type
+                    oldItem.type !== newBind.type ||
+                    oldItem.isWarning !== newBind.isWarning
                 );
-
                 if (!isDataChanged) {
-                    // 👉 数据完全没变：什么都不做，直接沿用旧mesh
                     finalPoints.push(oldItem);
                     continue;
                 }
-
-                // 👉【核心逻辑：数据变了 → 销毁旧group，新建】
                 const oldGroup = oldItem.mesh;
                 if (oldGroup) {
-                    // 标记销毁，拦截正在pending的图片onload回调
                     oldGroup.userData._destroyed = true;
+                    if (oldGroup.userData.rippleList) {
+                        oldGroup.userData.rippleList.forEach(ripple => {
+                            ripple.mesh.geometry?.dispose();
+                            ripple.mesh.material?.dispose();
+                        })
+                        oldGroup.userData.rippleList = [];
+                    }
+                    // ✅ 旧告警自动从动画集合移除
+                    this.activeWarningGroups.delete(oldGroup);
                     oldGroup.traverse(child => {
                         if (child.isMesh) {
                             child.geometry?.dispose();
@@ -616,14 +813,11 @@ export default {
                     });
                     mxObj.removeObject(oldGroup);
                 }
-                // 创建全新group
                 const newGroup = this.createBindMarker1(newBind);
                 if (newGroup) {
                     finalPoints.push({ ...newBind, mesh: newGroup });
                 }
             }
-
-            // 2. 处理旧数据里不存在于新数据的项：直接删除
             for (const [id, oldItem] of oldMap) {
                 if (!newMap.has(id)) {
                     const oldGroup = oldItem.mesh;
@@ -632,6 +826,15 @@ export default {
                         this.lastHoverGroup = null;
                     }
                     oldGroup.userData._destroyed = true;
+                    if (oldGroup.userData.rippleList) {
+                        oldGroup.userData.rippleList.forEach(ripple => {
+                            ripple.mesh.geometry?.dispose();
+                            ripple.mesh.material?.dispose();
+                        })
+                        oldGroup.userData.rippleList = [];
+                    }
+                    // ✅ 消失的告警自动剔除动画
+                    this.activeWarningGroups.delete(oldGroup);
                     oldGroup.traverse(child => {
                         if (child.isMesh) {
                             child.geometry?.dispose();
@@ -651,9 +854,13 @@ export default {
                     mxObj.removeObject(oldGroup);
                 }
             }
-
-            // 3. 同步业务数组
             this.annotationPoints = finalPoints;
+            // ✅ 自动启停动画
+            if (this.activeWarningGroups.size > 0) {
+                this.startGlobalWarningAnimate();
+            } else {
+                this.stopGlobalWarningAnimate();
+            }
             mxObj.updateDisplay(true);
         },
         getDefaultTz() {
@@ -661,7 +868,6 @@ export default {
                 this.TZPZ_NO = data.data
                 if (this.TZPZ_NO) {
                     this.getTzpzInfo()
-                    this.getGroupedIotInfo()
                 }
             })
         },
@@ -670,21 +876,22 @@ export default {
                 "TZPZ_NO": this.TZPZ_NO
             }).then(data => {
                 this.fileUrlInput = data.data.resourceUrl || ''
-                this.initViewer()
-                this.$nextTick(() => {
-                    this.initCtrlPan();
-                });
+                if (!this.mxcad) {
+                    this.initViewer()
+                    this.$nextTick(() => {
+                        this.initCtrlPan();
+                    });
+                } else {
+                    this.mxcad.openWebFile(this.fileUrlInput)
+                    this.annotationPoints = []
+                    this.clearAllBindMarkers()
+                }
+                this.getGroupedIotInfo()
             })
         },
         onConfirmTz(data) {
-            this.fileUrlInput = data.resourceUrl;
-            if (this.mxcad) {
-                this.mxcad.openWebFile(this.fileUrlInput)
-                this.annotationPoints = []
-                this.clearAllBindMarkers()
-                this.TZPZ_NO = data.TZPZ_NO
-                this.getGroupedIotInfo()
-            }
+            this.TZPZ_NO = data.TZPZ_NO
+            this.getTzpzInfo()
         },
         world2Screen(worldPos) {
             if (!worldPos) return null;
@@ -1122,7 +1329,7 @@ export default {
         onTabClick(item, index) {
             this.tabIndex = index
             this.panelCollapsed = true
-            this.renderMarkersDiffV2(this.pointList.map((item, index) => {
+            this.renderMarkersDiffV2(this.pointList.slice(0, 3).map((item, index) => {
                 item.id = item.pointNo;
                 item.name = item.pointName;
                 item.type = index === 1 ? '3' : '1'
@@ -1299,10 +1506,22 @@ export default {
         onFileLoaded() {
             this.loading = false
             if (this.pointList.length) {
-                this.renderMarkersDiff(this.pointList.map(item => {
+                this.renderMarkersDiffV2(this.pointList.map((item, index) => {
                     item.id = item.pointNo;
                     item.name = item.pointName;
                     item.type = '1'
+                    if (index == 2) {
+                        item.isWarning = true
+                        item.type = '3'
+                    }
+                    if (index == 3) {
+                        item.isWarning = true
+                        item.type = '4'
+                    }
+                    if (index == 5) {
+                        item.isWarning = true
+                        item.type = '2'
+                    }
                     return item
                 }));
             }
