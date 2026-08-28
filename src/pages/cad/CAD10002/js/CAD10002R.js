@@ -1,7 +1,4 @@
 import ViewerPanel from '../components/ViewerPanel/ViewerPanel.vue';
-import ViewerPanel1 from '../components/ViewerPanel/ViewerPanel1.vue';
-import ViewerPanel2 from '../components/ViewerPanel/ViewerPanel2.vue';
-import ViewerPanel3 from '../components/ViewerPanel/ViewerPanel3.vue';
 import PersonInfoModal from '../dialog/PersonInfoModal.vue';
 import SafetyCheckModal from '../dialog/SafetyCheckModal.vue';
 import AlarmHandleModal from '../dialog/AlarmHandleModal.vue';
@@ -13,9 +10,6 @@ import { RegistMxCommands, RxInitMxEntity } from "@/test/command";
 import { MyRect } from "@/test/DrawRect";
 import * as THREE from "three";
 import { mapState } from 'vuex'
-import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
-import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
-import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 let _allMarkerIds = {}
 export default {
     data() {
@@ -109,9 +103,6 @@ export default {
     },
     components: {
         ViewerPanel,
-        ViewerPanel1,
-        ViewerPanel2,
-        ViewerPanel3,
         PersonInfoModal,
         SafetyCheckModal,
         AlarmHandleModal,
@@ -865,7 +856,7 @@ export default {
         },
         getDefaultTz() {
             this.postData('/api/scaqyzt/getDefaultTZPZ').then(data => {
-                this.TZPZ_NO = data.data
+                this.TZPZ_NO = data.data.TZPZ_NO
                 if (this.TZPZ_NO) {
                     this.getTzpzInfo()
                 }
@@ -969,72 +960,6 @@ export default {
             }
             if (this.winResizeHandler) {
                 window.removeEventListener("resize", this.winResizeHandler);
-            }
-        },
-        initAnnotationBloom() {
-            const mxObj = MxFun.getCurrentDraw();
-            if (!mxObj) return;
-            const scene = mxObj.getScene();
-            const camera = mxObj.getCamera();
-            const renderer = mxObj.getRenderer();
-            if (!scene || !camera || !renderer) return;
-            if (this.bloomComposer) return;
-
-            // 创建辉光合成器
-            this.bloomComposer = new EffectComposer(renderer);
-            const renderPass = new RenderPass(scene, camera);
-            this.bloomComposer.addPass(renderPass);
-
-            this.bloomPass = new UnrealBloomPass(
-                new THREE.Vector2(window.innerWidth, window.innerHeight),
-                this.bloomStrength,
-                this.bloomRadius,
-                this.bloomThreshold
-            );
-            this.bloomComposer.addPass(this.bloomPass);
-
-            // 关键：关闭自动清屏，让 mxdraw 先画 CAD，再叠加辉光
-            renderer.autoClear = false;
-
-            // 注册 mxdraw 渲染后回调，叠加辉光
-            this.bloomRenderCb = () => {
-                if (this.bloomComposer) {
-                    this.bloomComposer.render();
-                }
-            };
-            mxObj.on("postRender", this.bloomRenderCb);
-
-            // 窗口大小变化
-            this.bloomResizeCb = () => {
-                if (this.bloomPass) {
-                    this.bloomPass.setSize(window.innerWidth, window.innerHeight);
-                }
-            };
-            window.addEventListener("resize", this.bloomResizeCb);
-
-            mxObj.updateDisplay(true);
-            console.log("✅ 辉光初始化完成");
-        },
-        destroyAnnotationBloom() {
-            const mxObj = MxFun.getCurrentDraw();
-            if (this.bloomRenderCb && mxObj) {
-                mxObj.off("postRender", this.bloomRenderCb);
-                this.bloomRenderCb = null;
-            }
-            if (this.bloomResizeCb) {
-                window.removeEventListener("resize", this.bloomResizeCb);
-                this.bloomResizeCb = null;
-            }
-            if (this.bloomComposer) {
-                this.bloomComposer.passes.forEach((pass) => {
-                    if (pass.dispose) pass.dispose();
-                });
-                this.bloomComposer = null;
-            }
-            this.bloomPass = null;
-            // 恢复渲染器默认状态
-            if (mxObj && mxObj.getRenderer()) {
-                mxObj.getRenderer().autoClear = true;
             }
         },
         destroyAnnotationEvent() {

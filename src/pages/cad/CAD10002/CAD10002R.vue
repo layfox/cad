@@ -154,6 +154,7 @@
       >
         <TzModal
           :visible="showTz"
+          :orgNo="orgNo"
           @update:visible="showTz = $event"
           @close="showTz = false"
           @confirm="onConfirmTz"

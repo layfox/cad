@@ -1,4 +1,4 @@
-const CopyWebpackPlugin = require("copy-webpack-plugin")
+﻿const CopyWebpackPlugin = require("copy-webpack-plugin")
 const path = require("path")
 module.exports = {
   publicPath: './',
@@ -10,11 +10,17 @@ module.exports = {
     config.plugins.delete('fork-ts-checker')
   },
   configureWebpack: {
-    devtool: 'source-map',
-    resolve: {
-      alias: {
-        // ========== 核心新增：强制所有three导入指向同一个three.module.js，解决双实例 ==========
-        three$: path.resolve(__dirname, 'node_modules/three/build/three.module.js'),
+    // devtool: 'source-map',
+    optimization: {
+      splitChunks: {
+        chunks: 'all',
+        cacheGroups: {
+          mxcad: { name: 'chunk-mxcad', test: /[\\/]node_modules[\\/]mxcad/, priority: 20 },
+          three: { name: 'chunk-three', test: /[\\/]node_modules[\\/]three/, priority: 20 },
+          echarts: { name: 'chunk-echarts', test: /[\\/]node_modules[\\/]echarts/, priority: 10 },
+          element: { name: 'chunk-element', test: /[\\/]node_modules[\\/]element-ui/, priority: 10 },
+          vendor: { name: 'chunk-vendor', test: /[\\/]node_modules[\\/]/, priority: -10 }
+        }
       }
     },
     // plugins: [

@@ -2,7 +2,7 @@
     <div id="CAD10001R">
         <div class="page-body">
             <div class="page-header">
-                <Button type="primary" v-if="(currentStep == 0 || currentStep == 1)&&entity.TZPZ_STA=='01'" @click="save">保存</Button>
+                <Button type="primary" v-if="(currentStep == 0)&&entity.TZPZ_STA=='01'" @click="save">保存</Button>
                 <Button type="primary" @click="onStep(1)" v-if="currentStep == 0">图纸解析</Button>
                 <Button type="primary" @click="onStep(2)" v-if="currentStep == 1">点位绑定</Button>
                 <Button type="primary" v-if="currentStep == 2&& (entity.TZPZ_STA !== '04'||entity.TZPZ_STA === '05')">复制旧版本测点</Button>

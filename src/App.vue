@@ -85,6 +85,20 @@ html, body {
   font-size: 0;
 }
 
+.ivu-table .ivu-table-wrapper {
+  border: none;
+}
+
+.ivu-table:after,
+.ivu-table:before {
+  display: none;
+}
+
+.ivu-table .ivu-table-body tr td,
+.ivu-table .ivu-table-header th {
+  border: none;
+}
+
 /* Firefox 兼容 */
 * {
   scrollbar-width: auto;       /* auto | thin | none */

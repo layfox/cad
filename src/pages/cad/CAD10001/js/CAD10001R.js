@@ -302,7 +302,7 @@ export default {
             "TZPZ_USR": "111",
             "TZPZ_DAT": "2026-11-12",
             "TZPZ_STA": "03",
-            "resourceUrl": "",
+            "resourceUrl": "./models/YTSF-001.mxweb",
             "TZXX_ID": "22",
             "TZLX_NAM": "11",
             "TZ_VERSION": "",
@@ -315,7 +315,21 @@ export default {
         if (params.get('TZPZ_NO')) {
             this.entity.TZPZ_NO = params.get('TZPZ_NO')
             this.getTzpzInfo()
+        } else if (!this.isDev) {
+            this.entity = {
+                "TZPZ_ID": "",
+                "TZXX_NO": "",
+                "TZPZ_USR": "",
+                "TZPZ_DAT": "",
+                "TZPZ_STA": "01",
+                "resourceUrl": "",
+                "TZXX_ID": "",
+                "TZLX_NAM": "",
+                "TZ_VERSION": "",
+                TZPZ_NO: "",
+            }
         }
+        this.currentStep = 0
         // _bindMarkerClickEvent 在 initViewer 内部调用（mxdraw 就绪后）
     },
     computed: {
@@ -347,6 +361,7 @@ export default {
             cancelAnimationFrame(this.rafId);
             this.rafId = null;
         }
+        this.clearAllBindMarkers()
         this.matchMode = null;
         this.selectedSurveyPoint = null;
         this.manualPlaceVisible = false;
@@ -1309,6 +1324,9 @@ export default {
                 this.entity = {...this.entity, ...data.data}
                 this.fileUrlInput = data.data.resourceUrl || ''
                 this.lastFileUrl = this.fileUrlInput
+                if (this.entity.TZPZ_STA && this.entity.TZPZ_STA !='01') {
+                    this.pointParsed = true
+                }
             })
         },
         upsertLayer(data) {
@@ -1319,6 +1337,7 @@ export default {
         upsertPoint(data) {
             this.postData('/api/scaqyzt/upsertPoint', data).then(data => {
                 this.getPoint(true)
+                this.pointParsed = true
                 this.upsertTzpp({
                     "TZPZ_STA": '02',
                     "TZPZ_NO": this.entity.TZPZ_NO
@@ -1427,10 +1446,6 @@ export default {
                         })
                     })
                 } else if (this.currentStep === 1) {
-                    if (!this.pointParsed) {
-                        this.$Message.error('请文件解析完成后再保存')
-                        return
-                    }
                     this.upsertPoint(
                         {
                             "TZPZ_NO": this.entity.TZPZ_NO,
@@ -1465,27 +1480,8 @@ export default {
                 this.currentStep = index
             } else if (index == 2) {
                 if (this.entity.TZPZ_STA === '01' || !this.entity.TZPZ_STA) {
-                    if (!this.pointParsed) {
-                        this.$Message.error('请文件解析完成后再保存')
-                        return
-                    }
-                    this.upsertPoint(
-                        {
-                            "TZPZ_NO": this.entity.TZPZ_NO,
-                            data: this.pointList.map(item => {
-                                return {
-                                    "POINT_NO": "",
-                                    "POINT_ID": item.no,
-                                    "POINT_NAM": item.name,
-                                    "X_VALUE": item.x,
-                                    "Y_VALUE": item.y,
-                                    "LAYER_NO": "",
-                                    "LAYER_ID": item.LAYER_ID,
-                                    "LAYER_NAM": item.LAYER_NAM
-                                }
-                            })
-                        }
-                    )
+                    this.$Message.error('请完成解析图纸后再进行下一步操作')
+                    return
                 }
                 this.currentStep = index
             } else if (index == 1) {
@@ -1511,6 +1507,7 @@ export default {
             }
             if (index > 0) {
                 if (!this.mxcad) {
+                    console.log(this.fileUrlInput, 2222)
                     this.initViewer()
                     this.$nextTick(() => {
                         this.initCtrlPan();
@@ -1695,7 +1692,7 @@ export default {
                 this.$Message.error("MxCAD 查看器初始化失败: " + error.message);
             }
             this.initAnnotationClick()
-            this.initAnnotationBloom();
+            // this.initAnnotationBloom();
             this.listenCanvasViewChange();
             // this.initPostRenderUpdate()
             // this._bindMarkerClickEvent();
@@ -1842,8 +1839,24 @@ export default {
             }
             // 收集点位数据
             if (this.entity.TZPZ_STA === '01' || !this.entity.TZPZ_STA) {
-                this.pointList = this.getAllMcDbPoint();
-                this.pointParsed = true
+                const pointList = this.getAllMcDbPoint();
+                this.upsertPoint(
+                    {
+                        "TZPZ_NO": this.entity.TZPZ_NO,
+                        data: pointList.map(item => {
+                            return {
+                                "POINT_NO": "",
+                                "POINT_ID": item.no,
+                                "POINT_NAM": item.name,
+                                "X_VALUE": item.x,
+                                "Y_VALUE": item.y,
+                                "LAYER_NO": "",
+                                "LAYER_ID": item.LAYER_ID,
+                                "LAYER_NAM": item.LAYER_NAM
+                            }
+                        })
+                    }
+                )
             } else {
                 this.getPoint(true)
             }
@@ -1854,6 +1867,7 @@ export default {
                         item.type = '1'
                     return item
                 }));
+                this.pointParsed = true
             }
         },
 

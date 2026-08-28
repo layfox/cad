@@ -462,11 +462,13 @@ export default {
     height: 42px;
     padding: 0 8px;
     background: #EEF1F6;
+    border: none;
 }
 
 .vp-body .ivu-table-body tr td {
     height: 42px;
     padding: 0 8px;
+    border: none;
 }
 
 .vp-body .ivu-table-cell {
