@@ -21,12 +21,15 @@
     <!-- 图纸列表 -->
     <div class="dsm-list">
       <Table
+        ref="drawingTable"
         :data="displayDrawings"
         :columns="columns"
         :border="false"
         size="small"
         highlight-row
+        :loading="tableLoading"
         @on-selection-change="onSelectionChange"
+        @on-row-click="onRowClick"
       />
     </div>
 
@@ -38,8 +41,7 @@
         :current="currentPage"
         show-easy-prev
         show-easy-next
-        show-sizer
-        :page-size-opts="[10, 20, 50]"
+        show-total
         @on-change="onPageChange"
         @on-page-size-change="onPageSizeChange"
       />
@@ -54,6 +56,17 @@
 </template>
 
 <script>
+// 防抖工具
+function debounce(fn, delay = 350) {
+  let timer = null
+  return function (...args) {
+    clearTimeout(timer)
+    timer = setTimeout(() => {
+      fn.apply(this, args)
+    }, delay)
+  }
+}
+
 export default {
   name: 'DrawingSelectModal',
   props: {
@@ -78,80 +91,111 @@ export default {
       pageSize: 10,
       selectedDrawings: [],
       companyOptions: ['小纪汗', '肖家洼'],
-      drawings: []
+      displayDrawings: [],
+      total: 0,
+      tableLoading: false
     }
   },
   computed: {
-    filteredDrawings() {
-      if (!this.searchKeyword.trim()) return this.drawings
-      const kw = this.searchKeyword.trim().toLowerCase()
-      return this.drawings.filter(d =>
-        d.TZLX_NAM.toLowerCase().includes(kw)
-      )
-    },
-    displayDrawings() {
-      const start = (this.currentPage - 1) * this.pageSize
-      return this.filteredDrawings.slice(start, start + this.pageSize)
-    },
-    total() {
-      return this.filteredDrawings.length
-    },
     columns() {
       return [
         { type: 'selection', width: 45, align: 'center' },
-        { title: '图纸类型名称', key: 'TZLX_NAM', minWidth: 180 },
-        { title: '图纸信息编号', key: 'TZXX_ID', minWidth: 120 },
-        { title: '图纸版本号', key: 'TZ_VERSION', minWidth: 120, align: 'center' }
+        { title: '配置编码', key: 'TZPZ_NO', minWidth: 180 },
+        { title: '配置人员', key: 'TZPZ_USR', minWidth: 120 },
+        { title: '图纸信息编码', key: 'TZXX_ID', minWidth: 120 },
+        { title: '配置状态', key: 'TZPZ_STA', minWidth: 100, align: 'center' },
+        { title: '图纸版本', key: 'TZ_VERSION', minWidth: 100, align: 'center' },
+        { title: '配置日期', key: 'TZPZ_DAT', minWidth: 120, align: 'center' }
       ]
     }
   },
   watch: {
     company(val) {
       this.selectedCompany = val
-    }
-  },
-  mounted() {
-    this.postData('/api/scaqyzt/getTzpzList', {
-      "pageSize": "1000",
-      "pageNum": "1",
-      param_orgNo: this.orgNo
-    }).then(data => {
-      this.drawings = data.data.data.filter(item => item.TZPZ_STA=='04')
+    },
+    visible(val) {
+      if (val) {
+        this.searchKeyword = ''
+        this.currentPage = 1
+        this.selectedDrawings = []
+        this.clearTableSelection()
+        this.fetchDrawingList()
+      }
+    },
+    searchKeyword: debounce(function () {
+      if (this.visible) {
+        this.currentPage = 1
+        this.clearTableSelection()
+        this.fetchDrawingList()
+      }
     })
   },
+  mounted() {
+  },
   methods: {
+    clearTableSelection() {
+      if (this.$refs.drawingTable) {
+        this.$refs.drawingTable.selectAll(false)
+      }
+    },
+    async fetchDrawingList() {
+      this.tableLoading = true
+      const params = {
+        pageNum: String(this.currentPage),
+        pageSize: String(this.pageSize),
+        param_orgNo: this.orgNo || ''
+      }
+      try {
+        const res = await this.postData('/api/scaqyzt/getTzpzList', params)
+        if (res.success && res.data) {
+          const list = (res.data.data || []).filter(item => item.TZPZ_STA === '04')
+          this.displayDrawings = list
+          this.total = res.data.pageInfo?.totalCount || 0
+          this.selectedDrawings = []
+          this.clearTableSelection()
+        } else {
+          this.displayDrawings = []
+          this.total = 0
+        }
+      } catch (err) {
+        this.$Message.error('图纸列表请求失败')
+        console.error(err)
+      } finally {
+        this.tableLoading = false
+      }
+    },
     async postData(url = "", data = {}) {
-        const response = await fetch(url, {
-            method: "POST",
-
-            body: JSON.stringify(data),
-        });
-        return response.json();
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data),
+      });
+      return response.json();
     },
     onCompanyChange() {
-      // 切换公司时重置搜索和分页
       this.searchKeyword = ''
       this.currentPage = 1
       this.selectedDrawings = []
+      this.clearTableSelection()
       this.$emit('company-change', this.selectedCompany)
+      this.fetchDrawingList()
     },
     onSelectionChange(rows) {
       this.selectedDrawings = rows
     },
     onRowClick(row) {
-      // 行点击时同步 selection
-      this.$refs.drawingTable.clearSelection()
-      this.$refs.drawingTable.toggleRowSelection(row)
       this.selectedDrawings = [row]
     },
     onPageChange(page) {
       this.currentPage = page
-      this.selectedDrawings = []
+      this.fetchDrawingList()
     },
     onPageSizeChange(size) {
       this.pageSize = size
       this.currentPage = 1
-      this.selectedDrawings = []
+      this.fetchDrawingList()
     },
     onConfirm() {
       if (this.selectedDrawings.length !== 1) {
@@ -295,7 +339,6 @@ gap: 6px;
   align-items: center;
   justify-content: right;
   padding: 8px 16px;
-  border-top: 1px solid #f0f0f0;
   flex-shrink: 0;
 }
 

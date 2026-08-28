@@ -61,9 +61,7 @@
           show-easy-prev
           show-easy-next
           class="c3-page"
-          show-sizer
           show-total
-          :page-size-opts="[10, 20, 50]"
           @on-change="onPageChange"
           @on-page-size-change="onPageSizeChange"
         />

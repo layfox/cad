@@ -118,7 +118,8 @@ export default {
             highlightLineGroup: null,
             highlightMeshList: [],
             highlightUseTempLine: false,
-            isDev: false
+            isDev: false,
+            pointParsed: false
         }
     },
     components: {
@@ -352,6 +353,89 @@ export default {
         this.manualPlaceHasCoordFill = false;
     },
     methods: {
+        renderMarkersByList(data) {
+            data.forEach(bind => {
+                this.addBindMarker(bind);
+            });
+        },
+        setAnnotationHighlightById(targetId, bindMatchId) {
+            // 先清上次高亮
+            this.clearAnnotationHighlight();
+            if (!targetId) return;
+
+            let targetPoint = this.annotationPoints.find(item => item.id === targetId);
+            const mainMesh = targetPoint.mesh;
+            const mxObj = MxFun.getCurrentDraw();
+
+            // 主点位高亮（和hover逻辑一致）
+            if (!mainMesh.userData.originScale) {
+                mainMesh.userData.originScale = mainMesh.scale.clone();
+            }
+            mainMesh.scale.copy(mainMesh.userData.originScale).multiplyScalar(1.5);
+            this.highlightMeshList.push(mainMesh);
+            //if (mxObj) this.startRingWave(mainMesh, mxObj);
+
+            let bindMesh = null;
+            if (bindMatchId) {
+                this.highlightMatchId = bindMatchId;
+                const bindPoint = this.annotationPoints.find(item => item.id === bindMatchId);
+                if (bindPoint && bindPoint.mesh) {
+                    bindMesh = bindPoint.mesh;
+                    if (!bindMesh.userData.originScale) {
+                        bindMesh.userData.originScale = bindMesh.scale.clone();
+                    }
+                    bindMesh.scale.copy(bindMesh.userData.originScale).multiplyScalar(1.5);
+                    this.highlightMeshList.push(bindMesh);
+                    //if (mxObj) this.startRingWave(bindMesh, mxObj);
+                }
+
+                // 存在绑定关系，直接调用已有createTempLine绘制箭头连线
+                if (mainMesh && bindMesh) {
+                    const startWorld = {
+                        x: targetPoint.x,
+                        y: targetPoint.y,
+                        z: targetPoint.z || 0
+                    };
+                    const endWorld = {
+                        x: bindPoint.x,
+                        y: bindPoint.y,
+                        z: bindPoint.z || 0
+                    };
+                    this.createTempLine(startWorld, endWorld);
+                    this.highlightUseTempLine = true;
+                }
+            }
+
+            this.highlightTargetId = targetId;
+            if (mxObj) mxObj.updateDisplay(true);
+        },
+
+        /**
+         * 清空所有高亮：恢复mesh原始材质、销毁高亮箭头连线
+         */
+        clearAnnotationHighlight() {
+            const mxObj = MxFun.getCurrentDraw();
+
+            // 恢复所有高亮点位
+            this.highlightMeshList.forEach((mesh) => {
+                if (!mesh) return;
+                this.stopRingWave(mesh);
+                if (mesh.userData.originScale) {
+                    mesh.scale.copy(mesh.userData.originScale);
+                }
+            });
+            this.highlightMeshList = [];
+
+            // 如果是高亮占用的临时连线，直接销毁
+            if (this.highlightUseTempLine) {
+                this.destroyTempLine();
+                this.highlightUseTempLine = false;
+            }
+
+            this.highlightTargetId = null;
+            this.highlightMatchId = null;
+            if (mxObj) mxObj.updateDisplay(true);
+        },
         world2Screen(worldPos) {
             if (!worldPos) return null;
             const mxObj = MxFun.getCurrentDraw();
@@ -634,6 +718,11 @@ export default {
                                     curObj = curObj.parent;
                                     continue;
                                 };
+                                if (targetDrawPoint.MATCH_STA == '匹配') {
+                                    this.$Message.warning('该图纸点位已完成匹配，请选择其它图纸点位')
+                                    curObj = curObj.parent;
+                                    continue;
+                                }
                                 if (!targetDrawPoint.id || targetDrawPoint.type === '2' || targetDrawPoint.MATCH_STA === '匹配') {
                                     curObj = curObj.parent;
                                     continue;
@@ -833,74 +922,6 @@ export default {
             this.tempLineGroup = null;
             mxObj.updateDisplay(true);
         },
-        // createTempLine(startVec, endVec) {
-        //     this.destroyTempLine();
-        //     const mxObj = MxFun.getCurrentDraw();
-        //     const scene = mxObj.getScene();
-
-        //     // 保险：强制转成真正Vector3
-        //     const start = new THREE.Vector3(startVec.x, startVec.y, startVec.z);
-        //     const end = new THREE.Vector3(endVec.x, endVec.y, endVec.z);
-
-        //     const dir = new THREE.Vector3().subVectors(end, start);
-        //     const dist = dir.length();
-        //     if (dist < 0.05) {
-        //         console.warn("两点距离过小，跳过绘制连线");
-        //         return;
-        //     }
-        //     dir.normalize();
-
-        //     // ---------- 1.绘制主线 橙色粗线 ----------
-        //     const points = [start, end];
-        //     const geoLine = new THREE.BufferGeometry().setFromPoints(points);
-        //     const matLine = new THREE.LineBasicMaterial({
-        //         color: 0xff7700,
-        //         depthTest: false,
-        //         depthWrite: false
-        //     });
-        //     this.tempLineObj = new THREE.Line(geoLine, matLine);
-        //     scene.add(this.tempLineObj);
-
-        //     // ----------2.手动绘制箭头头部小三角----------
-        //     const arrowSize = 2.2;
-        //     const quat = new THREE.Quaternion().setFromUnitVectors(
-        //         new THREE.Vector3(0, 1, 0),
-        //         dir
-        //     );
-        //     const coneGeo = new THREE.ConeGeometry(arrowSize * 0.4, arrowSize, 4);
-        //     const coneMat = new THREE.MeshBasicMaterial({
-        //         color: 0xff7700,
-        //         depthTest: false,
-        //         depthWrite: false
-        //     });
-        //     this.tempArrowHead = new THREE.Mesh(coneGeo, coneMat);
-        //     this.tempArrowHead.position.copy(end);
-        //     this.tempArrowHead.quaternion.copy(quat);
-        //     scene.add(this.tempArrowHead);
-        //     mxObj.updateDisplay(true);
-        // },
-
-        // destroyTempLine() {
-        //     const mxObj = MxFun.getCurrentDraw();
-        //     const scene = mxObj?.getScene?.();
-        //     if (this.tempLineObj) {
-        //         scene.remove(this.tempLineObj);
-        //         this.tempLineObj.geometry?.dispose();
-        //         this.tempLineObj.material?.dispose();
-        //         this.tempLineObj = null;
-        //     }
-        //     if (this.tempArrowHead) {
-        //         scene.remove(this.tempArrowHead);
-        //         this.tempArrowHead.geometry?.dispose();
-        //         this.tempArrowHead.material?.dispose();
-        //         this.tempArrowHead = null;
-        //     }
-        //     mxObj?.updateDisplay(true);
-        // },
-
-        /**
-         * 刷新点位显示：已匹配isMatched=true则隐藏
-         */
         refreshDrawMarkerDisplay() {
             this.annotationPoints.forEach(item => {
                 item.mesh.visible = !item.isMatched;
@@ -956,6 +977,7 @@ export default {
 
             // 清空hover缓存，防止残留状态
             this.lastHoverGroup = null;
+            this.annotationPoints = []
             mxObj.updateDisplay(true);
         },
         /**
@@ -1214,147 +1236,17 @@ export default {
 
             return group;
         },
-        renderMarkersByList(data) {
-            console.log(data, 2222)
-            data.forEach(bind => {
-                this.addBindMarker(bind);
-            });
-        },
-        setAnnotationHighlightById(targetId, bindMatchId) {
-            // 先清上次高亮
-            this.clearAnnotationHighlight();
-            if (!targetId) return;
-
-            let targetPoint = this.annotationPoints.find(item => item.id === targetId);
-            const mainMesh = targetPoint.mesh;
-            const mxObj = MxFun.getCurrentDraw();
-
-            // 主点位高亮（和hover逻辑一致）
-            if (!mainMesh.userData.originScale) {
-                mainMesh.userData.originScale = mainMesh.scale.clone();
-            }
-            mainMesh.scale.copy(mainMesh.userData.originScale).multiplyScalar(1.5);
-            this.highlightMeshList.push(mainMesh);
-            //if (mxObj) this.startRingWave(mainMesh, mxObj);
-
-            let bindMesh = null;
-            if (bindMatchId) {
-                this.highlightMatchId = bindMatchId;
-                const bindPoint = this.annotationPoints.find(item => item.id === bindMatchId);
-                if (bindPoint && bindPoint.mesh) {
-                    bindMesh = bindPoint.mesh;
-                    if (!bindMesh.userData.originScale) {
-                        bindMesh.userData.originScale = bindMesh.scale.clone();
-                    }
-                    bindMesh.scale.copy(bindMesh.userData.originScale).multiplyScalar(1.5);
-                    this.highlightMeshList.push(bindMesh);
-                    //if (mxObj) this.startRingWave(bindMesh, mxObj);
-                }
-
-                // 存在绑定关系，直接调用已有createTempLine绘制箭头连线
-                if (mainMesh && bindMesh) {
-                    const startWorld = {
-                        x: targetPoint.x,
-                        y: targetPoint.y,
-                        z: targetPoint.z || 0
-                    };
-                    const endWorld = {
-                        x: bindPoint.x,
-                        y: bindPoint.y,
-                        z: bindPoint.z || 0
-                    };
-                    this.createTempLine(startWorld, endWorld);
-                    this.highlightUseTempLine = true;
-                }
-            }
-
-            this.highlightTargetId = targetId;
-            if (mxObj) mxObj.updateDisplay(true);
-        },
-
-        /**
-         * 清空所有高亮：恢复mesh原始材质、销毁高亮箭头连线
-         */
-        clearAnnotationHighlight() {
-            const mxObj = MxFun.getCurrentDraw();
-
-            // 恢复所有高亮点位
-            this.highlightMeshList.forEach((mesh) => {
-                if (!mesh) return;
-                this.stopRingWave(mesh);
-                if (mesh.userData.originScale) {
-                    mesh.scale.copy(mesh.userData.originScale);
-                }
-            });
-            this.highlightMeshList = [];
-
-            // 如果是高亮占用的临时连线，直接销毁
-            if (this.highlightUseTempLine) {
-                this.destroyTempLine();
-                this.highlightUseTempLine = false;
-            }
-
-            this.highlightTargetId = null;
-            this.highlightMatchId = null;
-            if (mxObj) mxObj.updateDisplay(true);
-        },
+        
         onSelectTz(data) {
-            console.log(data, 222)
             this.entity.TZXX_NO = data.TZXX_NO
             this.entity.TZXX_ID = data.TZXX_ID
             this.entity.TZLX_NAM = data.TZLX_NAM
             this.entity.TZ_VERSION = data.TZ_VERSION
             if (data.resourceUrl && this.lastFileUrl !== data.resourceUrl) {
                 this.fileUrlInput = data.resourceUrl
+                this.pointParsed = false
             }
             // this.entity.TZLX_NAM = data.TZLX_NAM
-        },
-        setForceShow(id) {
-            this.forceShowIds.add(id);
-            this.triggerRenderMarker();
-        },
-        /**
-         * 取消点位强制显示
-         * @param {number|string} id
-         */
-        cancelForceShow(id) {
-            this.forceShowIds.delete(id);
-            this.triggerRenderMarker();
-        },
-        /**
-         * 清空全部强制显示
-         */
-        clearAllForceShow() {
-            this.forceShowIds.clear();
-            this.triggerRenderMarker();
-        },
-        isMarkerForceShow(m) {
-            return this.forceShowIds.has(m.biz.id);
-        },
-
-        // 统一触发渲染（复用rAF节流）
-        triggerRenderMarker() {
-            if (this.isRenderPending) return;
-            this.isRenderPending = true;
-            requestAnimationFrame(() => {
-                this.renderDomMarkers();
-                this.isRenderPending = false;
-            })
-        },
-        initCadViewListen() {
-            const draw = MxFun.getCurrentDraw();
-            if (!draw) return;
-            // 视图（缩放/平移）发生变化触发
-            this.viewChangeHandler = () => {
-                this.renderDomMarkers();
-            };
-            draw.on("viewChange", this.viewChangeHandler);
-        },
-        unListenCadView() {
-            const draw = MxFun.getCurrentDraw();
-            if (draw && this.viewChangeHandler) {
-                draw.off("viewChange", this.viewChangeHandler);
-            }
         },
         getViewPixelScale(mxobj) {
             // 取世界上100单位的长度，算出它占多少屏幕像素
@@ -1363,121 +1255,6 @@ export default {
             const pxLen = Math.hypot(p2.x - p1.x, p2.y - p1.y);
             // pxLen：100世界单位对应的屏幕像素
             return pxLen / 100;
-        },
-        /**
-         * 添加一个测点标记
-         * @param {Number} worldX 世界坐标
-         * @param {Number} worldY
-         * @param {String} type '1'|'2'
-         * @param {Object} bizData 业务 {id,name,...}
-         */
-        addMarker(worldX, worldY, type, bizData) {
-            this.markerList.push({
-                worldPt: new McGePoint3d(worldX, worldY, 0),
-                type,
-                biz: bizData
-            });
-            this.triggerRenderMarker();
-        },
-
-        /**
-         * 把全部测点世界坐标转屏幕像素，渲染DOM图标
-         */
-        renderDomMarkers() {
-            return
-            const draw = MxFun.getCurrentDraw();
-            if (!draw) return;
-            const markerLayer = this.$refs.markerLayer;
-            if (!markerLayer) return;
-            markerLayer.innerHTML = "";
-
-            // 计算当前视图像素缩放：1个世界单位对应多少屏幕像素
-            const p1 = draw.cadCoord2View(0, 0);
-            const p2 = draw.cadCoord2View(100, 0);
-            const pixelScale = Math.hypot(p2.x - p1.x, p2.y - p1.y) / 100;
-
-            // 根据缩放动态设置聚合阈值(像素)
-            let mergeThreshold;
-            if (pixelScale < 0.3) {
-                mergeThreshold = 24;
-            } else if (pixelScale < 0.8) {
-                mergeThreshold = 16;
-            } else {
-                mergeThreshold = 8;
-            }
-
-            const w = draw.getViewWidth();
-            const h = draw.getViewHeight();
-            const pixelGrid = new Map();
-            const gridSize = mergeThreshold;
-
-            // 内部工具：判断该屏幕点是否和已渲染点过近
-            function isNearPoint(screenX, screenY) {
-                const gx = Math.floor(screenX / gridSize);
-                const gy = Math.floor(screenY / gridSize);
-                // 只检查周围3x3网格
-                for (let dx = -1; dx <= 1; dx++) {
-                    for (let dy = -1; dy <= 1; dy++) {
-                        const key = `${gx + dx},${gy + dy}`;
-                        const list = pixelGrid.get(key);
-                        if (!list) continue;
-                        for (const p of list) {
-                            const dist = Math.hypot(screenX - p.x, screenY - p.y);
-                            if (dist < gridSize) {
-                                return true;
-                            }
-                        }
-                    }
-                }
-                return false;
-            }
-
-            for (const m of this.markerList) {
-                const screenPos = draw.cadCoord2View(m.worldPt.x, m.worldPt.y);
-
-                // 视口外过滤
-                if (screenPos.x < -20 || screenPos.x > w + 20 || screenPos.y < -20 || screenPos.y > h + 20) {
-                    continue;
-                }
-                // 网格分桶距离判断，替代全量循环renderedScreenPoints
-                if ((pixelScale < 0.05 || isNearPoint(screenPos.x, screenPos.y) && pixelScale < 5 && !this.isMarkerForceShow(m))) {
-                    continue;
-                }
-                // 将当前点存入像素网格
-                const gx = Math.floor(screenPos.x / gridSize);
-                const gy = Math.floor(screenPos.y / gridSize);
-                const key = `${gx},${gy}`;
-                if (!pixelGrid.has(key)) {
-                    pixelGrid.set(key, []);
-                }
-                pixelGrid.get(key).push({ x: screenPos.x, y: screenPos.y });
-
-                // 创建DOM标记节点
-                const div = document.createElement("div");
-                div.className = "marker-icon";
-                div.id = m.biz.id;
-                div.title = m.biz.name;
-                div.biz = m.biz;
-                div.style.position = "absolute";
-                div.style.left = (screenPos.x - 8) + "px";
-                div.style.top = (screenPos.y - 8) + "px";
-                div.style.width = "16px";
-                div.style.height = "16px";
-                div.style.pointerEvents = "auto";
-                div.style.backgroundSize = "contain";
-                div.style.backgroundRepeat = "no‑repeat";
-                div.style.backgroundImage = m.type === '1' ? `url(/image/icon9.svg)` : `url(/image/icon10.svg)`;
-                markerLayer.appendChild(div);
-                if (this.matchLineIds) {
-                    this.tryRedrawMatchLine();
-                }
-            }
-        },
-
-        clearAllMarker() {
-            this.markerList = [];
-            this.forceShowIds.clear();
-            this.triggerRenderMarker();
         },
         async postData(url = "", data = {}) {
             data.param_orgNo = this.orgNo
@@ -1561,12 +1338,15 @@ export default {
                     item.y = item.Y_VALUE
                     return item
                 })
-                this.renderMarkersByList(this.pointList.map(item => {
-                    item.id = item.POINT_NO,
-                        item.name = item.pointName,
-                        item.type = '1'
-                    return item
-                }));
+                if (flag) {
+                    this.renderMarkersByList(this.pointList.map(item => {
+                        item.id = item.POINT_NO,
+                            item.name = item.pointName,
+                            item.type = '1'
+                        return item
+                    }));
+                }
+                
             })
         },
         upsertIot(data) {
@@ -1591,11 +1371,13 @@ export default {
         autoMatch(data) {
             this.postData('/api/scaqyzt/autoMatch', data).then(() => {
                 this.refreshViewer1Data()
+                this.getPoint()
             })
         },
         manualMatch(data) {
             this.postData('/api/scaqyzt/manualMatch', data).then(() => {
                 this.refreshViewer1Data()
+                this.getPoint()
             })
         },
         autoAddAndMatch(data) {
@@ -1628,31 +1410,46 @@ export default {
             })
         },
         save() {
-            if (this.currentStep === 0 && this.entity.TZPZ_STA === '01') {
-                this.$refs.sForm.validate((valid) => {
-                    if (!valid) {
-                        this.$Message.error('请填写信息后再保存')
+            if (this.entity.TZPZ_STA === '01') {
+                if (this.currentStep === 0) {
+                    this.$refs.sForm.validate((valid) => {
+                        if (!valid) {
+                            this.$Message.error('请填写信息后再保存')
+                            return
+                        }
+                        this.upsertTzpp({
+                            "TZPZ_ID": this.entity.TZPZ_ID,
+                            "TZXX_NO": this.entity.TZXX_NO,
+                            "TZPZ_USR": this.entity.TZPZ_USR,
+                            "TZPZ_DAT": this.entity.TZPZ_DAT,
+                            "TZPZ_STA": this.entity.TZPZ_STA,
+                            "TZPZ_NO": this.entity.TZPZ_NO
+                        })
+                    })
+                } else if (this.currentStep === 1) {
+                    if (!this.pointParsed) {
+                        this.$Message.error('请文件解析完成后再保存')
                         return
                     }
-                    this.upsertTzpp({
-                        "TZPZ_ID": this.entity.TZPZ_ID,
-                        "TZXX_NO": this.entity.TZXX_NO,
-                        "TZPZ_USR": this.entity.TZPZ_USR,
-                        "TZPZ_DAT": this.entity.TZPZ_DAT,
-                        "TZPZ_STA": this.entity.TZPZ_STA,
-                        "TZPZ_NO": this.entity.TZPZ_NO
-                    })
-                    // if (parent && parent.upsertTzpp) {
-                    //     parent.upsertTzpp({
-                    //         "TZPZ_ID": this.entity.TZPZ_ID,
-                    //         "TZXX_NO": this.entity.TZXX_NO,
-                    //         "TZPZ_USR": this.entity.TZPZ_USR,
-                    //         "TZPZ_DAT": this.entity.TZPZ_DAT,
-                    //         "TZPZ_STA": this.entity.TZPZ_STA,
-                    //         "TZPZ_NO": this.entity.TZPZ_NO
-                    //     })
-                    // }
-                })
+                    this.upsertPoint(
+                        {
+                            "TZPZ_NO": this.entity.TZPZ_NO,
+                            data: this.pointList.map(item => {
+                                return {
+                                    "POINT_NO": "",
+                                    "POINT_ID": item.no,
+                                    "POINT_NAM": item.name,
+                                    "X_VALUE": item.x,
+                                    "Y_VALUE": item.y,
+                                    "LAYER_NO": "",
+                                    "LAYER_ID": item.LAYER_ID,
+                                    "LAYER_NAM": item.LAYER_NAM
+                                }
+                            })
+                        }
+                    )
+                }
+                
             }
         },
         async onStep(index) {
@@ -1668,8 +1465,27 @@ export default {
                 this.currentStep = index
             } else if (index == 2) {
                 if (this.entity.TZPZ_STA === '01' || !this.entity.TZPZ_STA) {
-                    this.$Message.error('请解析图纸完后再进行下一步操作')
-                    return
+                    if (!this.pointParsed) {
+                        this.$Message.error('请文件解析完成后再保存')
+                        return
+                    }
+                    this.upsertPoint(
+                        {
+                            "TZPZ_NO": this.entity.TZPZ_NO,
+                            data: this.pointList.map(item => {
+                                return {
+                                    "POINT_NO": "",
+                                    "POINT_ID": item.no,
+                                    "POINT_NAM": item.name,
+                                    "X_VALUE": item.x,
+                                    "Y_VALUE": item.y,
+                                    "LAYER_NO": "",
+                                    "LAYER_ID": item.LAYER_ID,
+                                    "LAYER_NAM": item.LAYER_NAM
+                                }
+                            })
+                        }
+                    )
                 }
                 this.currentStep = index
             } else if (index == 1) {
@@ -1683,6 +1499,7 @@ export default {
                     }
                     if (this.fileUrlInput !== this.lastFileUrl) {
                         if (this.mxcad) {
+                            this.clearAllBindMarkers()
                             await this.mxcad.openWebFile(this.fileUrlInput)
                         }
                         this.lastFileUrl = this.fileUrlInput;
@@ -2024,27 +1841,11 @@ export default {
                 console.warn("主动获取图层数据失败:", e);
             }
             // 收集点位数据
-            if (this.entity.TZPZ_STA === '01') {
-                const pointList = this.getAllMcDbPoint();
-                this.upsertPoint(
-                    {
-                        "TZPZ_NO": this.entity.TZPZ_NO,
-                        data: pointList.map(item => {
-                            return {
-                                "POINT_NO": "",
-                                "POINT_ID": item.no,
-                                "POINT_NAM": item.name,
-                                "X_VALUE": item.x,
-                                "Y_VALUE": item.y,
-                                "LAYER_NO": "",
-                                "LAYER_ID": item.LAYER_ID,
-                                "LAYER_NAM": item.LAYER_NAM
-                            }
-                        })
-                    }
-                )
+            if (this.entity.TZPZ_STA === '01' || !this.entity.TZPZ_STA) {
+                this.pointList = this.getAllMcDbPoint();
+                this.pointParsed = true
             } else {
-                this.getPoint()
+                this.getPoint(true)
             }
             if (this.isDev) {
                 this.renderMarkersByList(this.pointList.map(item => {

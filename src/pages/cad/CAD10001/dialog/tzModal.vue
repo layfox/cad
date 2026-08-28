@@ -38,8 +38,7 @@
         :current="currentPage"
         show-easy-prev
         show-easy-next
-        show-sizer
-        :page-size-opts="[10, 20, 50]"
+        show-total
         @on-change="onPageChange"
         @on-page-size-change="onPageSizeChange"
       />
@@ -152,7 +151,7 @@ export default {
   methods: {
     // ========== iview3.5.4 兼容：清空表格选中 ==========
     clearTableSelection() {
-      
+      this.$refs.drawingTable.selectAll(false)
     },
 
     // ========== 请求图纸列表（Mock / 真实接口二选一） ==========

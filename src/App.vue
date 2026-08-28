@@ -87,7 +87,7 @@ html, body {
 
 /* Firefox 兼容 */
 * {
-  scrollbar-width: thin;       /* auto | thin | none */
+  scrollbar-width: auto;       /* auto | thin | none */
   scrollbar-color: #c1c1c1 #f5f5f5; /* 滑块颜色 轨道颜色 */
 }
 

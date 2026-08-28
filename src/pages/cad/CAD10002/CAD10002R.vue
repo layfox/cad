@@ -147,7 +147,7 @@
       </Modal>
       <Modal
         v-model="showTz"
-        :width="800"
+        :width="1000"
         :footer-hide="true"
         class-name="custom-modal tz-modal"
         :styles="{ top: '40px' }"

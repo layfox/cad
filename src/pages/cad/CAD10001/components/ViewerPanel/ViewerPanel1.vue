@@ -146,20 +146,18 @@ export default {
                 { title: '坐标差', key: 'DALTA_XY', minWidth: 80, align: 'center' },
                 { title: '匹配图纸点位', key: 'POINT_NAM', minWidth: 120 },
                 { title: '匹配方式', key: 'MATCH_TYP', width: 90, align: 'center' }
-            ]
-        }
-    },
-    computed: {
-        summaryData() {
-            return {
-                total: this.total,
+            ],
+            summaryData: {
+                total: 0,
                 noCoord: 0,
                 matched: 0,
                 unmatched: 0,
                 totalPoints: 0,
                 used: 0
             }
-        },
+        }
+    },
+    computed: {
         pointPageDataWithSeq() {
             const start = (this.currentPage - 1) * this.pageSize
             return this.pageData.map((item, index) => ({
@@ -172,6 +170,7 @@ export default {
     watch: {
         tzpzNo() {
             this.fetchData()
+            this.getIotStatistic()
         }
     },
     mounted() {
@@ -250,6 +249,7 @@ export default {
         ]
         }
         this.fetchData()
+        this.getIotStatistic()
     },
     methods: {
         async postData(url, data) {
@@ -272,9 +272,24 @@ export default {
                 this.total = res.data.pageInfo ? res.data.pageInfo.totalCount : 0
             }
         },
+        getIotStatistic() {
+            this.postData('/api/scaqyzt/getIotStatistic', {
+                TZPZ_NO: this.tzpzNo
+            }).then(res => {
+                this.summaryData = {
+                    total: res.data.zcdNum,
+                    noCoord: res.data.wzbcdNum,
+                    matched: res.data.yppcdNum,
+                    unmatched: res.data.wppcdNum,
+                    totalPoints: res.data.zdwNum,
+                    used: res.data.ysyNum
+                }
+            })
+        },
         async refreshData() {
             this.currentPage = 1
             await this.fetchData()
+            this.getIotStatistic()
         },
         onAdd() {
             this.pointModalVisible = true

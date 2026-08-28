@@ -1047,6 +1047,14 @@ export default {
         },
         clickCallback(item) {
             console.log(item, 1111)
+            this.currentData = item
+            if (item.type === '1') {
+                this.showSafetyCheckModal = true
+            } else if (item.type === '2' || item.type === '3') {
+                this.showEquipModal = true
+            } else if (item.type === '4') {
+                this.showPersonModal = true
+            }
         },
         screenToThreeWorld(screenX, screenY) {
             const mxDraw = MxFun.getCurrentDraw();
@@ -1262,7 +1270,7 @@ export default {
             this.showPointInfoModal = true;
         },
         async postData(url = "", data = {}) {
-            data.orgNo = this.orgNo
+            data.param_orgNo = this.orgNo
             const response = await fetch(url, {
                 method: "POST",
 
