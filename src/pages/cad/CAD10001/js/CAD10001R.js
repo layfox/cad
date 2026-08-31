@@ -109,14 +109,15 @@ export default {
             highlightLineGroup: null,
             highlightMeshList: [],
             highlightUseTempLine: false,
-            isDev: true,
+            isDev: false,
             pointParsed: false,
             annotationMeshMap: new Map(),
             // 增加快速存在集合，提升大量点位查询性能
             annotationIdSet: new Set(),
             selectedAnnotationSet: new Set(),
             isPopOverBottom: false,
-            isAddingAnnotation: false
+            isAddingAnnotation: false,
+            instCircleMesh: null
         }
     },
     components: {
@@ -301,13 +302,13 @@ export default {
                 "TZPZ_USR": "111",
                 "TZPZ_DAT": "2026-11-12",
                 "TZPZ_STA": "03",
-                "resourceUrl": "./models/HDMY-XJH-v2.mxweb",
+                "resourceUrl": "./models/YTSF-001.mxweb",
                 "TZXX_ID": "22",
                 "TZLX_NAM": "11",
                 "TZ_VERSION": "",
                 TZPZ_NO: "",
             }
-            this.fileUrlInput = './models/HDMY-XJH-v2.mxweb'
+            this.fileUrlInput = './models/YTSF-001.mxweb'
         }
         const params = new URLSearchParams(location.search)
         this.orgNo = params.get('orgNo') || ''
@@ -366,20 +367,30 @@ export default {
             return base.clone();
         },
         setGroupHighlight(group, highlight, forceResetScale = false) {
-            if (!group) return;
-            const intensity = highlight ? 0.8 : 0.4;
-            group.children.forEach((mesh) => {
-                if (!mesh?.material) return;
-                mesh.material.emissiveIntensity = intensity;
-            });
-            if (forceResetScale) {
-                group.scale.copy(group.userData.originScale);
-                return;
-            }
-            if (this.lastHoverGroup !== group) {
-                group.scale.copy(this.getGroupBaseScale(group));
-            }
-        },
+    if (!group) return;
+
+    const intensity = highlight ? 0.8 : 0.4;
+
+    group.children.forEach((mesh) => {
+        if (!mesh?.material) return;
+        mesh.material.emissiveIntensity = intensity;
+    });
+
+    // 控制高亮外框显示
+    const highlightBorderMesh = group.userData.highlightBorderMesh;
+    if (highlightBorderMesh) {
+        highlightBorderMesh.visible = !!highlight;
+    }
+
+    if (forceResetScale) {
+        group.scale.copy(group.userData.originScale);
+        return;
+    }
+
+    if (this.lastHoverGroup !== group) {
+        group.scale.copy(this.getGroupBaseScale(group));
+    }
+},
         toggleAnnotationHighlightById(id) {
             const group = this.annotationMeshMap.get(id);
             if (!group) return;
@@ -884,76 +895,133 @@ export default {
             return this.annotationIdSet.has(id);
         },
         createBindMarker(bindItem) {
-            if (this.hasMarkerById(bindItem.id)) {
-                console.log(`点位${bindItem.id}已存在，跳过创建`);
-                return null;
-            }
-            this.annotationPoints.push(bindItem)
-            this.annotationIdSet.add(bindItem.id);
-            const mxObj = MxFun.getCurrentDraw();
-            if (!mxObj) return null;
-            const docX = bindItem.x;
-            const docY = bindItem.y;
-            const docZ = bindItem.z || 0;
-            const baseSize = 10;
-            const group = new THREE.Object3D();
-            group.position.set(docX, docY, docZ);
-            group.userData = {
-                isAnnotationPoint: true,
-                annotationId: bindItem.id,
-                originScale: new THREE.Vector3(baseSize, baseSize, 1),
-                type: bindItem.type,
-                ringMesh: null,
-                ringAnimId: null
-            };
-            if (bindItem.type === "2") {
-                const geoSquare = new THREE.PlaneGeometry(1, 1);
-                const matSquare = new THREE.MeshStandardMaterial({
-                    color: 0x26c557,
-                    emissive: 0x26c557,
-                    emissiveIntensity: 0.4,
-                    transparent: true,
-                    depthTest: false,
-                    depthWrite: false,
-                    side: THREE.DoubleSide
-                });
-                const squareMesh = new THREE.Mesh(geoSquare, matSquare);
-                squareMesh.renderOrder = 9999;
-                const geoBorder = new THREE.PlaneGeometry(1.2, 1.2);
-                const matBorder = new THREE.MeshStandardMaterial({
-                    color: 0xffffff,
-                    emissive: 0xffffff,
-                    emissiveIntensity: 0.2,
-                    transparent: true,
-                    depthTest: false,
-                    depthWrite: false,
-                    side: THREE.DoubleSide
-                });
-                const borderMesh = new THREE.Mesh(geoBorder, matBorder);
-                borderMesh.renderOrder = 9998;
-                group.add(borderMesh);
-                group.add(squareMesh);
-            } else {
-                const geoCircle = new THREE.CircleGeometry(0.5, 32);
-                const matCircle = new THREE.MeshStandardMaterial({
-                    color: 0xec3000,
-                    emissive: 0xec3000,
-                    emissiveIntensity: 0.4,
-                    transparent: true,
-                    depthTest: false,
-                    depthWrite: false,
-                    side: THREE.DoubleSide
-                });
-                const circleMesh = new THREE.Mesh(geoCircle, matCircle);
-                circleMesh.renderOrder = 9999;
-                group.add(circleMesh);
-            }
-            group.scale.set(baseSize, baseSize, 1);
-            this.annotationMeshMap.set(bindItem.id, group);
-            mxObj.addObject(group);
-            mxObj.updateDisplay(true);
-            return group;
-        },
+    if (this.hasMarkerById(bindItem.id)) {
+        console.log(`点位${bindItem.id}已存在，跳过创建`);
+        return null;
+    }
+
+    this.annotationPoints.push(bindItem);
+    this.annotationIdSet.add(bindItem.id);
+
+    const mxObj = MxFun.getCurrentDraw();
+    if (!mxObj) return null;
+
+    const docX = bindItem.x;
+    const docY = bindItem.y;
+    const docZ = bindItem.z || 0;
+
+    const baseSize = 10;
+    const group = new THREE.Object3D();
+    group.position.set(docX, docY, docZ);
+
+    group.userData = {
+        isAnnotationPoint: true,
+        annotationId: bindItem.id,
+        originScale: new THREE.Vector3(baseSize, baseSize, 1),
+        type: bindItem.type,
+        highlightBorderMesh: null // 高亮外框
+    };
+
+    let centerMesh = null;
+    let borderColor = 0xec3000; // 默认红色
+
+    // ====== 类型2：实时测点，方形 ======
+    if (bindItem.type === "2") {
+        borderColor = 0x26c557;
+
+        // 中心方块
+        const geoSquare = new THREE.PlaneGeometry(1, 1);
+        const matSquare = new THREE.MeshStandardMaterial({
+            color: borderColor,
+            emissive: borderColor,
+            emissiveIntensity: 0.4,
+            transparent: true,
+            depthTest: false,
+            depthWrite: false,
+            side: THREE.DoubleSide
+        });
+
+        const squareMesh = new THREE.Mesh(geoSquare, matSquare);
+        squareMesh.renderOrder = 9999;
+        group.add(squareMesh);
+        centerMesh = squareMesh;
+
+        // 外层白色边框
+        const geoWhiteBorder = new THREE.PlaneGeometry(1.2, 1.2);
+        const matWhiteBorder = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            emissive: 0xffffff,
+            emissiveIntensity: 0.2,
+            transparent: true,
+            depthTest: false,
+            depthWrite: false,
+            side: THREE.DoubleSide
+        });
+
+        const whiteBorderMesh = new THREE.Mesh(geoWhiteBorder, matWhiteBorder);
+        whiteBorderMesh.renderOrder = 9998;
+        group.add(whiteBorderMesh);
+
+    } else {
+        // ====== 类型1：图纸点位，圆形 ======
+        const geoCircle = new THREE.CircleGeometry(0.5, 32);
+        const matCircle = new THREE.MeshStandardMaterial({
+            color: borderColor,
+            emissive: borderColor,
+            emissiveIntensity: 0.4,
+            transparent: true,
+            depthTest: false,
+            depthWrite: false,
+            side: THREE.DoubleSide
+        });
+
+        const circleMesh = new THREE.Mesh(geoCircle, matCircle);
+        circleMesh.renderOrder = 9999;
+        group.add(circleMesh);
+        centerMesh = circleMesh;
+    }
+
+    // ========= 新增：高亮外框 =========
+    const highlightBorderMesh = this.createHighlightBorder(bindItem.type, borderColor);
+    group.add(highlightBorderMesh);
+    group.userData.highlightBorderMesh = highlightBorderMesh;
+
+    group.scale.set(baseSize, baseSize, 1);
+
+    this.annotationMeshMap.set(bindItem.id, group);
+    mxObj.addObject(group);
+    mxObj.updateDisplay(true);
+
+    return group;
+},
+createHighlightBorder(type, color) {
+    let geometry;
+
+    if (type === "2") {
+        // type=2：方形外框
+        geometry = new THREE.PlaneGeometry(1.5, 1.5);
+    } else {
+        // type=1：圆形外框
+        geometry = new THREE.RingGeometry(0.55, 0.8, 32);
+    }
+
+    const material = new THREE.MeshStandardMaterial({
+        color: color,
+        emissive: color,
+        emissiveIntensity: 0.6,
+        transparent: true,
+        opacity: 0.5, // 透明度低一点
+        depthTest: false,
+        depthWrite: false,
+        side: THREE.DoubleSide
+    });
+
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.renderOrder = 9996;
+    mesh.visible = false; // 默认隐藏
+
+    return mesh;
+},
         addBindMarker(data) {
             this.createBindMarker(data)
         },
