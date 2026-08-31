@@ -311,7 +311,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 16px;
+  padding: 16px;
   flex-shrink: 0;
 }
 .dsm-search-input {

@@ -9,7 +9,19 @@
     </div>
 
     <!-- 搜索框 -->
-    <div class="dsm-search" style="justify-content: flex-end;">
+    <div class="dsm-search">
+      <Select
+        v-model="selectedCompany"
+        style="width:240px;"
+        class="dsm-company-select"
+        @on-change="onCompanyChange"
+      >
+        <Option
+          v-for="company in companyOptions"
+          :key="company.ORG_NO"
+          :value="company.ORG_NO"
+        >{{ company.ORG_NAM }}</Option>
+      </Select>
       <Input
         v-model="searchKeyword"
         placeholder="输入关键字"
@@ -90,17 +102,18 @@ export default {
       currentPage: 1,
       pageSize: 10,
       selectedDrawings: [],
-      companyOptions: ['小纪汗', '肖家洼'],
+      companyOptions: [],
       displayDrawings: [],
       total: 0,
-      tableLoading: false
+      tableLoading: false,
+      orgNo1: ''
     }
   },
   computed: {
     columns() {
       return [
         { type: 'selection', width: 45, align: 'center' },
-        { title: '配置编码', key: 'TZPZ_NO', minWidth: 200 },
+        { title: '配置编码', key: 'TZPZ_ID', minWidth: 200 },
         { title: '配置人员', key: 'TZPZ_USR', minWidth: 120 },
         { title: '图纸信息编码', key: 'TZXX_ID', minWidth: 120 },
         { title: '配置状态', key: 'TZPZ_STA_NAM', minWidth: 100, align: 'center' },
@@ -131,8 +144,21 @@ export default {
     })
   },
   mounted() {
+    this.getCompany()
+    this.$nextTick(() => {
+      this.orgNo1 = this.orgNo
+    })
   },
   methods: {
+    async getCompany() {
+      const response = await fetch('/api/scaqyzt/getOrgs', {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      this.companyOptions = data.data.filter(item => item.ORG_NO)
+    },
     clearTableSelection() {
       if (this.$refs.drawingTable) {
         this.$refs.drawingTable.selectAll(false)
@@ -143,8 +169,9 @@ export default {
       const params = {
         pageNum: String(this.currentPage),
         pageSize: String(this.pageSize),
-        param_orgNo: this.orgNo || '',
-        param_TZPZ_STA: '04'
+        param_orgNo: this.orgNo1 || '',
+        param_TZPZ_STA: '04',
+        searchText: this.searchKeyword
       }
       try {
         const res = await this.postData('/api/scaqyzt/getTzpzList', params)
@@ -165,6 +192,7 @@ export default {
       }
     },
     async postData(url = "", data = {}) {
+      data.param_orgNo = this.orgNo1
       const response = await fetch(url, {
         method: "POST",
         headers: {
@@ -174,12 +202,12 @@ export default {
       });
       return response.json();
     },
-    onCompanyChange() {
+    onCompanyChange(val) {
       this.searchKeyword = ''
       this.currentPage = 1
       this.selectedDrawings = []
+      this.orgNo1 = val
       this.clearTableSelection()
-      this.$emit('company-change', this.selectedCompany)
       this.fetchDrawingList()
     },
     onSelectionChange(rows) {
@@ -202,7 +230,7 @@ export default {
         this.$Message.warning('请选择一张图纸')
         return
       }
-      this.$emit('confirm', this.selectedDrawings[0])
+      this.$emit('confirm', {...this.selectedDrawings[0], orgNo: this.orgNo1})
       this.onCancel()
     },
     onCancel() {
@@ -258,7 +286,7 @@ gap: 6px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 16px;
+  padding: 16px;
   flex-shrink: 0;
 }
 

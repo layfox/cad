@@ -4,7 +4,7 @@
         <div class="vp-toolbar" v-if="status!=='04'&&status!='05'">
             <Button type="primary" @click="onAdd" size="large" ghost><img src="../../css/images/icon1.png" alt="">添加测点</Button>
             <span class="vp-toolbar-label">坐标匹配容差</span>
-            <InputNumber v-model="tolerance" :min="0" :precision="2" style="width: 80px" />
+            <InputNumber v-model="tolerance" :min="0" style="width: 80px" />
             <Button type="primary" ghost @click="onAutoMatch"><img src="../../css/images/icon2.png" alt="">自动绑定</Button>
             <Button type="primary" ghost @click="onManualMatch"><img src="../../css/images/icon3.png" alt="">人工绑定</Button>
             <Button type="primary" ghost @click="onAutoPlace"><img src="../../css/images/icon4.png" alt="">自动布点</Button>
@@ -65,6 +65,11 @@
                         {{ row.PT_X_VALUE && row.PT_Y_VALUE ? ((+row.PT_X_VALUE).toFixed(2) + ',' + (+row.PT_Y_VALUE).toFixed(2)) : '无坐标' }}
                     </span>
                 </template>
+                <template slot-scope="{ row }" slot="status">
+                        <span :class="['vp-status', row.MATCH_STA !== '02' ? 'status-unmatched' : 'status-matched']">
+                            {{ row.MATCH_STA !== '02' ? '未匹配' : '已匹配' }}
+                        </span>
+                    </template>
             </Table>
         </div>
 
@@ -130,15 +135,15 @@ export default {
             tolerance: 4,
             pointModalVisible: false,
             orgNo: '',
-            isDev: false,
+            isDev: true,
             pointColumns: [
                 { type: 'selection', width: 60, align: 'center' },
                 { slot: 'seq', title: '序号', key: 'seq', width: 60, align: 'center', render: (h, { row, index }) => {
                     return h('span', (this.currentPage - 1) * this.pageSize + index + 1)
                 } },
-                { title: '实时测点', key: 'PT_NAM', minWidth: 120 },
-                { title: '测点坐标', key: 'coordValue', minWidth: 120, align: 'center', slot: 'coordStatus' },
-                { title: '匹配状态', key: 'MATCH_STA_NAM', width: 80, align: 'center'},
+                { title: '实时测点', key: 'PT_NAM', minWidth: 160 },
+                { title: '测点坐标', key: 'coordValue', minWidth: 160, align: 'center', slot: 'coordStatus' },
+                { title: '匹配状态', key: 'MATCH_STA', width: 80, align: 'center', slot: 'status'},
                 { title: '坐标差', key: 'DALTA_XY', minWidth: 80, align: 'center' },
                 { title: '匹配图纸点位', key: 'POINT_NAM', minWidth: 120 },
                 { title: '匹配方式', key: 'MATCH_TYP', width: 90, align: 'center' }

@@ -79,7 +79,7 @@
     </div> -->
     </div>
     <!-- 详情弹窗 -->
-    <Modal
+    <!-- <Modal
       v-model="showDetail"
       title="图纸配置详情"
       :width="560"
@@ -90,10 +90,10 @@
       <div slot="footer">
         <Button @click="showDetail = false">关闭</Button>
       </div>
-    </Modal>
+    </Modal> -->
 
     <!-- 删除确认 -->
-     <Modal
+     <!-- <Modal
         v-model="showDeleteConfirm"
         :width="640"
         :footer-hide="true"
@@ -114,7 +114,7 @@
           </div>
         </div>
       
-      </Modal>
+      </Modal> -->
   </div>
 </template>
 
@@ -272,14 +272,14 @@ export default {
         return
       }
       this.$Modal.confirm({
-        title: '删除确认',
-        content: '确定要删除选中的图纸配置吗？删除后不可恢复。',
-        onOK: () => {
-          this.postData('/api/scaqyzt/deleteTzpp', { TZPZ_NO: row.no }).then(res => {
-            this.$Message.success('删除成功')
-            this.fetchData()
-          })
-        }
+          title: '删除确认',
+          content: '确定要删除选中的图纸配置吗？删除后不可恢复。',
+          onOk: () => {
+              this.postData('/api/scaqyzt/deleteTzpp', { TZPZ_NO: row.TZPZ_NO }).then(res => {
+              this.$Message.success('删除成功')
+              this.fetchData()
+            })
+          }
       })
       // this.deleteTargetCount = 1
       // this.currentDetail = row

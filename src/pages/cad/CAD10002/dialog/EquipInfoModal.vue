@@ -121,7 +121,11 @@ export default {
     TZPZ_NO: {
       type: String,
       default: ''
-    }
+    },
+      orgNo: {
+        type: String,
+        default: ''
+      }
   },
   data() {
     return {
@@ -137,7 +141,6 @@ export default {
         equipType: '',
         sensorNo: ''
       },
-      orgNo: '',
     }
   },
   computed: {
@@ -171,9 +174,6 @@ export default {
     }
   },
   mounted() {
-    const params = new URLSearchParams(location.search)
-
-    this.orgNo = params.get('orgNo')
     if (this.visible) {
       if (this.data && this.TZPZ_NO) {
         this.equip.name = this.data.LOT_NAM

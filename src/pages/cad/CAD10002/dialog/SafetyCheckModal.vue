@@ -120,6 +120,10 @@ export default {
         currentData: [],
         highAlarm: '',
         lowAlarm: ''
+      },
+      orgNo: {
+        type: String,
+        default: ''
       }
     }
   },
@@ -134,9 +138,6 @@ export default {
     }
   },
   mounted() {
-    const params = new URLSearchParams(location.search)
-
-    this.orgNo = params.get('orgNo')
     if (this.visible) {
       if (this.data) {
           this.getRealTime()

@@ -54,8 +54,8 @@
                     no-data-text=""
                 >
                     <template slot-scope="{ row }" slot="status">
-                        <span :class="['vp-status', row.matchStatus === '未匹配' ? 'status-unmatched' : 'status-matched']">
-                            {{ row.matchStatus || '匹配' }}
+                        <span :class="['vp-status', row.MATCH_STA !== '02' ? 'status-unmatched' : 'status-matched']">
+                            {{ row.MATCH_STA !== '02' ? '未匹配' : '已匹配' }}
                         </span>
                     </template>
                 </Table>
@@ -143,7 +143,7 @@ export default {
                 //     return h('span', {}, row.y ? (+row.y).toFixed(2): '')
                 // } },
                 // { title: '解析方式', key: 'parseMethod', width: 100, align: 'center' },
-                // { title: '匹配状态', key: 'status', slot: 'status', width: 100, align: 'center' }
+                { title: '匹配状态', key: 'MATCH_STA', slot: 'status', width: 100, align: 'center' }
             ]
         }
     },

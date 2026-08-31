@@ -61,23 +61,14 @@
 
       <!-- 时间筛选按钮 -->
       <div class="pim-time-tabs">
-        <span
-          v-for="(tab, idx) in timeTabs"
-          :key="tab"
-          class="pim-time-tab"
-          :class="{ active: activeTimeTab === idx }"
-          @click="activeTimeTab = idx"
-        >{{ tab }}</span>
+        <span v-for="(tab, idx) in timeTabs" :key="tab" class="pim-time-tab" :class="{ active: activeTimeTab === idx }"
+          @click="activeTimeTab = idx">{{ tab }}</span>
         <span class="pim-entry-count">出入井次数 <strong>{{ trackRecords.length }}</strong> 次</span>
       </div>
 
       <!-- 轨迹记录列表 -->
       <div class="pim-track-list" v-if="trackRecords.length">
-        <div
-          v-for="(record, idx) in trackRecords"
-          :key="idx"
-          class="pim-track-card"
-        >
+        <div v-for="(record, idx) in trackRecords" :key="idx" class="pim-track-card">
           <div class="pim-track-card-row">
             <span class="pim-track-label">入井时间</span>
             <span class="pim-track-value">{{ record.enterTime }}</span>
@@ -96,7 +87,7 @@
         </div>
       </div>
       <div class="pim-track-empty" v-else>
-          <img src="../css/images/no_data.jpg" alt="">
+        <img src="../css/images/no_data.jpg" alt="">
       </div>
     </div>
   </div>
@@ -115,6 +106,10 @@ export default {
       default: ''
     },
     TZPZ_NO: {
+      type: String,
+      default: ''
+    },
+    orgNo: {
       type: String,
       default: ''
     }
@@ -139,9 +134,6 @@ export default {
     }
   },
   mounted() {
-    const params = new URLSearchParams(location.search)
-
-    this.orgNo = params.get('orgNo')
   },
   watch: {
     visible(val) {
@@ -211,8 +203,8 @@ export default {
   display: flex;
   align-items: center;
   font-weight: bold;
-font-size: 16px;
-color: #333333;
+  font-size: 16px;
+  color: #333333;
 }
 
 .pim-title-arrow {
@@ -298,6 +290,7 @@ color: #333333;
   width: 200px;
   height: 32px;
 }
+
 .pim-track-empty {
   display: flex;
   justify-content: center;

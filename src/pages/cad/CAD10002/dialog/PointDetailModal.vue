@@ -42,13 +42,8 @@
       <div class="pdm-chart-header">
         <span class="pdm-chart-unit">{{ point.CD_UNIT }}</span>
         <div class="pdm-chart-tabs">
-          <span
-            v-for="(tab, idx) in timeTabs"
-            :key="tab"
-            class="pdm-chart-tab"
-            :class="{ active: activeTab === idx }"
-            @click="onTimeTabClick(idx)"
-          >{{ tab }}</span>
+          <span v-for="(tab, idx) in timeTabs" :key="tab" class="pdm-chart-tab" :class="{ active: activeTab === idx }"
+            @click="onTimeTabClick(idx)">{{ tab }}</span>
         </div>
       </div>
       <div class="pdm-chart-container">
@@ -71,6 +66,10 @@ export default {
     point: {
       type: Object,
       default: () => ({})
+    },
+    orgNo: {
+      type: String,
+      default: ''
     }
   },
   watch: {
@@ -93,9 +92,6 @@ export default {
     }
   },
   mounted() {
-    const params = new URLSearchParams(location.search)
-
-    this.orgNo = params.get('orgNo')
   },
   beforeDestroy() {
     this.destroyChart()
@@ -161,7 +157,7 @@ export default {
       if (!this.chartInstance) {
         this.chartInstance = echarts.init(this.$refs.chartRef)
       }
-      
+
       const xData = this.chartXData
       const yData = this.chartYData
       this.chartInstance.setOption({
@@ -230,8 +226,8 @@ export default {
   display: flex;
   align-items: center;
   font-weight: bold;
-font-size: 16px;
-color: #333333;
+  font-size: 16px;
+  color: #333333;
 }
 
 .pdm-title-arrow {

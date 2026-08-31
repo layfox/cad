@@ -87,6 +87,7 @@
         <PersonInfoModal
           :visible="showPersonModal"
           :TZPZ_NO="TZPZ_NO"
+          :orgNo="orgNo"
           @update:visible="showPersonModal = $event"
           @close="showPersonModal = false"
         />
@@ -121,6 +122,7 @@
         <SafetyCheckModal
           :visible="showSafetyCheckModal"
           :alarm="currentAlarm"
+          :orgNo="orgNo"
           @update:visible="showSafetyCheckModal = $event"
           @close="showSafetyCheckModal = false"
           @alarm-handle="onAlarmHandle"
@@ -139,6 +141,7 @@
         <EquipInfoModal
           :visible="showEquipModal"
           :TZPZ_NO="TZPZ_NO"
+          :orgNo="orgNo"
           :data="currentData"
           @update:visible="showEquipModal = $event"
           @close="showEquipModal = false"

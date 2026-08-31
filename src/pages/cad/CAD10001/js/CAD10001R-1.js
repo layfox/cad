@@ -7,6 +7,10 @@ import * as THREE from "three";
 import { mapState } from 'vuex'
 let rafPending = false
 export default {
+    components: {
+        ViewerPanel,
+        ViewerPanel1
+    },
     data() {
         return {
             steps: [
@@ -109,19 +113,26 @@ export default {
             highlightLineGroup: null,
             highlightMeshList: [],
             highlightUseTempLine: false,
-            isDev: false,
+            isDev: true,
             pointParsed: false,
-            annotationMeshMap: new Map(),
-            // 增加快速存在集合，提升大量点位查询性能
-            annotationIdSet: new Set(),
+            // ===================== InstancedMesh 新增字段 =====================
+            MAX_INSTANCE_COUNT: 3000,
+            instCircleMesh: null,
+            instSquareMesh: null,
+            idToInstInfo: new Map(),
+            instIndexToId: new Map(),
+            circleFreeSlots: [],
+            squareFreeSlots: [],
+            circleOriginColor: [],
+            squareOriginColor: [],
+            tempOutlineGroup: null,
+            activeOutlineIds: new Set(),
+            _updatePending: false,
+            // =================================================================
             selectedAnnotationSet: new Set(),
             isPopOverBottom: false,
             isAddingAnnotation: false
         }
-    },
-    components: {
-        ViewerPanel,
-        ViewerPanel1
     },
     mounted() {
         if (this.isDev) {
@@ -333,7 +344,6 @@ export default {
     beforeDestroy() {
         clearTimeout(this.pointInfoTimer);
         this.pointInfoTimer = null;
-        // 清理raf
         if (this.rafId) {
             cancelAnimationFrame(this.rafId);
             this.rafId = null;
@@ -344,7 +354,24 @@ export default {
         }
         this.destroyAnnotationEvent();
         this.unlistenViewChange()
-        this.clearAllBindMarkers()
+
+        this.clearAnnotationHighlightInstanced();
+        this.clearAllOutline();
+        if (this.instCircleMesh) {
+            this.instCircleMesh.geometry?.dispose();
+            this.instCircleMesh.material?.dispose();
+        }
+        if (this.instSquareMesh) {
+            this.instSquareMesh.geometry?.dispose();
+            this.instSquareMesh.material?.dispose();
+        }
+        this.idToInstInfo.clear();
+        this.instIndexToId.clear();
+        this.circleFreeSlots = [];
+        this.squareFreeSlots = [];
+        this.circleOriginColor = [];
+        this.squareOriginColor = [];
+
         this.destroyTempLine();
         this.matchMode = null;
         this.selectedSurveyPoint = null;
@@ -352,6 +379,409 @@ export default {
         this.manualPlaceHasCoordFill = false;
     },
     methods: {
+        debounceUpdateDisplay() {
+            if (this._updatePending) return;
+            this._updatePending = true;
+            requestAnimationFrame(() => {
+                const mxObj = MxFun.getCurrentDraw();
+                mxObj && mxObj.updateDisplay(true);
+                this._updatePending = false;
+            })
+        },
+
+        async initInstancedMarker() {
+            const mxObj = MxFun.getCurrentDraw();
+            if (!mxObj) return;
+            const baseSize = 10;
+            const geoCircle = new THREE.CircleGeometry(0.5, 32);
+            const geoSquare = new THREE.PlaneGeometry(1, 1);
+
+            const matCircle = new THREE.MeshStandardMaterial({
+                color: 0xec3000,
+                emissive: 0xec3000,
+                emissiveIntensity: 0.4,
+                transparent: true,
+                depthTest: false,
+                depthWrite: false,
+                side: THREE.DoubleSide,
+            });
+            const matSquare = new THREE.MeshStandardMaterial({
+                color: 0x26c557,
+                emissive: 0x26c557,
+                emissiveIntensity: 0.4,
+                transparent: true,
+                depthTest: false,
+                depthWrite: false,
+                side: THREE.DoubleSide,
+            });
+
+            this.instCircleMesh = new THREE.InstancedMesh(geoCircle, matCircle, this.MAX_INSTANCE_COUNT);
+            this.instCircleMesh.renderOrder = 9999;
+            this.instCircleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            this.instCircleMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.MAX_INSTANCE_COUNT * 3), 3);
+
+            this.instSquareMesh = new THREE.InstancedMesh(geoSquare, matSquare, this.MAX_INSTANCE_COUNT);
+            this.instSquareMesh.renderOrder = 9999;
+            this.instSquareMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            this.instSquareMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.MAX_INSTANCE_COUNT * 3), 3);
+
+            const zeroMatrix = new THREE.Matrix4();
+            for (let i = 0; i < this.MAX_INSTANCE_COUNT; i++) {
+                this.instCircleMesh.setMatrixAt(i, zeroMatrix);
+                this.instSquareMesh.setMatrixAt(i, zeroMatrix);
+                this.circleFreeSlots.push(i);
+                this.squareFreeSlots.push(i);
+                const cColor = new THREE.Color(0xec3000);
+                const sColor = new THREE.Color(0x26c557);
+                this.circleOriginColor.push(cColor);
+                this.squareOriginColor.push(sColor);
+                this.instCircleMesh.setColorAt(i, cColor);
+                this.instSquareMesh.setColorAt(i, sColor);
+            }
+            this.instCircleMesh.instanceMatrix.needsUpdate = true;
+            this.instCircleMesh.instanceColor.needsUpdate = true;
+            this.instSquareMesh.instanceMatrix.needsUpdate = true;
+            this.instSquareMesh.instanceColor.needsUpdate = true;
+
+            this.tempOutlineGroup = new THREE.Group();
+            mxObj.addObject(this.tempOutlineGroup);
+            mxObj.addObject(this.instCircleMesh);
+            mxObj.addObject(this.instSquareMesh);
+        },
+
+        addBindMarkerInstanced(bindItem) {
+            const { id, x, y, z = 0, type } = bindItem;
+            if (this.idToInstInfo.has(id)) {
+                console.log(`点位${id}已存在跳过`);
+                return;
+            }
+            let instType, freeSlots, instMesh, originColorList;
+            const baseSize = 10;
+            if (type === "2") {
+                instType = "square";
+                freeSlots = this.squareFreeSlots;
+                instMesh = this.instSquareMesh;
+                originColorList = this.squareOriginColor;
+            } else {
+                instType = "circle";
+                freeSlots = this.circleFreeSlots;
+                instMesh = this.instCircleMesh;
+                originColorList = this.circleOriginColor;
+            }
+            if (freeSlots.length === 0) {
+                this.$Message.error(`已达到最大点位上限${this.MAX_INSTANCE_COUNT}，请过滤图层点位`);
+                return;
+            }
+            const slotIndex = freeSlots.shift();
+            const mat = new THREE.Matrix4();
+            mat.makeScale(baseSize, baseSize, 1);
+            mat.setPosition(x, y, z);
+            instMesh.setMatrixAt(slotIndex, mat);
+            instMesh.instanceMatrix.needsUpdate = true;
+
+            this.idToInstInfo.set(id, { instType, slotIndex });
+            this.instIndexToId.set(`${instType}_${slotIndex}`, id);
+            this.annotationPoints.push({ ...bindItem });
+
+            const initColor = originColorList[slotIndex].clone();
+            instMesh.setColorAt(slotIndex, initColor);
+            instMesh.instanceColor.needsUpdate = true;
+            this.debounceUpdateDisplay();
+        },
+
+        removeBindMarkerByIdInstanced(id) {
+            if (!this.idToInstInfo.has(id)) return;
+            const { instType, slotIndex } = this.idToInstInfo.get(id);
+            let instMesh, freeSlots;
+            if (instType === "square") {
+                instMesh = this.instSquareMesh;
+                freeSlots = this.squareFreeSlots;
+            } else {
+                instMesh = this.instCircleMesh;
+                freeSlots = this.circleFreeSlots;
+            }
+            const zeroMat = new THREE.Matrix4();
+            instMesh.setMatrixAt(slotIndex, zeroMat);
+            instMesh.instanceMatrix.needsUpdate = true;
+
+            freeSlots.push(slotIndex);
+            this.idToInstInfo.delete(id);
+            this.instIndexToId.delete(`${instType}_${slotIndex}`);
+            this.annotationPoints = this.annotationPoints.filter(p => p.id !== id);
+            this.selectedAnnotationSet.delete(id);
+
+            if (this.activeOutlineIds.has(id)) {
+                this.removeSingleOutline(id);
+            }
+            this.debounceUpdateDisplay();
+        },
+
+        addSingleOutline(pointId) {
+            if (this.activeOutlineIds.has(pointId)) return;
+            const point = this.annotationPoints.find(p => p.id === pointId);
+            if (!point) return;
+            const { x, y, z = 0, type } = point;
+            let geo;
+            const borderColor = type === "2" ? 0x26c557 : 0xec3000;
+            if (type === "2") {
+                geo = new THREE.PlaneGeometry(1.5, 1.5);
+            } else {
+                geo = new THREE.RingGeometry(0.55, 0.8, 32);
+            }
+            const mat = new THREE.MeshStandardMaterial({
+                color: borderColor,
+                emissive: borderColor,
+                emissiveIntensity: 0.6,
+                transparent: true,
+                opacity: 0.5,
+                depthTest: false,
+                depthWrite: false,
+                side: THREE.DoubleSide
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            const baseSize = 10;
+            mesh.scale.set(baseSize, baseSize, 1);
+            mesh.position.set(x, y, z);
+            mesh.renderOrder = 9996;
+            mesh.userData.outlineForId = pointId;
+            this.tempOutlineGroup.add(mesh);
+            this.activeOutlineIds.add(pointId);
+        },
+
+        removeSingleOutline(pointId) {
+            if (!this.activeOutlineIds.has(pointId)) return;
+            const toRemove = [];
+            this.tempOutlineGroup.traverse(obj => {
+                if (obj.isMesh && obj.userData.outlineForId === pointId) {
+                    toRemove.push(obj);
+                }
+            });
+            toRemove.forEach(mesh => {
+                if (mesh.geometry) mesh.geometry.dispose();
+                if (mesh.material) {
+                    if (Array.isArray(mesh.material)) mesh.material.forEach(m => m.dispose());
+                    else mesh.material.dispose();
+                }
+                this.tempOutlineGroup.remove(mesh);
+            });
+            this.activeOutlineIds.delete(pointId);
+        },
+
+        clearAllOutline() {
+            const ids = Array.from(this.activeOutlineIds);
+            ids.forEach(id => this.removeSingleOutline(id));
+        },
+
+        setInstanceHighlight(pointId, highlight) {
+            if (!this.idToInstInfo.has(pointId)) return;
+            const { instType, slotIndex } = this.idToInstInfo.get(pointId);
+            let instMesh, originColorList;
+            if (instType === "square") {
+                instMesh = this.instSquareMesh;
+                originColorList = this.squareOriginColor;
+            } else {
+                instMesh = this.instCircleMesh;
+                originColorList = this.circleOriginColor;
+            }
+            if (highlight) {
+                const highlightColor = new THREE.Color(0xffffff);
+                instMesh.setColorAt(slotIndex, highlightColor);
+                this.addSingleOutline(pointId);
+            } else {
+                const originColor = originColorList[slotIndex].clone();
+                instMesh.setColorAt(slotIndex, originColor);
+                this.removeSingleOutline(pointId);
+            }
+            instMesh.instanceColor.needsUpdate = true;
+            this.debounceUpdateDisplay();
+        },
+
+        toggleAnnotationHighlightByIdInstanced(id) {
+            if (!this.idToInstInfo.has(id)) return;
+            if (this.selectedAnnotationSet.has(id)) {
+                this.selectedAnnotationSet.delete(id);
+                this.setInstanceHighlight(id, false);
+            } else {
+                this.selectedAnnotationSet.add(id);
+                this.setInstanceHighlight(id, true);
+            }
+        },
+
+        clearAnnotationHighlightInstanced() {
+            this.selectedAnnotationSet.forEach(id => {
+                this.setInstanceHighlight(id, false);
+            });
+            this.selectedAnnotationSet.clear();
+            this.clearAllOutline();
+            this.debounceUpdateDisplay();
+        },
+
+        setAnnotationHighlightById(targetId, bindMatchId) {
+            this.clearAnnotationHighlightInstanced();
+            this.destroyTempLine();
+            if (!targetId) return;
+            this.selectedAnnotationSet.add(targetId);
+            this.setInstanceHighlight(targetId, true);
+            let targetPoint = this.annotationPoints.find(item => item.id === targetId);
+            if (bindMatchId) {
+                this.selectedAnnotationSet.add(bindMatchId);
+                this.setInstanceHighlight(bindMatchId, true);
+                const bindPoint = this.annotationPoints.find(item => item.id === bindMatchId);
+                if (targetPoint && bindPoint) {
+                    const startWorld = { x: targetPoint.x, y: targetPoint.y, z: targetPoint.z || 0 };
+                    const endWorld = { x: bindPoint.x, y: bindPoint.y, z: bindPoint.z || 0 };
+                    this.createTempLine(startWorld, endWorld);
+                    this.highlightUseTempLine = true;
+                }
+            }
+            this.highlightTargetId = targetId;
+            this.debounceUpdateDisplay();
+        },
+
+        async renderMarkersByList(data, batchSize = 30) {
+            const total = data.length;
+            for (let i = 0; i < total; i += batchSize) {
+                const slice = data.slice(i, i + batchSize);
+                for (const bind of slice) {
+                    this.addBindMarkerInstanced(bind);
+                }
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
+        },
+
+        handleAnnotationHover(e) {
+            if (this.hoverTick) return;
+            this.hoverTick = requestAnimationFrame(() => {
+                try {
+                    if (this.isAddingAnnotation) return;
+                    const canvas = document.getElementById("mxcad");
+                    if (!canvas) return;
+                    const rect = canvas.getBoundingClientRect();
+                    const mouseX = e.clientX - rect.left;
+                    const mouseY = e.clientY - rect.top;
+                    const mxObj = MxFun.getCurrentDraw();
+                    if (!mxObj) return;
+                    const scene = mxObj.getScene?.();
+                    const camera = mxObj.getCamera?.();
+                    if (!scene || !camera) return;
+                    const ndcX = (mouseX / rect.width) * 2 - 1;
+                    const ndcY = -(mouseY / rect.height) * 2 + 1;
+                    const raycaster = new THREE.Raycaster();
+                    raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
+
+                    const intersects = raycaster.intersectObjects([this.instCircleMesh, this.instSquareMesh]);
+                    let hoverTargetId = null;
+                    if (intersects.length > 0) {
+                        const hit = intersects[0];
+                        const instType = hit.object === this.instCircleMesh ? "circle" : "square";
+                        const key = `${instType}_${hit.instanceId}`;
+                        hoverTargetId = this.instIndexToId.get(key);
+                    }
+
+                    if (this.lastHoverGroup) {
+                        this.setInstanceHighlight(this.lastHoverGroup, false);
+                        this.lastHoverGroup = null;
+                    }
+                    if (hoverTargetId) {
+                        this.lastHoverGroup = hoverTargetId;
+                        this.setInstanceHighlight(hoverTargetId, true);
+                        canvas.style.cursor = "pointer";
+                    } else {
+                        canvas.style.cursor = "";
+                    }
+                    this.debounceUpdateDisplay();
+                } catch (err) {
+                    console.error("hover异常", err);
+                } finally {
+                    this.hoverTick = null;
+                }
+            });
+        },
+
+        async handleAnnotationClick(e) {
+            try {
+                if (this.isAddingAnnotation) return;
+                if (this.annotationPoints.length === 0) return;
+                const canvas = document.getElementById("mxcad");
+                if (!canvas) return;
+                const rect = canvas.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const clickY = e.clientY - rect.top;
+                const mxObj = MxFun.getCurrentDraw();
+                if (!mxObj) return;
+                const scene = mxObj.getScene?.();
+                const camera = mxObj.getCamera?.();
+                if (!scene || !camera) return;
+                const ndcX = (clickX / rect.width) * 2 - 1;
+                const ndcY = -(clickY / rect.height) * 2 + 1;
+                const raycaster = new THREE.Raycaster();
+                raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
+
+                const intersects = raycaster.intersectObjects([this.instCircleMesh, this.instSquareMesh]);
+                let hitAnnotationId = null;
+                if (intersects.length > 0) {
+                    const hit = intersects[0];
+                    const instType = hit.object === this.instCircleMesh ? "circle" : "square";
+                    const key = `${instType}_${hit.instanceId}`;
+                    hitAnnotationId = this.instIndexToId.get(key);
+                }
+
+                if (this.matchMode === 'manual-match') {
+                    if (!this.selectedSurveyPoint) return;
+                    if (!hitAnnotationId) return;
+                    const targetDrawPoint = this.annotationPoints.find(b => b.id === hitAnnotationId);
+                    if (!targetDrawPoint) return;
+                    if (!targetDrawPoint.id || targetDrawPoint.type === '2' || targetDrawPoint.MATCH_STA === '02') {
+                        return;
+                    }
+                    this.selectedAnnotationSet.add(hitAnnotationId);
+                    this.setInstanceHighlight(hitAnnotationId, true);
+                    const startVec = { x: this.selectedSurveyPoint.PT_X_VALUE, y: this.selectedSurveyPoint.PT_Y_VALUE };
+                    const endVec = { x: targetDrawPoint.x, y: targetDrawPoint.y };
+                    this.createTempLine(startVec, endVec);
+                    this.popData = { realPoint: this.selectedSurveyPoint, drawPoint: targetDrawPoint };
+                    this.popoverTargetObj = {
+                        matrixWorld: {
+                            getPosition: function (v3) {
+                                return v3.set(targetDrawPoint.x, targetDrawPoint.y, targetDrawPoint.z || 0);
+                            }
+                        }
+                    };
+                    this.showManualMatchPop = true;
+                    this.markNeedUpdate();
+                    return;
+                }
+
+                if (hitAnnotationId) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const bindItem = this.annotationPoints.find(b => b.id === hitAnnotationId);
+                    if (!bindItem) return;
+                    this.detailTargetObj = {
+                        matrixWorld: {
+                            getPosition: function (v3) {
+                                return v3.set(bindItem.x, bindItem.y, bindItem.z || 0);
+                            }
+                        }
+                    };
+                    this.markNeedUpdate();
+                    this.pointInfo = bindItem.type === "1" ? `图纸点位：${bindItem.name}` : `实时测点：${bindItem.name}`;
+                    this.showPointInfoModal = true;
+                    clearTimeout(this.pointInfoTimer);
+                    this.pointInfoTimer = setTimeout(() => {
+                        this.showPointInfoModal = false;
+                    }, 3000);
+                    this.clearAnnotationHighlightInstanced();
+                    this.toggleAnnotationHighlightByIdInstanced(hitAnnotationId);
+                } else {
+                    this.clearAnnotationHighlightInstanced();
+                    this.destroyTempLine();
+                }
+            } catch (err) {
+                console.error("点击marker异常", err);
+            }
+        },
+
         onCopy() {
             this.postData('/api/scaqyzt/copyTzpp', {
                 TZPZ_NO: this.entity.TZPZ_NO,
@@ -370,128 +800,6 @@ export default {
             if (parent && parent.selectUser) {
                 parent.selectUser()
             }
-        },
-        getGroupBaseScale(group) {
-            if (!group?.userData?.originScale) return new THREE.Vector3(10, 10, 1);
-            const base = group.userData.originScale;
-            if (this.selectedAnnotationSet.has(group.userData.annotationId)) {
-                return base.clone().multiplyScalar(1.2);
-            }
-            return base.clone();
-        },
-        setGroupHighlight(group, highlight, forceResetScale = false) {
-            if (!group) return;
-
-            const intensity = highlight ? 0.8 : 0.4;
-
-            group.children.forEach((mesh) => {
-                if (!mesh?.material) return;
-                mesh.material.emissiveIntensity = intensity;
-            });
-
-            // 控制高亮外框显示
-            const highlightBorderMesh = group.userData.highlightBorderMesh;
-            if (highlightBorderMesh) {
-                highlightBorderMesh.visible = !!highlight;
-            }
-
-            if (forceResetScale) {
-                group.scale.copy(group.userData.originScale);
-                return;
-            }
-
-            if (this.lastHoverGroup !== group) {
-                group.scale.copy(this.getGroupBaseScale(group));
-            }
-        },
-        toggleAnnotationHighlightById(id) {
-            const group = this.annotationMeshMap.get(id);
-            if (!group) return;
-            if (this.selectedAnnotationSet.has(id)) {
-                this.selectedAnnotationSet.delete(id);
-                this.setGroupHighlight(group, false);
-            } else {
-                this.selectedAnnotationSet.add(id);
-                this.setGroupHighlight(group, true);
-            }
-            const mxObj = MxFun.getCurrentDraw();
-            mxObj && mxObj.updateDisplay(true);
-        },
-        clearAnnotationHighlight() {
-            this.selectedAnnotationSet.clear();
-            for (const group of this.annotationMeshMap.values()) {
-                this.setGroupHighlight(group, false, true);
-            }
-            this.lastHoverGroup = null;
-            const mxObj = MxFun.getCurrentDraw();
-            mxObj && mxObj.updateDisplay(true);
-        },
-        removeBindMarkerById(id) {
-            if (!this.annotationMeshMap.has(id)) return;
-            const group = this.annotationMeshMap.get(id);
-            const mxObj = MxFun.getCurrentDraw();
-            //释放资源
-            group.traverse(child => {
-                if (child.isMesh) {
-                    if (child.geometry) child.geometry.dispose();
-                    if (child.material) {
-                        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
-                        else child.material.dispose();
-                    }
-                }
-            });
-            mxObj?.removeObject(group);
-            this.annotationMeshMap.delete(id);
-            this.annotationIdSet.delete(id);
-            this.annotationPoints = this.annotationPoints.filter((p) => p.id !== id);
-            this.selectedAnnotationSet.delete(id);
-            mxObj && mxObj.updateDisplay(true);
-        },
-        /**
-         * 分片批量渲染marker，防止大量点位阻塞主线程
-         */
-        async renderMarkersByList(data, batchSize = 30) {
-            const total = data.length;
-            for (let i = 0; i < total; i += batchSize) {
-                const slice = data.slice(i, i + batchSize);
-                for (const bind of slice) {
-                    this.addBindMarker(bind);
-                }
-                //让出主线程
-                await new Promise(resolve => setTimeout(resolve, 0));
-            }
-        },
-        setAnnotationHighlightById(targetId, bindMatchId) {
-            this.clearAnnotationHighlight();
-            this.destroyTempLine()
-            if (!targetId) return;
-            this.selectedAnnotationSet.add(targetId)
-            const tGroup = this.annotationMeshMap.get(targetId);
-            tGroup && this.setGroupHighlight(tGroup, true)
-            let targetPoint = this.annotationPoints.find(item => item.id === targetId);
-            if (bindMatchId) {
-                this.selectedAnnotationSet.add(bindMatchId)
-                const bGroup = this.annotationMeshMap.get(bindMatchId);
-                bGroup && this.setGroupHighlight(bGroup, true)
-                const bindPoint = this.annotationPoints.find(item => item.id === bindMatchId);
-                if (targetPoint && bindPoint) {
-                    const startWorld = {
-                        x: targetPoint.x,
-                        y: targetPoint.y,
-                        z: targetPoint.z || 0
-                    };
-                    const endWorld = {
-                        x: bindPoint.x,
-                        y: bindPoint.y,
-                        z: bindPoint.z || 0
-                    };
-                    this.createTempLine(startWorld, endWorld);
-                    this.highlightUseTempLine = true;
-                }
-            }
-            this.highlightTargetId = targetId;
-            const mxObj = MxFun.getCurrentDraw();
-            if (mxObj) mxObj.updateDisplay(true);
         },
         world2Screen(worldPos) {
             if (!worldPos) return null;
@@ -580,161 +888,6 @@ export default {
             if (canvas) {
                 canvas.removeEventListener("mousedown", this.handleAnnotationClick, true);
                 canvas.removeEventListener("mousemove", this.handleAnnotationHover);
-            }
-            this.clearAnnotationHighlight()
-            this.destroyTempLine()
-        },
-        handleAnnotationHover(e) {
-            if (this.hoverTick) return;
-            this.hoverTick = requestAnimationFrame(() => {
-                try {
-                    if (this.isAddingAnnotation) return;
-                    const canvas = document.getElementById("mxcad");
-                    if (!canvas) return;
-                    const rect = canvas.getBoundingClientRect();
-                    const mouseX = e.clientX - rect.left;
-                    const mouseY = e.clientY - rect.top;
-                    const mxObj = MxFun.getCurrentDraw();
-                    if (!mxObj) return;
-                    const scene = mxObj.getScene?.();
-                    const camera = mxObj.getCamera?.();
-                    if (!scene || !camera) return;
-                    const ndcX = (mouseX / rect.width) * 2 - 1;
-                    const ndcY = -(mouseY / rect.height) * 2 + 1;
-                    const raycaster = new THREE.Raycaster();
-                    raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
-                    const intersects = raycaster.intersectObjects(scene.children, true);
-                    let hoverTargetGroup = null;
-                    for (const intersect of intersects) {
-                        if (intersect.object.userData?.isWaveRing) continue;
-                        let curObj = intersect.object;
-                        while (curObj) {
-                            if (curObj.userData && curObj.userData.isAnnotationPoint) {
-                                hoverTargetGroup = curObj;
-                                break;
-                            }
-                            curObj = curObj.parent;
-                        }
-                        if (hoverTargetGroup) break;
-                    }
-                    if (this.lastHoverGroup && this.lastHoverGroup !== hoverTargetGroup) {
-                        this.lastHoverGroup.scale.copy(this.getGroupBaseScale(this.lastHoverGroup));
-                        this.lastHoverGroup = null;
-                    }
-                    if (hoverTargetGroup) {
-                        if (!hoverTargetGroup.userData.originScale) {
-                            hoverTargetGroup.userData.originScale = hoverTargetGroup.scale.clone();
-                        }
-                        hoverTargetGroup.scale.copy(hoverTargetGroup.userData.originScale).multiplyScalar(1.2);
-                        this.lastHoverGroup = hoverTargetGroup;
-                    }
-                    canvas.style.cursor = hoverTargetGroup ? "pointer" : "";
-                    mxObj.updateDisplay(true);
-                } catch (err) {
-                    console.error("hover异常", err);
-                } finally {
-                    this.hoverTick = null;
-                }
-            });
-        },
-        async handleAnnotationClick(e) {
-            try {
-                if (this.isAddingAnnotation) return;
-                if (this.annotationPoints.length === 0) return;
-                const canvas = document.getElementById("mxcad");
-                if (!canvas) return;
-                const rect = canvas.getBoundingClientRect();
-                const clickX = e.clientX - rect.left;
-                const clickY = e.clientY - rect.top;
-                const mxObj = MxFun.getCurrentDraw();
-                if (!mxObj) return;
-                const scene = mxObj.getScene?.();
-                const camera = mxObj.getCamera?.();
-                if (!scene || !camera) return;
-                const ndcX = (clickX / rect.width) * 2 - 1;
-                const ndcY = -(clickY / rect.height) * 2 + 1;
-                const raycaster = new THREE.Raycaster();
-                raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
-                const intersects = raycaster.intersectObjects(scene.children, true);
-                if (this.matchMode === 'manual-match') {
-                    if (!this.selectedSurveyPoint) return;
-                    for (const inter of intersects) {
-                        if (inter.object.userData?.isWaveRing) continue;
-                        let curObj = inter.object;
-                        while (curObj) {
-                            if (curObj.userData && curObj.userData.isAnnotationPoint) {
-                                const id = curObj.userData.annotationId;
-                                const targetDrawPoint = this.annotationPoints.find(b => b.id === id);
-                                if (!targetDrawPoint) {
-                                    curObj = curObj.parent;
-                                    continue;
-                                };
-                                if (!targetDrawPoint.id || targetDrawPoint.type === '2' || targetDrawPoint.MATCH_STA === '02') {
-                                    curObj = curObj.parent;
-                                    continue;
-                                }
-                                this.selectedAnnotationSet.add(id)
-                                this.setGroupHighlight(this.annotationMeshMap.get(id), true)
-                                const startVec = { x: this.selectedSurveyPoint.PT_X_VALUE, y: this.selectedSurveyPoint.PT_Y_VALUE };
-                                const endVec = { x: targetDrawPoint.x, y: targetDrawPoint.y };
-                                this.createTempLine(startVec, endVec);
-                                const emitData = {
-                                    realPoint: this.selectedSurveyPoint,
-                                    drawPoint: targetDrawPoint,
-                                };
-                                this.popoverTargetObj = curObj;
-                                this.markNeedUpdate();
-                                this.popData = {
-                                    realPoint: this.selectedSurveyPoint,
-                                    drawPoint: targetDrawPoint,
-                                };
-                                this.showManualMatchPop = true;
-                                return
-                            }
-                            curObj = curObj.parent;
-                        }
-                    }
-                    return;
-                }
-                let hitAnnotationId = null;
-                let hitTargetObj = null;
-                for (const intersect of intersects) {
-                    if (intersect.object.userData?.isWaveRing) continue;
-                    let curObj = intersect.object;
-                    while (curObj) {
-                        if (curObj.userData && curObj.userData.isAnnotationPoint) {
-                            const id = curObj.userData.annotationId;
-                            const bindItem = this.annotationPoints.find(b => b.id === id);
-                            if (bindItem) {
-                                hitAnnotationId = id;
-                                hitTargetObj = curObj;
-                                break;
-                            }
-                        }
-                        curObj = curObj.parent;
-                    }
-                    if (hitAnnotationId) break;
-                }
-                if (hitAnnotationId && hitTargetObj) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.detailTargetObj = hitTargetObj;
-                    this.markNeedUpdate();
-                    const bindItem = this.annotationPoints.find(b => b.id === hitAnnotationId);
-                    this.pointInfo = bindItem.type === "1" ? `图纸点位：${bindItem.name}` : `实时测点：${bindItem.name}`;
-                    this.showPointInfoModal = true;
-                    clearTimeout(this.pointInfoTimer);
-                    this.pointInfoTimer = setTimeout(() => {
-                        this.showPointInfoModal = false;
-                    }, 3000);
-                    this.clearAnnotationHighlight();
-                    this.toggleAnnotationHighlightById(hitAnnotationId);
-                } else {
-                    this.clearAnnotationHighlight();
-                    this.destroyTempLine()
-                }
-            } catch (err) {
-                console.error("点击marker异常", err);
             }
         },
         closeManualPop() {
@@ -834,209 +987,32 @@ export default {
             this.showPointInfoModal = true;
         },
         clearAllBindMarkers() {
-            const mxObj = MxFun.getCurrentDraw();
-            if (!mxObj) return;
-            const scene = mxObj.getScene?.();
-            if (!scene) return;
-            const toRemove = [];
-            scene.traverse((obj) => {
-                if (obj.userData && obj.userData.isAnnotationPoint) {
-                    toRemove.push(obj);
-                }
-            });
-            toRemove.forEach(group => {
-                group.traverse(child => {
-                    if (child.isMesh) {
-                        if (child.geometry) child.geometry.dispose();
-                        if (child.material) {
-                            if (Array.isArray(child.material)) {
-                                child.material.forEach(mat => mat.dispose());
-                            } else {
-                                child.material.dispose();
-                            }
-                        }
-                    }
-                });
-                mxObj.removeObject(group);
-            });
-            this.annotationMeshMap.clear();
-            this.annotationIdSet.clear();
-            this.annotationPoints = []
-            this.selectedAnnotationSet.clear();
+            this.clearAnnotationHighlightInstanced();
+            this.clearAllOutline();
+            this.idToInstInfo.clear();
+            this.instIndexToId.clear();
+            this.annotationPoints = [];
             this.lastHoverGroup = null;
-            mxObj.updateDisplay(true);
+            for (let i = 0; i < this.MAX_INSTANCE_COUNT; i++) {
+                if (this.instCircleMesh) this.instCircleMesh.setMatrixAt(i, new THREE.Matrix4());
+                if (this.instSquareMesh) this.instSquareMesh.setMatrixAt(i, new THREE.Matrix4());
+            }
+            if (this.instCircleMesh) this.instCircleMesh.instanceMatrix.needsUpdate = true;
+            if (this.instSquareMesh) this.instSquareMesh.instanceMatrix.needsUpdate = true;
+            this.circleFreeSlots.length = 0;
+            this.squareFreeSlots.length = 0;
+            for (let i = 0; i < this.MAX_INSTANCE_COUNT; i++) {
+                this.circleFreeSlots.push(i);
+                this.squareFreeSlots.push(i);
+            }
+            this.debounceUpdateDisplay();
         },
         clearBindMarkersByIds(ids) {
             if (!ids || ids.length === 0) return;
-            const idSet = new Set(ids);
-            const mxObj = MxFun.getCurrentDraw();
-            if (!mxObj) return;
-            const scene = mxObj.getScene?.();
-            if (!scene) return;
-            const toRemove = [];
-            scene.traverse((obj) => {
-                if (obj.userData && obj.userData.isAnnotationPoint && idSet.has(obj.userData.annotationId)) {
-                    toRemove.push(obj);
-                }
-            });
-            toRemove.forEach(group => {
-                group.traverse(child => {
-                    if (child.isMesh) {
-                        if (child.geometry) child.geometry.dispose();
-                        if (child.material) {
-                            if (Array.isArray(child.material)) {
-                                child.material.forEach(mat => mat.dispose());
-                            } else {
-                                child.material.dispose();
-                            }
-                        }
-                    }
-                });
-                mxObj.removeObject(group);
-                const aid = group.userData.annotationId;
-                const idx = this.annotationPoints.findIndex(item => item.id === aid);
-                if (idx !== -1) {
-                    this.annotationPoints.splice(idx, 1);
-                }
-                this.annotationMeshMap.delete(aid);
-                this.annotationIdSet.delete(aid);
-            });
-            this.lastHoverGroup = null;
-            mxObj.updateDisplay(true);
+            ids.forEach(id => this.removeBindMarkerByIdInstanced(id));
         },
         hasMarkerById(id) {
-            return this.annotationIdSet.has(id);
-        },
-        createBindMarker(bindItem) {
-            if (this.hasMarkerById(bindItem.id)) {
-                console.log(`点位${bindItem.id}已存在，跳过创建`);
-                return null;
-            }
-
-            this.annotationPoints.push(bindItem);
-            this.annotationIdSet.add(bindItem.id);
-
-            const mxObj = MxFun.getCurrentDraw();
-            if (!mxObj) return null;
-
-            const docX = bindItem.x;
-            const docY = bindItem.y;
-            const docZ = bindItem.z || 0;
-
-            const baseSize = 10;
-            const group = new THREE.Object3D();
-            group.position.set(docX, docY, docZ);
-
-            group.userData = {
-                isAnnotationPoint: true,
-                annotationId: bindItem.id,
-                originScale: new THREE.Vector3(baseSize, baseSize, 1),
-                type: bindItem.type,
-                highlightBorderMesh: null // 高亮外框
-            };
-
-            let centerMesh = null;
-            let borderColor = 0xec3000; // 默认红色
-
-            // ====== 类型2：实时测点，方形 ======
-            if (bindItem.type === "2") {
-                borderColor = 0x26c557;
-
-                // 中心方块
-                const geoSquare = new THREE.PlaneGeometry(1, 1);
-                const matSquare = new THREE.MeshStandardMaterial({
-                    color: borderColor,
-                    emissive: borderColor,
-                    emissiveIntensity: 0.4,
-                    transparent: true,
-                    depthTest: false,
-                    depthWrite: false,
-                    side: THREE.DoubleSide
-                });
-
-                const squareMesh = new THREE.Mesh(geoSquare, matSquare);
-                squareMesh.renderOrder = 9999;
-                group.add(squareMesh);
-                centerMesh = squareMesh;
-
-                // 外层白色边框
-                const geoWhiteBorder = new THREE.PlaneGeometry(1.2, 1.2);
-                const matWhiteBorder = new THREE.MeshStandardMaterial({
-                    color: 0xffffff,
-                    emissive: 0xffffff,
-                    emissiveIntensity: 0.2,
-                    transparent: true,
-                    depthTest: false,
-                    depthWrite: false,
-                    side: THREE.DoubleSide
-                });
-
-                const whiteBorderMesh = new THREE.Mesh(geoWhiteBorder, matWhiteBorder);
-                whiteBorderMesh.renderOrder = 9998;
-                group.add(whiteBorderMesh);
-
-            } else {
-                // ====== 类型1：图纸点位，圆形 ======
-                const geoCircle = new THREE.CircleGeometry(0.5, 32);
-                const matCircle = new THREE.MeshStandardMaterial({
-                    color: borderColor,
-                    emissive: borderColor,
-                    emissiveIntensity: 0.4,
-                    transparent: true,
-                    depthTest: false,
-                    depthWrite: false,
-                    side: THREE.DoubleSide
-                });
-
-                const circleMesh = new THREE.Mesh(geoCircle, matCircle);
-                circleMesh.renderOrder = 9999;
-                group.add(circleMesh);
-                centerMesh = circleMesh;
-            }
-
-            // ========= 新增：高亮外框 =========
-            const highlightBorderMesh = this.createHighlightBorder(bindItem.type, borderColor);
-            group.add(highlightBorderMesh);
-            group.userData.highlightBorderMesh = highlightBorderMesh;
-
-            group.scale.set(baseSize, baseSize, 1);
-
-            this.annotationMeshMap.set(bindItem.id, group);
-            mxObj.addObject(group);
-            mxObj.updateDisplay(true);
-
-            return group;
-        },
-        createHighlightBorder(type, color) {
-            let geometry;
-
-            if (type === "2") {
-                // type=2：方形外框
-                geometry = new THREE.PlaneGeometry(1.5, 1.5);
-            } else {
-                // type=1：圆形外框
-                geometry = new THREE.RingGeometry(0.55, 0.8, 32);
-            }
-
-            const material = new THREE.MeshStandardMaterial({
-                color: color,
-                emissive: color,
-                emissiveIntensity: 0.6,
-                transparent: true,
-                opacity: 0.5, // 透明度低一点
-                depthTest: false,
-                depthWrite: false,
-                side: THREE.DoubleSide
-            });
-
-            const mesh = new THREE.Mesh(geometry, material);
-            mesh.renderOrder = 9996;
-            mesh.visible = false; // 默认隐藏
-
-            return mesh;
-        },
-        addBindMarker(data) {
-            this.createBindMarker(data)
+            return this.idToInstInfo.has(id);
         },
         onSelectTz(data) {
             this.entity.TZXX_NO = data.TZXX_NO
@@ -1136,7 +1112,7 @@ export default {
                 })
                 if (flag) {
                     this.renderMarkersByList(this.pointList.map(item => {
-                        item.id = item.POINT_NO,
+                        item.id = item.POINT_NO || item.pointNo,
                             item.name = item.pointName,
                             item.type = '1'
                         return item
@@ -1348,6 +1324,9 @@ export default {
                 this.mxcad = mxcad;
                 this.mxDraw = mxcad.mxdraw;
                 this.fileUrl = this.fileUrlInput;
+                // ========== 初始化InstancedMarker ==========
+                await this.initInstancedMarker();
+
                 mxcad.setViewBackgroundColor(255, 255, 255);
                 try {
                     mxcad.mxdraw.setMouseMiddlePan(true);
@@ -1507,8 +1486,8 @@ export default {
                 }
                 this.mxcad.zoomCenter(numX, numY);
                 this.mxcad.zoomScale(zoomFactor);
-                this.clearAnnotationHighlight()
-                if (id) this.toggleAnnotationHighlightById(id)
+                this.clearAnnotationHighlightInstanced()
+                if (id) this.toggleAnnotationHighlightByIdInstanced(id)
                 this.mxcad.updateDisplay();
             } catch (e) {
                 console.error('[zoomToPoint] 失败:', e);
@@ -1517,7 +1496,7 @@ export default {
         async zoomToPoint1(row, zoomFactor = 3) {
             try {
                 if (row.MATCH_STA == '02' && !this.hasMarkerById(row.PT_NO)) {
-                    this.addBindMarker({
+                    this.addBindMarkerInstanced({
                         id: row.PT_NO,
                         name: row.PT_NAM,
                         x: row.PT_X_VALUE || row.POINT_X_VALUE,
@@ -1598,7 +1577,7 @@ export default {
             this.destroyTempLine()
             this.hideMatchPoint()
             this.zoomToPoint(this.selectedSurveyPoint.PT_X_VALUE, this.selectedSurveyPoint.PT_Y_VALUE);
-            this.addBindMarker({
+            this.addBindMarkerInstanced({
                 id: this.selectedSurveyPoint.PT_NO,
                 name: this.selectedSurveyPoint.PT_NAM,
                 x: this.selectedSurveyPoint.PT_X_VALUE,
@@ -1610,8 +1589,8 @@ export default {
             this.selectedAnnotationSet.add(this.selectedSurveyPoint.PT_NO)
             this.matchMode = 'manual-match';
             this.$nextTick(() => {
-                const g = this.annotationMeshMap.get(this.selectedSurveyPoint.PT_NO);
-                g && this.setGroupHighlight(g, true)
+                const gId = this.selectedSurveyPoint.PT_NO;
+                this.setInstanceHighlight(gId, true)
             })
             this._hidePanel1();
             this.$Message.info('请在图纸上点击一个未匹配的图纸点位完成匹配');
@@ -1619,24 +1598,38 @@ export default {
         hideMatchPoint() {
             this.pointList.forEach(item => {
                 if (item.MATCH_STA === '02') {
-                    const group = this.annotationMeshMap.get(item.POINT_NO || item.POINT_ID)
-                    if (group) {
-                        group.visible = false
-                    }
+                    if (this.idToInstInfo.has(item.POINT_NO || item.POINT_ID)) {
+                        const { instType, slotIndex } = this.idToInstInfo.get(item.POINT_NO || item.POINT_ID);
+                        let instMesh;
+                        if (instType === "square") instMesh = this.instSquareMesh;
+                        else instMesh = this.instCircleMesh;
+                        const zero = new THREE.Matrix4();
+                        instMesh.setMatrixAt(slotIndex, zero);
+                        instMesh.instanceMatrix.needsUpdate = true
+                                            }
                 }
             })
-            const mxObj = MxFun.getCurrentDraw();
-            mxObj && mxObj.updateDisplay(true);
+            this.debounceUpdateDisplay();
         },
         showAllPoint() {
             this.pointList.forEach(item => {
-                const group = this.annotationMeshMap.get(item.POINT_NO || item.POINT_ID)
-                if (group) {
-                    group.visible = true
+                const pid = item.POINT_NO || item.POINT_ID;
+                if (this.idToInstInfo.has(pid)) {
+                    const { instType, slotIndex } = this.idToInstInfo.get(pid);
+                    const pointItem = this.annotationPoints.find(p => p.id === pid);
+                    if (!pointItem) return;
+                    let instMesh;
+                    const baseSize = 10;
+                    if (instType === "square") instMesh = this.instSquareMesh;
+                    else instMesh = this.instCircleMesh;
+                    const mat = new THREE.Matrix4();
+                    mat.makeScale(baseSize, baseSize, 1);
+                    mat.setPosition(pointItem.x, pointItem.y, pointItem.z || 0);
+                    instMesh.setMatrixAt(slotIndex, mat);
+                    instMesh.instanceMatrix.needsUpdate = true;
                 }
             })
-            const mxObj = MxFun.getCurrentDraw();
-            mxObj && mxObj.updateDisplay(true);
+            this.debounceUpdateDisplay();
         },
         onAutoPlace(points) {
             const pts = points;
@@ -1652,7 +1645,7 @@ export default {
                 const coord = this._parseSurveyCoord(survey);
                 if (!coord) return;
                 const [x, y] = coord;
-                this.addBindMarker({
+                this.addBindMarkerInstanced({
                     id: survey.PT_NO,
                     name: survey.PT_NAM,
                     x: x,
@@ -1700,12 +1693,10 @@ export default {
                 title: '提示',
                 content: '请选择已匹配状态的测点。点击后弹出提示：解除匹配后不可撤销，确定吗？',
                 onOk: () => {
-                    //if (parent && parent.cancelMatch) {
                     this.cancelMatch({
                         TZPZ_NO: this.entity.TZPZ_NO,
                         I2P_NOs: points.map(item => item.I2P_NO)
                     })
-                    //}
                 }
             })
         },
@@ -1731,7 +1722,7 @@ export default {
             const survey = this.selectedSurveyPoint;
             const { x, y } = coords;
             // 添加标记
-            this.addBindMarker({
+            this.addBindMarkerInstanced({
                 id: survey.PT_NO,
                 name: survey.PT_NAM,
                 x: x,
@@ -1758,9 +1749,6 @@ export default {
                 MxFun.stopRunCommand();
             }
         },
-        /**
-         * 弹窗取消
-         */
         onAddPoints(points) {
             this.upsertIot({
                 TZPZ_NO: this.entity.TZPZ_NO,
@@ -1774,178 +1762,9 @@ export default {
             this.manualPlaceVisible = false
         },
         _clearHighlights() {
-            this.clearAnnotationHighlight();
+            this.clearAnnotationHighlightInstanced();
             this.destroyTempLine();
         },
-        //         getAllMcDbPoint() {
-        //             try {
-        //                 if (this.mxcad && this.mxcad.getDatabase) {
-        //                     const blockTable = this.mxcad.getDatabase().getBlockTable();
-        //                     const blockRecordIds = blockTable.getAllRecordId();
-        //                     console.log("块表记录数量:", blockRecordIds.length);
-
-        //                     let modelSpace = null;
-
-        //                     // 查找模型空间
-        //                     for (let i = 0; i < blockRecordIds.length; i++) {
-        //                         const blkRecId = blockRecordIds[i];
-        //                         try {
-        //                             const blkRec = blkRecId.getMcDbBlockTableRecord();
-        //                             if (blkRec) {
-        //                                 const name = blkRec.name || blkRec.getName?.() || "";
-        //                                 if (name === "*Model_Space" || name === "Model_Space" || name.includes("Model")) {
-        //                                     modelSpace = blkRec;
-        //                                     console.log("找到模型空间:", name);
-        //                                     break;
-        //                                 }
-        //                             }
-        //                         } catch (e) { }
-        //                     }
-
-        //                     if (modelSpace) {
-        //                         const entityIds = modelSpace.getAllEntityId();
-        //                         console.log("模型空间实体数量:", entityIds.length);
-
-        //                         const pointList = [];
-        //                         let pointIndex = 0;
-        //                         let blockIndex = 0;
-
-        //                         for (let i = 0; i < entityIds.length; i++) {
-        //                             const entId = entityIds[i];
-        //                             try {
-        //                                 // 1. 处理点实体（McDbPoint）
-        //                                 if (entId.isKindOf("McDbPoint")) {
-        //                                     const pointEnt = entId.getMcDbEntity();
-        //                                     if (pointEnt && pointEnt.position) {
-        //                                         const pos = pointEnt.position;
-        //                                         // 获取图层名称
-        //                                         let layerName = "未知图层";
-        //                                         let layerId = ''
-        //                                         try {
-        //                                             const layerId = pointEnt.layerId;
-        //                                             if (layerId) {
-        //                                                 const layerRec = layerId.getMcDbLayerTableRecord();
-        //                                                 if (layerRec) {
-        //                                                     layerName = layerRec.name;
-        //                                                     layerId = layerRec.getHandle() || ''
-        //                                                 }
-        //                                             }
-        //                                         } catch (e) { }
-
-        //                                         pointIndex++;
-        //                                         pointList.push({
-        //                                             id: entId,
-        //                                             type: "point",
-        //                                             name: `点${pointIndex}`,
-        //                                             x: pos.x,
-        //                                             y: pos.y,
-        //                                             z: pos.z,
-        //                                             LAYER_NAM: layerName,
-        //                                             LAYER_ID: layerId,
-        //                                             description: `图层: ${layerName}`,
-        //                                             visible: true,
-        //                                             index: pointList.length + 1,
-        //                                             no: entId.getMcDbEntity().getHandle()
-        //                                         });
-        //                                     }
-        //                                 }
-
-        //                                 // 2. 处理块引用（McDbBlockReference）- 从属性中获取名称和描述
-        //                                 if (entId.isKindOf("McDbBlockReference")) {
-        //                                     const blkRef = entId.getMcDbEntity();
-        //                                     if (blkRef && blkRef.position) {
-        //                                         const pos = blkRef.position;
-        //                                         const blockName = blkRef.blockName || "未知块";
-
-        //                                         // 获取图层名称
-        //                                         let layerName = "未知图层";
-        //                                         let layerId = ''
-        //                                         try {
-        //                                             const layerId = blkRef.layerId;
-        //                                             if (layerId) {
-        //                                                 const layerRec = layerId.getMcDbLayerTableRecord();
-        //                                                 if (layerRec) {
-        //                                                     layerName = layerRec.name;
-        //                                                     layerId = layerRec.getHandle() || ''
-        //                                                 }
-        //                                             }
-        //                                         } catch (e) { }
-
-        //                                         // 获取块引用的所有属性
-        //                                         let attributes = [];
-        //                                         let pointName = "";
-        //                                         let pointDesc = "";
-
-        //                                         try {
-        //                                             if (blkRef.getAllAttribute) {
-        //                                                 const attrIds = blkRef.getAllAttribute();
-        //                                                 if (attrIds && attrIds.length > 0) {
-        //                                                     for (let j = 0; j < attrIds.length; j++) {
-        //                                                         try {
-        //                                                             const attr = attrIds[j].getMcDbEntity();
-        //                                                             if (attr) {
-        //                                                                 const tag = attr.tag || "";
-        //                                                                 const value = attr.textString || "";
-        //                                                                 attributes.push({ tag, value });
-
-        //                                                                 // 尝试找名称属性
-        //                                                                 if (!pointName && (tag.includes("名称") || tag.includes("编号") ||
-        //                                                                     tag.toLowerCase().includes("name") || tag.toLowerCase().includes("code") ||
-        //                                                                     tag.toLowerCase().includes("id") || tag.includes("号"))) {
-        //                                                                     pointName = value;
-        //                                                                 }
-        //                                                             }
-        //                                                         } catch (e) { }
-        //                                                     }
-        //                                                 }
-        //                                             }
-        //                                         } catch (e) { }
-
-        //                                         // 构建描述信息
-        //                                         if (attributes.length > 0) {
-        //                                             pointDesc = attributes.map((a) => `${a.tag}: ${a.value}`).join(", ");
-        //                                         } else {
-        //                                             pointDesc = `块: ${blockName}, 图层: ${layerName}`;
-        //                                         }
-
-        //                                         // 如果没有找到名称属性，用块名称
-        //                                         if (!pointName) {
-        //                                             blockIndex++;
-        //                                             pointName = `${blockName}${blockIndex}`;
-        //                                         }
-        // console.log(blockName, pointName, 1111)
-        //                                         pointList.push({
-        //                                             id: entId,
-        //                                             type: "block",
-        //                                             blockName: blockName,
-        //                                             name: pointName,
-        //                                             x: pos.x,
-        //                                             y: pos.y,
-        //                                             z: pos.z,
-        //                                             LAYER_NAM: layerName,
-        //                                             LAYER_ID: layerId,
-        //                                             description: pointDesc,
-        //                                             attributes: attributes,
-        //                                             visible: true,
-        //                                             no: entId.getMcDbEntity().getHandle(),
-        //                                             index: pointList.length + 1
-        //                                         });
-        //                                     }
-        //                                 }
-        //                             } catch (e) { }
-        //                         }
-
-        //                         return pointList
-        //                         console.log("获取点位数据成功，点位总数:", this.pointCount);
-        //                         console.log("其中点实体:", pointIndex, "个，块引用:", blockIndex, "个");
-        //                     } else {
-        //                         console.warn("未找到模型空间");
-        //                     }
-        //                 }
-        //             } catch (e) {
-        //                 console.warn("获取点位数据失败:", e);
-        //             }
-        //         },
         async getAllMcDbPoint() {
             try {
                 if (!this.mxcad || !this.mxcad.getDatabase) {
@@ -1994,7 +1813,6 @@ export default {
                             if (entId.isKindOf("McDbPoint")) {
                                 const pointEnt = entId.getMcDbEntity();
                                 if (!pointEnt || !pointEnt.position) continue;
-
                                 const pos = pointEnt.position;
                                 let layerName = "未知图层";
                                 let layerHandle = "";
@@ -2217,3 +2035,4 @@ export default {
         }
     }
 }
+
