@@ -49,14 +49,14 @@
     <div class="pim-track-section">
       <div class="pim-track-header">
         <span class="pim-track-title">人员轨迹数据</span>
-        <div class="pim-track-search">
+        <!-- <div class="pim-track-search">
           <Input
             v-model="searchKeyword"
             placeholder="请输入搜索关键词"
             clearable
             class="pim-search-input"
           />
-        </div>
+        </div> -->
       </div>
 
       <!-- 时间筛选按钮 -->
@@ -72,7 +72,7 @@
       </div>
 
       <!-- 轨迹记录列表 -->
-      <div class="pim-track-list">
+      <div class="pim-track-list" v-if="trackRecords.length">
         <div
           v-for="(record, idx) in trackRecords"
           :key="idx"
@@ -95,6 +95,9 @@
           </div>
         </div>
       </div>
+      <div class="pim-track-empty" v-else>
+          <img src="../css/images/no_data.jpg" alt="">
+      </div>
     </div>
   </div>
 </template>
@@ -110,49 +113,74 @@ export default {
     personId: {
       type: String,
       default: ''
+    },
+    TZPZ_NO: {
+      type: String,
+      default: ''
     }
   },
   data() {
     return {
       searchKeyword: '',
       activeTimeTab: 0,
-      timeTabs: ['今天', '本周', '本月', '近7天', '近30天']
+      timeTabs: ['今天', '本周', '本月', '近7天', '近30天'],
+      person: {
+        name: '',
+        company: '',
+        position: '',
+        cardNo: '',
+        phone: '',
+        gender: '',
+        location: '',
+        department: '',
+        isUnderground: ''
+      },
+      trackRecords: []
     }
   },
-  computed: {
-    person() {
-      return {
-        name: '刘海林',
-        company: '小纪汗',
-        position: '普工',
-        cardNo: 'JZ03018',
-        phone: '15091226981',
-        gender: '男',
-        location: '分站-148-13201回风150米148号基站(148)',
-        department: '综采一队',
-        isUnderground: '是'
+  mounted() {
+    const params = new URLSearchParams(location.search)
+
+    this.orgNo = params.get('orgNo')
+  },
+  watch: {
+    visible(val) {
+      if (val) {
+        this.getData()
       }
-    },
-    trackRecords() {
-      // 模拟数据：两条轨迹记录
-      return [
-        {
-          enterTime: '2026-07-29 23:16:33',
-          exitTime: '2026-07-30 08:25:14',
-          duration: '9小时'
-        },
-        {
-          enterTime: '2026-07-29 23:16:33',
-          exitTime: '2026-07-30 08:25:14',
-          duration: '9小时'
-        }
-      ]
     }
   },
   methods: {
     onClose() {
       this.$emit('update:visible', false)
       this.$emit('close')
+    },
+    async postData(url = "", data = {}) {
+      data.param_orgNo = this.orgNo
+      const response = await fetch(url, {
+        method: "POST",
+
+        body: JSON.stringify(data),
+      });
+      return response.json();
+    },
+    getData() {
+      this.postData('/api/scaqyzt/getRydwRealtime', {
+        TZPZ_NO: this.TZPZ_NO
+      }).then(res => {
+        const data = res.data
+        this.person = {
+          name: data.PL_NAM,
+          company: data.ORG_SHOT_NAM,
+          position: data.PL_DUTY,
+          cardNo: data.CARD_CODE,
+          phone: data.PL_PHONE,
+          gender: data.GENDER_TYP,
+          location: data.ORG_SHOT_NAM,
+          department: data.DEP_NAM,
+          isUnderground: data.JX_FLG
+        }
+      })
     }
   }
 }
@@ -269,6 +297,11 @@ color: #333333;
 .pim-search-input {
   width: 200px;
   height: 32px;
+}
+.pim-track-empty {
+  display: flex;
+  justify-content: center;
+  padding: 60px 0;
 }
 
 /* ===== 时间筛选 ===== */

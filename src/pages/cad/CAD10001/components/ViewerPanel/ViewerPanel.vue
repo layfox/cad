@@ -258,7 +258,7 @@ export default {
             this.isIndeterminate = false
         },
         onPointRowClick(row) {
-            this.$emit('zoom-to-point', row.x, row.y)
+            this.$emit('zoom-to-point', row.x, row.y, row.id)
         },
         onPointRowClick1(row, index) {
             this.$emit('toggle-layer', (this.layerPage.current -1) * this.layerPage.pageSize + index + 1, row.off)

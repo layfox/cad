@@ -65,11 +65,6 @@
                         {{ row.PT_X_VALUE && row.PT_Y_VALUE ? ((+row.PT_X_VALUE).toFixed(2) + ',' + (+row.PT_Y_VALUE).toFixed(2)) : '无坐标' }}
                     </span>
                 </template>
-                <template slot-scope="{ row }" slot="MATCH_STA">
-                    <span :class="['vp-match-status', row.MATCH_STA === '未匹配' ? 'status-unmatched' : 'status-matched']">
-                        {{ row.MATCH_STA || '匹配' }}
-                    </span>
-                </template>
             </Table>
         </div>
 
@@ -109,6 +104,7 @@
 
 <script>
 import PointSelectModal from '../../dialog/PointSelectModal.vue'
+import { McGeMatrix3d, McGePoint3d, McGeVector3d } from 'mxcad'
 export default {
     name: 'ViewerPanel1',
     props: {
@@ -134,7 +130,7 @@ export default {
             tolerance: 4,
             pointModalVisible: false,
             orgNo: '',
-            isDev: false,
+            isDev: true,
             pointColumns: [
                 { type: 'selection', width: 60, align: 'center' },
                 { slot: 'seq', title: '序号', key: 'seq', width: 60, align: 'center', render: (h, { row, index }) => {
@@ -142,7 +138,7 @@ export default {
                 } },
                 { title: '实时测点', key: 'PT_NAM', minWidth: 120 },
                 { title: '测点坐标', key: 'coordValue', minWidth: 120, align: 'center', slot: 'coordStatus' },
-                { title: '匹配状态', key: 'MATCH_STA', width: 80, align: 'center', slot: 'MATCH_STA' },
+                { title: '匹配状态', key: 'MATCH_STA_NAM', width: 80, align: 'center'},
                 { title: '坐标差', key: 'DALTA_XY', minWidth: 80, align: 'center' },
                 { title: '匹配图纸点位', key: 'POINT_NAM', minWidth: 120 },
                 { title: '匹配方式', key: 'MATCH_TYP', width: 90, align: 'center' }
@@ -182,16 +178,17 @@ export default {
                 "I2P_NO": "133777110241938767871",
                 "TZPZ_NO": "133775589162091020281",
                 "POINT_X_VALUE": "",
-                "MATCH_STA": "匹配",
-                "POINT_ID": "",
+                "MATCH_STA_NAM": "匹配",
+                "MATCH_STA": "02",
+                "POINT_ID": "58a6",
                 "POINT_NAM": "",
-                "PT_Y_VALUE": "-30388651.27496908",
+                "PT_Y_VALUE": "-30382957.704416513",
                 "PT_NAM": "氧气1",
                 "PT_NO": "128681301464609980416",
                 "MATCH_TYP": "",
                 "DALTA_XY": "",
                 "PT_ID": "61080201921101MN001200001816",
-                "PT_X_VALUE": "23372898.909408778",
+                "PT_X_VALUE": "23369439.109730206",
                 "POINT_Y_VALUE": "",
                 "POINT_NO": "58a6"
             },
@@ -199,12 +196,13 @@ export default {
                 "I2P_NO": "133777110241938767872",
                 "TZPZ_NO": "133775589162091020288",
                 "POINT_X_VALUE": "",
-                "MATCH_STA": "未匹配",
+                "MATCH_STA_NAM": "未匹配",
+                "MATCH_STA": "01",
                 "POINT_ID": "",
                 "POINT_NAM": "",
                 "PT_Y_VALUE": "-30382999.282143094",
                 "PT_NAM": "氧气",
-                "PT_NO": "128681301464609980416",
+                "PT_NO": "128681301464609980417",
                 "MATCH_TYP": "",
                 "DALTA_XY": "",
                 "PT_ID": "61080201921101MN001200001818",
@@ -216,7 +214,8 @@ export default {
                 "I2P_NO": "133777112498138775552",
                 "TZPZ_NO": "133775589162091020288",
                 "POINT_X_VALUE": "",
-                "MATCH_STA": "未匹配",
+                "MATCH_STA": "01",
+                "MATCH_STA_NAM": "未匹配",
                 "POINT_ID": "",
                 "POINT_NAM": "",
                 "PT_Y_VALUE": "39394974.134983465",
@@ -233,12 +232,13 @@ export default {
                 "I2P_NO": "133777112498138775552",
                 "TZPZ_NO": "133775589162091020288",
                 "POINT_X_VALUE": "",
-                "MATCH_STA": "未匹配",
+                "MATCH_STA_NAM": "未匹配",
+                "MATCH_STA": "01",
                 "POINT_ID": "",
                 "POINT_NAM": "",
                 "PT_Y_VALUE": "",
                 "PT_NAM": "环境温度",
-                "PT_NO": "128681301465683722240",
+                "PT_NO": "128681301465683722241",
                 "MATCH_TYP": "",
                 "DALTA_XY": "",
                 "PT_ID": "61080201921101MN000300000200",
@@ -252,6 +252,30 @@ export default {
         this.getIotStatistic()
     },
     methods: {
+        convert54ToDwg(x54, y54) {
+            const dx = -7390.927094
+            const dy = 30928.553991
+            const thetaSec = -59.804546
+            const k = 0.999204252375
+
+            // 秒 → 弧度
+            const thetaRad = (thetaSec / 3600) * Math.PI / 180
+
+            // 构建CAD仿射矩阵
+            const matrix = new McGeMatrix3d()
+            matrix.setToIdentity()
+            // 顺序：先缩放 → 旋转 → 平移（四参数标准顺序）
+            matrix.scaleBy(k)
+            matrix.rotateBy(thetaRad, new McGeVector3d(0, 0, 1))
+            matrix.translateBy(new McGeVector3d(dx, dy, 0))
+
+            const pt = new McGePoint3d(x54, y54, 0)
+            pt.transformBy(matrix)
+            return {
+                x: pt.x,
+                y: pt.y
+            }
+        },
         async postData(url, data) {
             data.param_orgNo = this.orgNo
             const response = await fetch(url, {
@@ -287,7 +311,6 @@ export default {
             })
         },
         async refreshData() {
-            this.currentPage = 1
             await this.fetchData()
             this.getIotStatistic()
         },

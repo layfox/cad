@@ -12,16 +12,16 @@
       <div class="scm-current-grid">
         <div class="scm-current-item">
           <div class="scm-current-value" :style="{ color: sensor.currentColor }">
-            {{ sensor.currentValue }}<span class="scm-current-unit">%</span>
+            {{ sensor.currentValue }}<span class="scm-current-unit"></span>
           </div>
           <div class="scm-current-label">当前值</div>
         </div>
         <div class="scm-current-item">
-          <div class="scm-current-value scm-high">{{ sensor.highAlarm }}<span class="scm-current-unit">%</span></div>
+          <div class="scm-current-value scm-high">{{ sensor.highAlarm }}<span class="scm-current-unit"></span></div>
           <div class="scm-current-label">高报</div>
         </div>
         <div class="scm-current-item">
-          <div class="scm-current-value scm-low">{{ sensor.lowAlarm }}<span class="scm-current-unit">%</span></div>
+          <div class="scm-current-value scm-low">{{ sensor.lowAlarm }}<span class="scm-current-unit"></span></div>
           <div class="scm-current-label">低报</div>
         </div>
       </div>
@@ -41,7 +41,7 @@
       </div>
       <div class="scm-info-row">
         <div class="scm-info-card">
-          <div class="scm-info-value">{{ sensorInfo.areaGroup }}</div>
+          <div class="scm-info-value">{{ sensorInfo.areaGroup || '--' }}</div>
           <div class="scm-info-label">区域组</div>
         </div>
         <div class="scm-info-card">
@@ -92,7 +92,7 @@ export default {
       default: () => ({})
     },
     data: {
-      type: String,
+      type: Object,
       default: () => { }
     }
   },
@@ -158,7 +158,7 @@ export default {
       return response.json();
     },
     getRealTime() {
-      this.postData('/api/scaqyzt/getRealTime', {
+      this.postData('/api/scaqyzt/getRealtime', {
         LOT_DOMAIN: this.data.LOT_DOMAIN,
         GZBH_DSC: this.data.GZBH_DSC,
         CDBM_DSC: this.data.CDBM_DSC,
@@ -189,9 +189,11 @@ export default {
       const year = d.getFullYear();
       const month = d.getMonth() + 1;
       const day = d.getDate();
+      const hours = d.getHours();
       const m = month < 10 ? '0' + month : month;
       const dd = day < 10 ? '0' + day : day;
-      return `${year}${m}${dd}`;
+      const hh = hours < 10 ? '0' + hours : hours;
+      return `${year}${m}${dd}${hh}`;
     },
     getHistory() {
       const end = this.getDateYmd()
@@ -201,7 +203,7 @@ export default {
       } else {
         start = this.getDateYmd(new Date(new Date().getTime() - 24 * 7 * 60 * 60 * 1000))
       }
-      this.postData('/api/scaqyzt/History', {
+      this.postData('/api/scaqyzt/getHistory', {
         dimType: 'd',
         GZBH_DSC: this.data.GZBH_DSC,
         CDBM_DSC: this.data.CDBM_DSC,
@@ -228,10 +230,7 @@ export default {
     },
     onTimeTabClick(idx) {
       this.activeTimeTab = idx
-      this.destroyChart()
-      this.$nextTick(() => {
-        this.initChart()
-      })
+      this.getHistory()
     },
     initChart() {
       if (!this.$refs.chartRef) return
@@ -247,7 +246,7 @@ export default {
           yAxis: highAlarm,
           name: '高报',
           lineStyle: { color: '#EC3000', type: 'dashed' },
-          label: { position: 'end', formatter: '{c}%' }
+          label: { position: 'end', formatter: '{c}' }
         })
       }
       if (lowAlarm != null && lowAlarm !== '') {
@@ -255,7 +254,7 @@ export default {
           yAxis: lowAlarm,
           name: '低报',
           lineStyle: { color: '#1764E8', type: 'dashed' },
-          label: { position: 'end', formatter: '{c}%' }
+          label: { position: 'end', formatter: '{c}' }
         })
       }
 
@@ -266,19 +265,21 @@ export default {
           right: 16,
           bottom: 32
         },
+        tooltip: {
+          show: true,
+          trigger: 'axis'
+        },
         xAxis: {
           type: 'category',
           data: hours,
-          axisLine: { lineStyle: { color: '#e0e0e0' } },
-          axisLabel: { color: '#888', fontSize: 11 },
+          axisLine: { lineStyle: { color: '#DDDDDD' } },
+          axisLabel: { color: '#666', fontSize: 14 },
           axisTick: { show: false }
         },
         yAxis: {
           type: 'value',
-          min: 0,
-          max: 1.2,
-          splitLine: { lineStyle: { color: '#f0f0f0' } },
-          axisLabel: { color: '#888', fontSize: 11, formatter: '{value}%' }
+          splitLine: { lineStyle: { color: '#DDDDDD' } },
+          axisLabel: { color: '#666', fontSize: 14, formatter: '{value}' }
         },
         series: [
           {
@@ -286,10 +287,9 @@ export default {
             type: 'line',
             data: currentData,
             smooth: true,
-            symbol: 'circle',
+            symbol: 'none',
             symbolSize: 4,
-            lineStyle: { color: '#52c41a', width: 2 },
-            areaStyle: { color: 'rgba(82,196,26,0.06)' },
+            lineStyle: { color: '#26A94E', width: 2 },
             markLine: {
               silent: true,
               data: markLineData

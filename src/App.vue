@@ -99,10 +99,18 @@ html, body {
   border: none;
 }
 
-/* Firefox 兼容 */
-* {
-  scrollbar-width: auto;       /* auto | thin | none */
-  scrollbar-color: #c1c1c1 #f5f5f5; /* 滑块颜色 轨道颜色 */
+.ivu-modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+.ivu-modal-body::-webkit-scrollbar-track {
+  background: transparent !important; /* 关键：轨道透明，杜绝黑底 */
+}
+.ivu-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.2);
+  border-radius: 3px;
+}
+.ivu-modal-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.35);
 }
 
 router-view {

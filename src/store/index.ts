@@ -14,7 +14,8 @@ const store = new Vuex.Store({
         tzPoints: [],
         tzpzInfo: {
             TZPZ_NO: '',
-        }
+        },
+        userInfo: {}
     },
     
     mutations: {
@@ -41,6 +42,9 @@ const store = new Vuex.Store({
         },
         setTzNo(state, data) {
             state.tzpzInfo.TZPZ_NO = data
+        },
+        setUser(state, data) {
+            state.userInfo = data
         }
     }
 })

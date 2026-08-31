@@ -49,20 +49,17 @@
 
       <!-- 测点分组列表 -->
       <div class="eim-points-body">
-        <div
+        <!-- <div
           v-for="(group, groupIdx) in displayGroups"
           :key="groupIdx"
           class="eim-point-group"
         >
-          <!-- 分组标题（可折叠） -->
           <div class="eim-group-header" @click="toggleGroup(groupIdx)">
             <span class="eim-group-name">{{ group.name }}</span>
             <span class="eim-group-arrow" :class="group.expanded ? 'arrow-up' : 'arrow-down'">
               <img src="../css/images/arrow-down.png" alt="">
             </span>
           </div>
-
-          <!-- 分组表格 -->
           <div v-if="group.expanded" class="eim-group-body">
             <Table
               :data="group.pageData"
@@ -73,7 +70,15 @@
               @on-row-click="onRowClick"
             />
           </div>
-        </div>
+        </div> -->
+        <Table
+            :data="filteredGroups"
+            :columns="pointColumns"
+            :border="false"
+            size="small"
+            no-data-text=""
+            @on-row-click="onRowClick"
+          />
       </div>
     </div>
 
@@ -108,6 +113,14 @@ export default {
     equipId: {
       type: String,
       default: ''
+    },
+    data: {
+      type: Object,
+      default: () => { }
+    },
+    TZPZ_NO: {
+      type: String,
+      default: ''
     }
   },
   data() {
@@ -115,107 +128,97 @@ export default {
       searchKeyword: '',
       showPointDetail: false,
       currentPoint: {},
-      groups: [
-        {
-          name: '模拟量-温度',
-          expanded: true,
-          currentPage: 1,
-          pageSize: 10,
-          points: [
-            { seq: 1, name: '定子A温度', value: '106.00°C', time: '2026-07-23 18:00:00' },
-            { seq: 2, name: '定子C温度', value: '98.00°C', time: '2026-07-23 18:00:00' },
-            { seq: 3, name: '瓦斯泵温度', value: '31.00°C', time: '2026-07-23 18:00:00' },
-            { seq: 4, name: '电机后轴温度', value: '63.00°C', time: '2026-07-23 18:00:00' }
-          ]
-        },
-        {
-          name: '模拟量-默认分组',
-          expanded: true,
-          currentPage: 1,
-          pageSize: 10,
-          points: [
-            { seq: 1, name: '压力', value: '-3Kpa', time: '2026-07-23 18:00:00' }
-          ]
-        },
-        {
-          name: '开关量-默认分组',
-          expanded: true,
-          currentPage: 1,
-          pageSize: 10,
-          points: [
-            { seq: 1, name: '开关状态', value: '是', time: '2026-07-23 18:00:00' },
-            { seq: 2, name: '缺水状态', value: '否', time: '2026-07-23 18:00:00' }
-          ]
-        }
-      ]
+      groups: [],
+      equip: {
+        name: '',
+        company: '',
+        serialNo: '',
+        equipName: '',
+        equipType: '',
+        sensorNo: ''
+      },
+      orgNo: '',
     }
   },
   computed: {
-    equip() {
-      return {
-        name: '1#瓦斯泵',
-        company: '肖家洼',
-        serialNo: '27045788',
-        equipName: '1#瓦斯泵',
-        equipType: '瓦斯抽采',
-        sensorNo: 'WSCC-1#WS'
-      }
-    },
     pointColumns() {
       return [
         { type: 'seq', title: '序号', key: 'seq', width: 70, align: 'center' },
-        { title: '测点名称', key: 'name', minWidth: 140 },
-        { title: '数值', key: 'value', minWidth: 120, align: 'center' },
-        { title: '数据时间', key: 'time', minWidth: 180 }
+        { title: '测点名称', key: 'CD_NAM', minWidth: 140 },
+        { title: '测点值', key: 'value', minWidth: 120, align: 'center', render: (h, {row}) => {
+          return h('span', `${row.CD_VALUE || ''}${row.CD_UNIT || ''}`)
+        } },
+        { title: '时间', key: 'CD_DTM', minWidth: 180 }
       ]
     },
     filteredGroups() {
       if (!this.searchKeyword.trim()) return this.groups
       const kw = this.searchKeyword.trim().toLowerCase()
-      return this.groups.map(group => ({
-        ...group,
-        points: group.points.filter(p =>
-          p.name.toLowerCase().includes(kw) ||
-          String(p.value).toLowerCase().includes(kw)
-        )
-      })).filter(g => g.points.length > 0)
-    },
-    displayGroups() {
-      return this.filteredGroups.map(group => {
-        if (!group.currentPage) group.currentPage = 1
-        const start = (group.currentPage - 1) * group.pageSize
-        const pageData = group.points.slice(start, start + group.pageSize)
-        return {
-          ...group,
-          total: group.points.length,
-          pageData
-        }
+      return this.groups.filter(group => {
+        const name = (group.CD_NAM || '').toLowerCase()
+        return name.includes(kw)
       })
+    },
+  },
+  watch: {
+    visible(val) {
+      if (val) {
+        if (this.data && this.TZPZ_NO) {
+          this.equip.name = this.data.LOT_NAM
+          this.getRealTime()
+        }
+      }
+    }
+  },
+  mounted() {
+    const params = new URLSearchParams(location.search)
+
+    this.orgNo = params.get('orgNo')
+    if (this.visible) {
+      if (this.data && this.TZPZ_NO) {
+        this.equip.name = this.data.LOT_NAM
+          this.getRealTime()
+        }
     }
   },
   methods: {
+    async postData(url = "", data = {}) {
+      data.param_orgNo = this.orgNo
+      const response = await fetch(url, {
+        method: "POST",
+
+        body: JSON.stringify(data),
+      });
+      return response.json();
+    },
+    getRealTime() {
+      this.postData('/api/scaqyzt/getHydrologyCh4Realtime', {
+        TZPZ_NO: this.TZPZ_NO,
+        GZBH_DSC: this.data.GZBH_DSC
+      }).then(res => {
+        const data = res.data;
+        this.equip = {
+          name: this.data.LOT_NAM,
+          company: data.ORG_NAM,
+          equipName: data.LOT_NAM,
+          equipType: data.LOT_TYPE_NAM,
+          sensorNo: data.GZBH_DSC
+        }
+        this.groups = data.data.map((item, index) => {
+          item.seq = index + 1
+          return item
+        })
+      })
+    },
     onClose() {
       this.$emit('update:visible', false)
       this.$emit('close')
     },
-    toggleGroup(idx) {
-      const group = this.filteredGroups[idx]
-      if (group) {
-        group.expanded = !group.expanded
-      }
-    },
     onRowClick(row) {
-      const group = this.filteredGroups.find(g =>
-        g.points.some(p => p.seq === row.seq && p.name === row.name)
-      )
-      const title = group ? `${group.name}/${row.name}` : row.name
       this.currentPoint = {
-        title,
-        dataType: group ? group.name.split('-')[0] : '模拟量',
-        unit: row.value.replace(/[\d.\-]/g, ''),
-        code: '',
-        range: '不限-不限',
-        enabled: '是'
+        title: row.CD_NAM,
+        TZPZ_NO: this.TZPZ_NO,
+        ...row,
       }
       this.showPointDetail = true
     }

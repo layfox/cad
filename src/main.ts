@@ -7,7 +7,6 @@ import iView from 'iview'
 import 'iview/dist/styles/iview.css'
 import '@/rely/css/sui/sushine.css'
 import '@/rely/iconfont/iconfont.css'
-import mockData from './mock'
 
 // 注册vue指令
 import "./directive/index"

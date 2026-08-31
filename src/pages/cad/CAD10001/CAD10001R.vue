@@ -58,8 +58,9 @@
                                     <Col :span="6">
                                     <FormItem label="配置人员" prop="TZPZ_USR"
                                         :rules="[{ required: true, message: '请选择配置人员', trigger: 'change' }]">
-                                        <Input :disabled="entity.TZPZ_STA == '04'" v-model="entity.TZPZ_USR"
+                                        <Input readonly :disabled="entity.TZPZ_STA == '04'" v-model="entity.TZPZ_USR_NAM"
                                             placeholder="请选择配置人员">
+                                            <Button @click="selectUser" :disabled="entity.TZPZ_STA && entity.TZPZ_STA !== '01'" slot="append" icon="ios-more"></Button>
                                         </Input>
                                     </FormItem>
                                     </Col>
@@ -119,7 +120,7 @@
                             <div class="marker-item" :style="{left: item.screenX + 'px', top: item.screenY + 'px'}" v-for="(item, index) in pointList" :key="index"></div>
                         </div> -->
                             </div>
-                            <div v-if="showManualMatchPop" class="manual‑match‑popover"
+                            <div v-if="showManualMatchPop" :class="isPopOverBottom ?  'pop-top' : '' " class="manual-match-popover"
                                 :style="{ left: popoverPos.x + 'px', top: popoverPos.y + 'px' }">
                                 <div class="pop‑title">人工匹配</div>
                                 <div class="pop‑content">
@@ -140,13 +141,13 @@
             </div>
         </div>
         <!-- 人工布点弹窗 -->
-        <Modal v-model="manualPlaceVisible" width="770" :mask-closable="false" class-name="custom-modal1"
+        <Modal v-model="manualPlaceVisible" width="770" :mask-closable="false" class-name="custom-modal"
             :footer-hide="true">
             <ManualPlaceDialog ref="manualPlaceForm" :survey-point="selectedSurveyPoint"
                 :has-coord-fill="manualPlaceHasCoordFill" @pick-request="onPickCoordinateFromCanvas"
                 @confirm="onManualPlaceConfirm" @cancel="onManualPlaceCancel" />
         </Modal>
-        <Modal v-model="showTz" :width="800" :footer-hide="true" class-name="custom-modal1" :styles="{ top: '40px' }">
+        <Modal v-model="showTz" :width="800" :footer-hide="true" class-name="custom-modal" :styles="{ top: '40px' }">
             <TzModal :visible="showTz" :orgNo="orgNo" @update:visible="showTz = $event" @close="showTz = false"
                 @confirm="onSelectTz" />
         </Modal>
@@ -170,6 +171,14 @@ export default {
 </style>
 
 <style>
+.custom-modal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.custom-modal .ivu-modal {
+  top: 0!important;
+}
 .custom-modal1 .ivu-modal-body {
     padding: 0;
 }

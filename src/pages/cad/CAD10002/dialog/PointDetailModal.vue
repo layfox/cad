@@ -3,7 +3,7 @@
     <!-- 头部 -->
     <div class="pdm-header">
       <div class="pdm-title">
-        <span class="pdm-title-name">{{ point.title }}</span>
+        <span class="pdm-title-name">{{ point.name }}</span>
       </div>
     </div>
 
@@ -16,13 +16,13 @@
         </div>
         <div class="pdm-info-item">
           <span class="pdm-info-label">单位</span>
-          <span class="pdm-info-value">{{ point.unit }}</span>
+          <span class="pdm-info-value">{{ point.CD_UNIT }}</span>
         </div>
       </div>
       <div class="pdm-info-row">
         <div class="pdm-info-item">
           <span class="pdm-info-label">测点编码</span>
-          <span class="pdm-info-value">{{ point.code }}</span>
+          <span class="pdm-info-value">{{ point.CD_ID }}</span>
         </div>
         <div class="pdm-info-item">
           <span class="pdm-info-label">量程</span>
@@ -40,7 +40,7 @@
     <!-- 趋势图表 -->
     <div class="pdm-chart-section">
       <div class="pdm-chart-header">
-        <span class="pdm-chart-unit">{{ point.unit }}</span>
+        <span class="pdm-chart-unit">{{ point.CD_UNIT }}</span>
         <div class="pdm-chart-tabs">
           <span
             v-for="(tab, idx) in timeTabs"
@@ -73,61 +73,97 @@ export default {
       default: () => ({})
     }
   },
-  data() {
-    return {
-      activeTab: 1,
-      timeTabs: ['分钟', '小时', '前一天', '后一天', '本周', '上周', '下周', '本月', '上月', '下月'],
-      chartInstance: null
-    }
-  },
-  computed: {
-    chartXData() {
-      return ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00']
-    },
-    chartYData() {
-      return [60, 62, 70, 78, 82, 86, 88]
-    },
-    yAxisMax() {
-      return Math.ceil(Math.max(...this.chartYData) / 30) * 30 + 30
-    }
-  },
   watch: {
     visible(val) {
       if (val) {
-        this.$nextTick(() => {
-          this.initChart()
-        })
+        if (this.point) {
+          this.getData()
+        }
       }
     }
   },
-  mounted() {
-    if (this.visible) {
-      this.$nextTick(() => {
-        this.initChart()
-      })
+  data() {
+    return {
+      activeTab: 0,
+      timeTabs: ['近一天', '近一周', '近一月', '近半年', '近一年'],
+      chartInstance: null,
+      orgNo: '',
+      chartXData: [],
+      chartYData: []
     }
+  },
+  mounted() {
+    const params = new URLSearchParams(location.search)
+
+    this.orgNo = params.get('orgNo')
   },
   beforeDestroy() {
     this.destroyChart()
   },
   methods: {
+    getDateYmd(date = new Date()) {
+      const d = new Date(date);
+      const year = d.getFullYear();
+      const month = d.getMonth() + 1;
+      const day = d.getDate();
+      const hours = d.getHours();
+      const m = month < 10 ? '0' + month : month;
+      const dd = day < 10 ? '0' + day : day;
+      const hh = hours < 10 ? '0' + hours : hours;
+      return `${year}${m}${dd}${hh}`;
+    },
+    async postData(url = "", data = {}) {
+      data.param_orgNo = this.orgNo
+      const response = await fetch(url, {
+        method: "POST",
+
+        body: JSON.stringify(data),
+      });
+      return response.json();
+    },
+    getData() {
+      const end = this.getDateYmd()
+      let start = ''
+      if (this.activeTab === 0) {
+        start = this.getDateYmd(new Date(new Date().getTime() - 24 * 60 * 60 * 1000))
+      } else if (this.activeTab === 1) {
+        start = this.getDateYmd(new Date(new Date().getTime() - 24 * 7 * 60 * 60 * 1000))
+      } else if (this.activeTab === 2) {
+        start = this.getDateYmd(new Date(new Date().getTime() - 24 * 30 * 60 * 60 * 1000))
+      } else if (this.activeTab === 3) {
+        start = this.getDateYmd(new Date(new Date().getTime() - 24 * 180 * 60 * 60 * 1000))
+      } else if (this.activeTab === 4) {
+        start = this.getDateYmd(new Date(new Date().getTime() - 24 * 365 * 60 * 60 * 1000))
+      }
+      this.postData('/api/scaqyzt/getHydrologyCh4History', {
+        TZPZ_NO: this.point.TZPZ_NO,
+        start,
+        end,
+        CD_ID: this.point.CD_ID,
+        GZBH_DSC: this.point.GZBH_DSC
+      }).then(res => {
+        const data = res.data;
+        this.chartXData = Object.keys(res.data)
+        this.chartYData = Object.values(res.data)
+        this.initChart()
+      })
+    },
     onClose() {
       this.$emit('update:visible', false)
       this.$emit('close')
     },
     onTimeTabClick(idx) {
       this.activeTab = idx
-      this.destroyChart()
-      this.$nextTick(() => {
-        this.initChart()
-      })
+      this.getData()
     },
     initChart() {
       if (!this.$refs.chartRef) return
-      this.chartInstance = echarts.init(this.$refs.chartRef)
+      if (!this.chartInstance) {
+        this.chartInstance = echarts.init(this.$refs.chartRef)
+      }
+      
       const xData = this.chartXData
       const yData = this.chartYData
-      const maxVal = this.yAxisMax
       this.chartInstance.setOption({
         grid: {
           top: 36,
@@ -138,17 +174,15 @@ export default {
         xAxis: {
           type: 'category',
           data: xData,
-          axisLine: { lineStyle: { color: '#e0e0e0' } },
-          axisLabel: { color: '#888', fontSize: 11 },
+          axisLine: { lineStyle: { color: '#DDDDDD' } },
+          axisLabel: { color: '#666', fontSize: 14 },
           axisTick: { show: false }
         },
         yAxis: {
           type: 'value',
-          min: 0,
-          max: maxVal,
           splitNumber: 4,
-          splitLine: { lineStyle: { color: '#f0f0f0' } },
-          axisLabel: { color: '#888', fontSize: 11 }
+          splitLine: { lineStyle: { color: '#DDDDDD' } },
+          axisLabel: { color: '#666', fontSize: 14 }
         },
         series: [{
           type: 'line',
@@ -156,17 +190,7 @@ export default {
           smooth: true,
           symbol: 'circle',
           symbolSize: 4,
-          lineStyle: { color: '#52c41a', width: 2 },
-          areaStyle: {
-            color: {
-              type: 'linear',
-              x: 0, y: 0, x2: 0, y2: 1,
-              colorStops: [
-                { offset: 0, color: 'rgba(82,196,26,0.15)' },
-                { offset: 1, color: 'rgba(82,196,26,0.01)' }
-              ]
-            }
-          }
+          lineStyle: { color: '#26A94E', width: 2 },
         }]
       })
     },

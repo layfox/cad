@@ -48,7 +48,6 @@
         :loading="loading"
         :border="false"
         class="c3-table"
-        size="small"
         no-data-text=""
         highlight-row
         @on-select="onRowSelect"
@@ -94,18 +93,28 @@
     </Modal>
 
     <!-- 删除确认 -->
-    <Modal
-      v-model="showDeleteConfirm"
-      title="确认删除"
-      :width="400"
-      :mask-closable="false"
-    >
-      <p>确定要删除选中的 {{ deleteTargetCount }} 条图纸配置吗？删除后不可恢复。</p>
-      <div slot="footer">
-        <Button @click="showDeleteConfirm = false">取消</Button>
-        <Button type="error" :loading="deleteLoading" @click="confirmDelete">删除</Button>
-      </div>
-    </Modal>
+     <Modal
+        v-model="showDeleteConfirm"
+        :width="640"
+        :footer-hide="true"
+        class-name="custom-modal delete-modal"
+        :styles="{ top: '0' }"
+      >
+        <div class="delete-dialog">
+          <div class="delete-header">
+            <div class="delete-title">
+              <img src="./css/images/modal-icon.png" alt="">
+              <span class="delete-title-text">删除图纸配置</span>
+            </div>
+          </div>
+          <p class="delete-content">确定要删除选中的图纸配置吗？删除后不可恢复。</p>
+          <div class="delete-footer">
+            <Button @click="showDeleteConfirm = false">取消</Button>
+            <Button type="primary" :loading="deleteLoading" @click="confirmDelete">删除</Button>
+          </div>
+        </div>
+      
+      </Modal>
   </div>
 </template>
 
@@ -142,8 +151,8 @@ export default {
         // { type: 'selection', align: 'center', width: 60, fixed: 'left' },
         { title: '序号', key: 'index', width: 80, align: 'center', render: (h, { index }) => h('span', (this.pageNum - 1) * this.pageSize + index + 1) },
         { title: '配置编号', align: 'center',  key: 'TZPZ_ID', minWidth: 200 },
-        { title: '图纸信息名称', align: 'center',  key: 'TZXX_NAM', minWidth: 220 },
-        { title: '配置人员', align: 'center',  key: 'TZPZ_USR', minWidth: 120 },
+        { title: '图纸信息名称', align: 'center',  key: 'TZXX_ID', minWidth: 220 },
+        { title: '配置人员', align: 'center',  key: 'TZPZ_USR_NAM', minWidth: 120 },
         { title: '图纸版本', align: 'center',  key: 'TZ_VERSION', minWidth: 120 },
         {
           title: '配置状态',
@@ -262,9 +271,19 @@ export default {
         this.$Message.error('只能删除未解析的配置图纸')
         return
       }
-      this.deleteTargetCount = 1
-      this.currentDetail = row
-      this.showDeleteConfirm = true
+      this.$Modal.confirm({
+        title: '删除确认',
+        content: '确定要删除选中的图纸配置吗？删除后不可恢复。',
+        onOK: () => {
+          this.postData('/api/scaqyzt/deleteTzpp', { TZPZ_NO: row.no }).then(res => {
+            this.$Message.success('删除成功')
+            this.fetchData()
+          })
+        }
+      })
+      // this.deleteTargetCount = 1
+      // this.currentDetail = row
+      // this.showDeleteConfirm = true
     },
     onBatchDelete() {
       if (this.selectedCount === 0) return
@@ -278,7 +297,7 @@ export default {
           ? [this.currentDetail.TZPZ_NO]
           : this.selectedRows.map(r => r.TZPZ_NO)
         for (const no of targets) {
-          await this.postData('/api/scaqyzt/deleteTzpz', { TZPZ_NO: no })
+          await this.postData('/api/scaqyzt/deleteTzpp', { TZPZ_NO: no })
         }
         this.$Message.success('删除成功')
         this.showDeleteConfirm = false
@@ -310,6 +329,39 @@ export default {
   flex-direction: column;
   background: #f5f7fa;
   overflow: hidden;
+}
+
+.delete-dialog {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-size: 14px;
+}
+
+/* ===== 头部 ===== */
+.delete-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  padding: 0 16px;
+  border-bottom: 1px solid #e8e8e8;
+  flex-shrink: 0;
+}
+
+.delete-title {
+  display: flex;
+  align-items: center;
+  font-weight: bold;
+font-size: 16px;
+color: #333333;
+gap: 6px;
+}
+.delete-content {
+  padding: 24px;
+  font-size: 14px;
 }
 
 /* ===== 顶部栏 ===== */
@@ -461,10 +513,38 @@ export default {
 .c3-footer-right >>> .ivu-page {
   margin: 0;
 }
+
+.delete-footer {
+  display: flex;
+  align-items: center;
+  justify-content: right;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid #e8e8e8;
+  flex-shrink: 0;
+}
 </style>
 
 <style>
-.c3-detail-modal .ivu-modal-body {
-  padding: 20px 24px;
+.custom-modal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+.custom-modal .ivu-modal {
+  top: 0!important;
+}
+.custom-modal .ivu-modal-body {
+    padding: 0;
+  }
+
+  .custom-modal .ivu-modal-close {
+    top: 4px;
+    color: #8B99B9;
+    font-weight: bold;
+  }
+
+  .delete-modal .ivu-modal-close {
+    top: 8px;
+  }
 </style>

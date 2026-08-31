@@ -12,50 +12,46 @@
         </div>
         <div class="page-content">
           <div class="viewer-panel" :style="{width: panelCollapsed ? '' : '545px'}" :class="panelCollapsed?'':'expand'">
-            <template v-if="tabIndex === 0">
+            <div class="viewer-panel-box" style="height: calc(100% - 36px); margin-bottom: 16px;" v-show="tabIndex === 0&&!panelCollapsed">
                 <ViewerPanel
-                    ref="panelSafety"
-                    v-show="!panelCollapsed"
+                    ref="panel1Ref"
                     :categories="categories"
-                    title="安全检测"
+                    title="安全监测"
+                    @zoom-to-point="zoomToPoint"
                     panel-key="safety"
-                    style="height: calc(100% - 36px); margin-bottom: 16px;"
                     @select-change="onPanelSelectChange"
                 />
-            </template>
-            <template v-if="tabIndex === 1">
+            </div>
+            <div class="viewer-panel-box" style="height: calc(100% - 36px); margin-bottom: 16px;" v-show="tabIndex === 1&&!panelCollapsed">
                 <ViewerPanel
-                    ref="panelHydro"
-                    v-show="!panelCollapsed"
-                    title="水文检测"
+                    ref="panel2Ref"
+                    title="水文监测"
+                    @zoom-to-point="zoomToPoint"
                     :categories="categories1"
                     panel-key="hydro"
-                    style="height: calc(100% - 36px); margin-bottom: 16px;"
                     @select-change="onPanelSelectChange"
                 />
-            </template>
-            <template v-if="tabIndex === 2">
+            </div>
+            <div class="viewer-panel-box" style="height: calc(100% - 36px); margin-bottom: 16px;" v-show="tabIndex === 2&&!panelCollapsed">
                 <ViewerPanel
-                    ref="panelGas"
-                    v-show="!panelCollapsed"
+                    ref="panel3Ref"
                     title="瓦斯抽采"
                     :categories="categories2"
                     panel-key="gas"
-                    style="height: calc(100% - 36px); margin-bottom: 16px;"
+                    @zoom-to-point="zoomToPoint"
                     @select-change="onPanelSelectChange"
                 />
-            </template>
-            <template v-if="tabIndex === 3">
+            </div>
+            <div class="viewer-panel-box" style="height: calc(100% - 36px); margin-bottom: 16px;" v-show="tabIndex === 3&&!panelCollapsed">
                 <ViewerPanel
-                    ref="panelPerson"
-                    v-show="!panelCollapsed"
+                    ref="panel4Ref"
                     :categories="categories3"
-                    title="人员定位"
+                    @zoom-to-point="zoomToPoint"
+                    title="人员定位站"
                     panel-key="person"
-                    style="height: calc(100% - 36px); margin-bottom: 16px;"
                     @select-change="onPanelSelectChange"
                 />
-            </template>
+            </div>
               <div v-if="panelCollapsed" class="viewer-panel-btn" @click="panelCollapsed = false">
                   <img src="./css/images/expand.png" alt="">
               </div>
@@ -90,6 +86,7 @@
       >
         <PersonInfoModal
           :visible="showPersonModal"
+          :TZPZ_NO="TZPZ_NO"
           @update:visible="showPersonModal = $event"
           @close="showPersonModal = false"
         />
@@ -141,13 +138,15 @@
       >
         <EquipInfoModal
           :visible="showEquipModal"
+          :TZPZ_NO="TZPZ_NO"
+          :data="currentData"
           @update:visible="showEquipModal = $event"
           @close="showEquipModal = false"
         />
       </Modal>
       <Modal
         v-model="showTz"
-        :width="1000"
+        :width="1100"
         :footer-hide="true"
         class-name="custom-modal tz-modal"
         :styles="{ top: '40px' }"
@@ -176,6 +175,14 @@ export default {
 </style>
 
 <style>
+.custom-modal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.custom-modal .ivu-modal {
+  top: 0!important;
+}
   .custom-modal .ivu-modal-body {
     padding: 0;
   }

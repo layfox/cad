@@ -187,6 +187,7 @@
   width: 100%;
   height: 100%;
   position: relative;
+  user-select: none;
 }
 
 .viewer-box canvas {
@@ -207,6 +208,7 @@
   align-items: center;
   justify-content: center;
   z-index: 100;
+  pointer-events: none;
 }
 
 /* 点位悬浮提示框 */
@@ -364,7 +366,7 @@
   pointer-events:none;z-index:100;
 }
 
- .manual‑match‑popover {
+ .manual-match-popover {
   min-width: 280px;
   position: absolute;
   background: #FFFFFF;
@@ -372,10 +374,14 @@
   border-radius: 0px 0px 0px 0px;
   z-index: 999;
   padding: 16px;
-  transform: translateX(-50%);
+  transform: translate(-50%, 0);
+}
+.manual-match-popover.pop-top {
+  transform: translate(-50%, calc(-100% - 54px));
 }
 
-.manual‑match‑popover:before {
+
+.manual-match-popover:before {
   content: '';
   position: absolute;
   width:0;height:0;
@@ -384,6 +390,19 @@
   border-bottom:12px solid #fff;
   top:-12px;
   left:50%;
+  margin-left: -10px;
+}
+.pop-top:before {
+  content: '';
+  position: absolute;
+  width:0;height:0;
+  border-left:10px solid transparent;
+  border-right:10px solid transparent;
+  border-top:12px solid #fff; /* ✅ 改成上边框实体，形成向下箭头 */
+  bottom:-12px; /* ✅ 放到弹窗底部 */
+  left:50%;
+  top: auto;
+  border-bottom: none;
   margin-left: -10px;
 }
  .pop‑title {
@@ -411,7 +430,7 @@
   padding: 8px 12px;
   border-radius: 6px;
   box-shadow: 0px 0px 30px 0px rgba(0,0,0,0.1);
-  z-index: 9999;
+  z-index: 100;
   pointer-events: none; /* 不阻挡鼠标事件 */
   /* 小三角箭头（和截图气泡尖角一致） */
 }

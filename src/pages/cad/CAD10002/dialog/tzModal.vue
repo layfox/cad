@@ -100,10 +100,10 @@ export default {
     columns() {
       return [
         { type: 'selection', width: 45, align: 'center' },
-        { title: '配置编码', key: 'TZPZ_NO', minWidth: 180 },
+        { title: '配置编码', key: 'TZPZ_NO', minWidth: 200 },
         { title: '配置人员', key: 'TZPZ_USR', minWidth: 120 },
         { title: '图纸信息编码', key: 'TZXX_ID', minWidth: 120 },
-        { title: '配置状态', key: 'TZPZ_STA', minWidth: 100, align: 'center' },
+        { title: '配置状态', key: 'TZPZ_STA_NAM', minWidth: 100, align: 'center' },
         { title: '图纸版本', key: 'TZ_VERSION', minWidth: 100, align: 'center' },
         { title: '配置日期', key: 'TZPZ_DAT', minWidth: 120, align: 'center' }
       ]
@@ -143,13 +143,13 @@ export default {
       const params = {
         pageNum: String(this.currentPage),
         pageSize: String(this.pageSize),
-        param_orgNo: this.orgNo || ''
+        param_orgNo: this.orgNo || '',
+        param_TZPZ_STA: '04'
       }
       try {
         const res = await this.postData('/api/scaqyzt/getTzpzList', params)
         if (res.success && res.data) {
-          const list = (res.data.data || []).filter(item => item.TZPZ_STA === '04')
-          this.displayDrawings = list
+          this.displayDrawings = res.data.data
           this.total = res.data.pageInfo?.totalCount || 0
           this.selectedDrawings = []
           this.clearTableSelection()
