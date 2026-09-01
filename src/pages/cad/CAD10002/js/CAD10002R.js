@@ -67,7 +67,7 @@ export default {
             lastHoverGroup: null,
             currentData: null,
             markerTextureCache: new Map(),
-            isDev: false,
+            isDev: true,
             activeWarningGroups: new Set(),
             globalAnimateRaf: null,
             realData: {},

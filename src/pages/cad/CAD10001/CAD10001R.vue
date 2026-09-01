@@ -155,7 +155,7 @@
 </template>
 
 <script>
-import CAD10001R from './js/CAD10001R-1';
+import CAD10001R from './js/CAD10001R';
 import ManualPlaceDialog from './dialog/ManualPlaceDialog.vue';
 import TzModal from './dialog/tzModal.vue';
 import PointSelectModal from './dialog/PointSelectModal.vue';

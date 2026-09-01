@@ -109,14 +109,21 @@ export default {
             highlightLineGroup: null,
             highlightMeshList: [],
             highlightUseTempLine: false,
-            isDev: false,
+            isDev: true,
             pointParsed: false,
             annotationMeshMap: new Map(),
+            annotationById: new Map(),
             // 增加快速存在集合，提升大量点位查询性能
             annotationIdSet: new Set(),
             selectedAnnotationSet: new Set(),
             isPopOverBottom: false,
-            isAddingAnnotation: false
+            isAddingAnnotation: false,
+            markerRoot: null,
+            markerPickables: [],
+            markerShared: null,
+            renderTaskId: 0,
+            raycaster: new THREE.Raycaster(),
+            pointerNdc: new THREE.Vector2()
         }
     },
     components: {
@@ -330,7 +337,8 @@ export default {
             immediate: true
         },
     },
-    beforeDestroy() {
+        beforeDestroy() {
+        this.renderTaskId++;
         clearTimeout(this.pointInfoTimer);
         this.pointInfoTimer = null;
         // 清理raf
@@ -433,8 +441,8 @@ export default {
             //释放资源
             group.traverse(child => {
                 if (child.isMesh) {
-                    if (child.geometry) child.geometry.dispose();
-                    if (child.material) {
+                    if (child.geometry && !this.markerShared) child.geometry.dispose();
+                    if (child.material && !this.markerShared) {
                         if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
                         else child.material.dispose();
                     }
@@ -443,20 +451,25 @@ export default {
             mxObj?.removeObject(group);
             this.annotationMeshMap.delete(id);
             this.annotationIdSet.delete(id);
-            this.annotationPoints = this.annotationPoints.filter((p) => p.id !== id);
+            this.annotationById.delete(id);
+            const idx = this.annotationPoints.findIndex((p) => p.id === id);
+            if (idx !== -1) this.annotationPoints.splice(idx, 1);
             this.selectedAnnotationSet.delete(id);
             mxObj && mxObj.updateDisplay(true);
         },
         /**
          * 分片批量渲染marker，防止大量点位阻塞主线程
          */
-        async renderMarkersByList(data, batchSize = 30) {
+        async renderMarkersByList(data, batchSize = 100) {
+            const taskId = ++this.renderTaskId;
             const total = data.length;
             for (let i = 0; i < total; i += batchSize) {
+                if (taskId !== this.renderTaskId) return;
                 const slice = data.slice(i, i + batchSize);
                 for (const bind of slice) {
                     this.addBindMarker(bind);
                 }
+                MxFun.getCurrentDraw()?.updateDisplay(true);
                 //让出主线程
                 await new Promise(resolve => setTimeout(resolve, 0));
             }
@@ -468,12 +481,12 @@ export default {
             this.selectedAnnotationSet.add(targetId)
             const tGroup = this.annotationMeshMap.get(targetId);
             tGroup && this.setGroupHighlight(tGroup, true)
-            let targetPoint = this.annotationPoints.find(item => item.id === targetId);
+            let targetPoint = this.annotationById.get(targetId);
             if (bindMatchId) {
                 this.selectedAnnotationSet.add(bindMatchId)
                 const bGroup = this.annotationMeshMap.get(bindMatchId);
                 bGroup && this.setGroupHighlight(bGroup, true)
-                const bindPoint = this.annotationPoints.find(item => item.id === bindMatchId);
+                const bindPoint = this.annotationById.get(bindMatchId);
                 if (targetPoint && bindPoint) {
                     const startWorld = {
                         x: targetPoint.x,
@@ -603,7 +616,7 @@ export default {
                     const ndcY = -(mouseY / rect.height) * 2 + 1;
                     const raycaster = new THREE.Raycaster();
                     raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
-                    const intersects = raycaster.intersectObjects(scene.children, true);
+                    const intersects = raycaster.intersectObjects(this.markerPickables, false);
                     let hoverTargetGroup = null;
                     for (const intersect of intersects) {
                         if (intersect.object.userData?.isWaveRing) continue;
@@ -655,7 +668,7 @@ export default {
                 const ndcY = -(clickY / rect.height) * 2 + 1;
                 const raycaster = new THREE.Raycaster();
                 raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
-                const intersects = raycaster.intersectObjects(scene.children, true);
+                const intersects = raycaster.intersectObjects(this.markerPickables, false);
                 if (this.matchMode === 'manual-match') {
                     if (!this.selectedSurveyPoint) return;
                     for (const inter of intersects) {
@@ -664,7 +677,7 @@ export default {
                         while (curObj) {
                             if (curObj.userData && curObj.userData.isAnnotationPoint) {
                                 const id = curObj.userData.annotationId;
-                                const targetDrawPoint = this.annotationPoints.find(b => b.id === id);
+                                const targetDrawPoint = this.annotationById.get(id);
                                 if (!targetDrawPoint) {
                                     curObj = curObj.parent;
                                     continue;
@@ -704,7 +717,7 @@ export default {
                     while (curObj) {
                         if (curObj.userData && curObj.userData.isAnnotationPoint) {
                             const id = curObj.userData.annotationId;
-                            const bindItem = this.annotationPoints.find(b => b.id === id);
+                            const bindItem = this.annotationById.get(id);
                             if (bindItem) {
                                 hitAnnotationId = id;
                                 hitTargetObj = curObj;
@@ -720,7 +733,7 @@ export default {
                     e.stopPropagation();
                     this.detailTargetObj = hitTargetObj;
                     this.markNeedUpdate();
-                    const bindItem = this.annotationPoints.find(b => b.id === hitAnnotationId);
+                    const bindItem = this.annotationById.get(hitAnnotationId);
                     this.pointInfo = bindItem.type === "1" ? `图纸点位：${bindItem.name}` : `实时测点：${bindItem.name}`;
                     this.showPointInfoModal = true;
                     clearTimeout(this.pointInfoTimer);
@@ -836,19 +849,12 @@ export default {
         clearAllBindMarkers() {
             const mxObj = MxFun.getCurrentDraw();
             if (!mxObj) return;
-            const scene = mxObj.getScene?.();
-            if (!scene) return;
-            const toRemove = [];
-            scene.traverse((obj) => {
-                if (obj.userData && obj.userData.isAnnotationPoint) {
-                    toRemove.push(obj);
-                }
-            });
+            const toRemove = this.markerRoot ? [...this.markerRoot.children] : [...this.annotationMeshMap.values()];
             toRemove.forEach(group => {
                 group.traverse(child => {
                     if (child.isMesh) {
-                        if (child.geometry) child.geometry.dispose();
-                        if (child.material) {
+                        if (child.geometry && !this.markerShared) child.geometry.dispose();
+                        if (child.material && !this.markerShared) {
                             if (Array.isArray(child.material)) {
                                 child.material.forEach(mat => mat.dispose());
                             } else {
@@ -857,11 +863,15 @@ export default {
                         }
                     }
                 });
-                mxObj.removeObject(group);
+                if (group.parent) group.parent.remove(group);
             });
             this.annotationMeshMap.clear();
+            this.annotationById.clear();
             this.annotationIdSet.clear();
             this.annotationPoints = []
+            this.markerPickables = [];
+            this.markerRoot = null;
+            this.markerShared = null;
             this.selectedAnnotationSet.clear();
             this.lastHoverGroup = null;
             mxObj.updateDisplay(true);
@@ -871,14 +881,7 @@ export default {
             const idSet = new Set(ids);
             const mxObj = MxFun.getCurrentDraw();
             if (!mxObj) return;
-            const scene = mxObj.getScene?.();
-            if (!scene) return;
-            const toRemove = [];
-            scene.traverse((obj) => {
-                if (obj.userData && obj.userData.isAnnotationPoint && idSet.has(obj.userData.annotationId)) {
-                    toRemove.push(obj);
-                }
-            });
+            const toRemove = [...idSet].map(id => this.annotationMeshMap.get(id)).filter(Boolean);
             toRemove.forEach(group => {
                 group.traverse(child => {
                     if (child.isMesh) {
@@ -892,15 +895,17 @@ export default {
                         }
                     }
                 });
-                mxObj.removeObject(group);
+                if (group.parent) group.parent.remove(group);
                 const aid = group.userData.annotationId;
                 const idx = this.annotationPoints.findIndex(item => item.id === aid);
                 if (idx !== -1) {
                     this.annotationPoints.splice(idx, 1);
                 }
                 this.annotationMeshMap.delete(aid);
+                this.annotationById.delete(aid);
                 this.annotationIdSet.delete(aid);
             });
+            this.markerPickables = this.markerPickables.filter(mesh => mesh.parent);
             this.lastHoverGroup = null;
             mxObj.updateDisplay(true);
         },
@@ -914,10 +919,16 @@ export default {
             }
 
             this.annotationPoints.push(bindItem);
+            this.annotationById.set(bindItem.id, bindItem);
             this.annotationIdSet.add(bindItem.id);
 
             const mxObj = MxFun.getCurrentDraw();
             if (!mxObj) return null;
+            if (!this.markerRoot) {
+                this.markerRoot = new THREE.Group();
+                this.markerRoot.userData.isMarkerRoot = true;
+                mxObj.addObject(this.markerRoot);
+            }
 
             const docX = bindItem.x;
             const docY = bindItem.y;
@@ -943,8 +954,9 @@ export default {
                 borderColor = 0x26c557;
 
                 // 中心方块
-                const geoSquare = new THREE.PlaneGeometry(1, 1);
-                const matSquare = new THREE.MeshStandardMaterial({
+                this.markerShared = this.markerShared || {};
+                const geoSquare = this.markerShared.squareGeo || (this.markerShared.squareGeo = new THREE.PlaneGeometry(1, 1));
+                const matSquare = this.markerShared.squareMat || (this.markerShared.squareMat = new THREE.MeshBasicMaterial({
                     color: borderColor,
                     emissive: borderColor,
                     emissiveIntensity: 0.4,
@@ -952,7 +964,7 @@ export default {
                     depthTest: false,
                     depthWrite: false,
                     side: THREE.DoubleSide
-                });
+                }));
 
                 const squareMesh = new THREE.Mesh(geoSquare, matSquare);
                 squareMesh.renderOrder = 9999;
@@ -960,8 +972,8 @@ export default {
                 centerMesh = squareMesh;
 
                 // 外层白色边框
-                const geoWhiteBorder = new THREE.PlaneGeometry(1.2, 1.2);
-                const matWhiteBorder = new THREE.MeshStandardMaterial({
+                const geoWhiteBorder = this.markerShared.whiteGeo || (this.markerShared.whiteGeo = new THREE.PlaneGeometry(1.2, 1.2));
+                const matWhiteBorder = this.markerShared.whiteMat || (this.markerShared.whiteMat = new THREE.MeshBasicMaterial({
                     color: 0xffffff,
                     emissive: 0xffffff,
                     emissiveIntensity: 0.2,
@@ -969,7 +981,7 @@ export default {
                     depthTest: false,
                     depthWrite: false,
                     side: THREE.DoubleSide
-                });
+                }));
 
                 const whiteBorderMesh = new THREE.Mesh(geoWhiteBorder, matWhiteBorder);
                 whiteBorderMesh.renderOrder = 9998;
@@ -977,8 +989,9 @@ export default {
 
             } else {
                 // ====== 类型1：图纸点位，圆形 ======
-                const geoCircle = new THREE.CircleGeometry(0.5, 32);
-                const matCircle = new THREE.MeshStandardMaterial({
+                this.markerShared = this.markerShared || {};
+                const geoCircle = this.markerShared.circleGeo || (this.markerShared.circleGeo = new THREE.CircleGeometry(0.5, 16));
+                const matCircle = this.markerShared.circleMat || (this.markerShared.circleMat = new THREE.MeshBasicMaterial({
                     color: borderColor,
                     emissive: borderColor,
                     emissiveIntensity: 0.4,
@@ -986,7 +999,7 @@ export default {
                     depthTest: false,
                     depthWrite: false,
                     side: THREE.DoubleSide
-                });
+                }));
 
                 const circleMesh = new THREE.Mesh(geoCircle, matCircle);
                 circleMesh.renderOrder = 9999;
@@ -1002,8 +1015,8 @@ export default {
             group.scale.set(baseSize, baseSize, 1);
 
             this.annotationMeshMap.set(bindItem.id, group);
-            mxObj.addObject(group);
-            mxObj.updateDisplay(true);
+            this.markerRoot.add(group);
+            this.markerPickables.push(centerMesh);
 
             return group;
         },
@@ -1456,7 +1469,10 @@ export default {
             this.loading = false
             if (this.isDev) {
                 const pointList = await this.getAllMcDbPoint();
-                console.log(pointList, 1111)
+                this.pointList = pointList.map(item => {
+                    item.pointNo = item.no
+                    return item
+                })
                 this.renderMarkersByList(this.pointList.map(item => {
                     item.id = item.POINT_NO || item.pointNo,
                         item.name = item.pointName,
@@ -2099,7 +2115,7 @@ export default {
                     // 让出主线程，释放wasm临时内存，核心防溢出
                     await new Promise(resolve => setTimeout(resolve, 0));
                 }
-                return pointList.slice(0, this.getRandomInt(600, 900));
+            return pointList;
             } catch (e) {
                 console.warn("获取点位数据整体失败:", e);
                 return [];
