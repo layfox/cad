@@ -132,6 +132,16 @@ export default {
         ViewerPanel1
     },
     mounted() {
+        
+        const params = new URLSearchParams(location.search)
+        this.orgNo = params.get('orgNo') || ''
+        if (params.get('TZPZ_NO')) {
+            this.entity.TZPZ_NO = params.get('TZPZ_NO')
+            this.getTzpzInfo()
+        } else {
+            this.entity.TZPZ_USR_NAM = params.get('userName')
+            this.entity.TZPZ_USR = params.get('userId')
+        }
         if (this.isDev) {
             this.pointList = [
                 {
@@ -315,16 +325,7 @@ export default {
                 "TZ_VERSION": "",
                 TZPZ_NO: "",
             }
-            this.fileUrlInput = './models/YTSF-001.mxweb'
-        }
-        const params = new URLSearchParams(location.search)
-        this.orgNo = params.get('orgNo') || ''
-        if (params.get('TZPZ_NO')) {
-            this.entity.TZPZ_NO = params.get('TZPZ_NO')
-            this.getTzpzInfo()
-        } else {
-            this.entity.TZPZ_USR_NAM = params.get('userName')
-            this.entity.TZPZ_USR = params.get('userId')
+            this.fileUrlInput = './models/HDMY-XJH-v2.mxweb'
         }
         this.currentStep = 0
     },
@@ -918,7 +919,6 @@ export default {
         },
         createBindMarker(bindItem) {
             if (this.hasMarkerById(bindItem.id)) {
-                console.log(`点位${bindItem.id}已存在，跳过创建`);
                 return null;
             }
 
@@ -1539,10 +1539,9 @@ export default {
             }
             if (!this.mxcad || !this.mxcad.zoomCenter || !this.mxcad.zoomScale) return;
             try {
-                const { minPt, maxPt } = this.mxcad.getDatabase().currentSpace.getBoundingBox();
-                if (numX < minPt.x || numX > maxPt.x || numY < minPt.y || numY > maxPt.y) {
-                    return;
-                }
+                // 不在这里调用 currentSpace.getBoundingBox()：
+                // 该接口会进入 WASM 计算图纸范围，currentSpace/native 对象失效
+                // 或图纸尚未完全加载时可能触发 memory access out of bounds。
                 this.mxcad.zoomCenter(numX, numY);
                 this.mxcad.zoomScale(zoomFactor);
                 this.clearAnnotationHighlight()
@@ -1700,7 +1699,7 @@ export default {
                     ...survey
                 })
             });
-            this.zoomToPoint(valid[0].x, valid[0].y, valid[0].PT_NO)
+            this.zoomToPoint(valid[0].PT_X_VALUE, valid[0].PT_Y_VALUE, valid[0].PT_NO)
             this.autoAddAndMatch({
                 "TZPZ_NO": this.entity.TZPZ_NO,
                 I2P_NO: valid[0].I2P_NO
@@ -2064,6 +2063,9 @@ export default {
                                 if (!layer.isVisible) continue;
                                 const handle = typeof pointEnt.getHandle === 'function' ? pointEnt.getHandle() : '';
                                 if (handle && validPointHandles.has(handle)) continue;
+                                if (pos.x == 0 || pos.y == 0) {
+                                    continue
+                                }
                                 if (handle) validPointHandles.add(handle);
                                 pointIndex++;
                                 pointList.push({
@@ -2124,6 +2126,9 @@ export default {
                                 }
                                 const handle = typeof blkRef.getHandle === 'function' ? blkRef.getHandle() : '';
                                 if (handle && validPointHandles.has(handle)) continue;
+                                if (pos.x == 0 || pos.y == 0) {
+                                    continue
+                                }
                                 if (handle) validPointHandles.add(handle);
                                 blockIndex++;
                                 pointList.push({
@@ -2150,6 +2155,7 @@ export default {
                     // 让出主线程，释放wasm临时内存，核心防溢出
                     await new Promise(resolve => setTimeout(resolve, 0));
                 }
+                console.log(pointList, 1111)
             return pointList;
             } catch (e) {
                 console.warn("获取点位数据整体失败:", e);

@@ -75,7 +75,7 @@ export default {
             lastHoverGroup: null,
             currentData: null,
             markerTextureCache: new Map(),
-            isDev: true,
+            isDev: false,
             activeWarningGroups: new Set(),
             globalAnimateRaf: null,
             realData: {},
@@ -1483,10 +1483,11 @@ export default {
             }
             if (!this.mxcad || !this.mxcad.zoomCenter || !this.mxcad.zoomScale) return;
             try {
-                const { minPt, maxPt } = this.mxcad.getDatabase().currentSpace.getBoundingBox();
-                if (numX < minPt.x || numX > maxPt.x || numY < minPt.y || numY > maxPt.y) {
-                    return;
-                }
+                // const { minPt, maxPt } = this.mxcad.getDatabase().currentSpace.getBoundingBox();
+                // if (numX < minPt.x || numX > maxPt.x || numY < minPt.y || numY > maxPt.y) {
+                //     return;
+                // }
+                // console.log(numX, numY)
                 this.mxcad.zoomCenter(numX, numY);
                 this.mxcad.zoomScale(zoomFactor);
                 // this.clearAnnotationHighlight()
