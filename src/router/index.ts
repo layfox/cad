@@ -8,29 +8,29 @@ Vue.use(VueRouter);
 
 const routes: RouteConfig[] = [
   {
-    path: '/',
-    redirect: '/CAD10001R'
+	path: '/',
+	redirect: '/CAD10001R',
   },
   {
-    path: '/CAD10001R',
-    name: 'CAD10001R',
-    component:  CAD10001R // 后台配置
+	path: '/CAD10001R',
+	name: 'CAD10001R',
+	component:  CAD10001R, // 后台配置
   },
   {
-    path: '/CAD10002R',
-    name: 'CAD10002R',
-    component:  CAD10002R // 一张图
+	path: '/CAD10002R',
+	name: 'CAD10002R',
+	component:  CAD10002R, // 一张图
   },
   {
-    path: '/CAD10003S',
-    name: 'CAD10003S',
-    component: () => import('@/pages/cad/CAD10003/CAD10003S.vue')
-  }
+	path: '/CAD10003S',
+	name: 'CAD10003S',
+	component: () => import('@/pages/cad/CAD10003/CAD10003S.vue'),
+  },
 ];
 
 const router = new VueRouter({
   mode: 'hash',
-  routes
+  routes,
 });
 
 export default router;

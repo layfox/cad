@@ -93,6 +93,7 @@
       <PointDetailModal
         :visible="showPointDetail"
         :point="currentPoint"
+        :orgNo="orgNo"
         @update:visible="showPointDetail = $event"
         @close="showPointDetail = false"
       />

@@ -86,7 +86,6 @@ export default {
       activeTab: 0,
       timeTabs: ['近一天', '近一周', '近一月', '近半年', '近一年'],
       chartInstance: null,
-      orgNo: '',
       chartXData: [],
       chartYData: []
     }

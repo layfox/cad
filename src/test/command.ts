@@ -5,7 +5,7 @@ import { init as initMxDbEntityEdit} from './MxDbEntityEdit';
 import { MyAlignedDimension, MyFixArrowTextSizeAlignedDimension } from './MeasureDistance';
 import { MyArea } from './MeasureArea';
 
-import { drawShapeInit } from './drawShape'
+import { drawShapeInit } from './drawShape';
 import { MyRect } from './DrawRect';
 // import { store } from 'mxdraw'
 export function RegistMxCommands() {
@@ -13,12 +13,12 @@ export function RegistMxCommands() {
   CommentInit();
   SvgInit();
   initMxDbEntityEdit();
-  drawShapeInit()
+  drawShapeInit();
 }
 
 // 初化自定义实体的类信息，用数据归档和恢复.
-export function RxInitMxEntity(){
-  //...
+export function RxInitMxEntity() {
+  // ...
   new MyAlignedDimension().rxInit();
   new MyFixArrowTextSizeAlignedDimension().rxInit();
   new MyArea().rxInit();

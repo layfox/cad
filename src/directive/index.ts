@@ -1,1 +1,1 @@
-export { drag } from "./v-drag"
+export { drag } from "./v-drag";

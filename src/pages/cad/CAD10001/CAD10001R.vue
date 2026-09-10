@@ -5,11 +5,11 @@
                 <Button type="primary" v-if="(currentStep == 0)&&entity.TZPZ_STA=='01'" @click="save">保存</Button>
                 <Button type="primary" @click="onStep(1)" v-if="currentStep == 0">图纸解析</Button>
                 <Button type="primary" @click="onStep(2)" v-if="currentStep == 1">点位绑定</Button>
-                <Button type="primary" @click="onCopy" v-if="currentStep == 2&& (entity.TZPZ_STA !== '04'||entity.TZPZ_STA === '05')">复制旧版本测点</Button>
-                <Button type="primary" @click="onFabu" v-if="currentStep == 2 && (entity.TZPZ_STA === '03'||entity.TZPZ_STA === '02')">发布版本</Button>
+                <Button type="primary" @click="onCopy" v-if="currentStep == 2&& (entity.TZPZ_STA !== '04')">复制旧版本测点</Button>
+                <Button type="primary" @click="onFabu" v-if="currentStep == 2 && (entity.TZPZ_STA === '03'||entity.TZPZ_STA === '02'||entity.TZPZ_STA === '05')">发布版本</Button>
                 <Button type="primary" @click="stopVersion" v-if="currentStep == 3">停用版本</Button>
-                <Button type="primary" @click="setDefault" v-if="currentStep == 3&&entity.TZPZ_STA==='04'">设置默认页</Button>
-                <Button v-if="currentStep > 0" @click="onStep(currentStep - 1)">返回上一步</Button>
+                <Button type="primary" @click="setDefault" v-if="currentStep == 3&&entity.TZPZ_STA==='04'&&!isDefault">设置默认页</Button>
+                <Button v-if="currentStep > 0&&(entity.TZPZ_STA !== '04')" @click="onStep(currentStep - 1)">返回上一步</Button>
             </div>
             <div class="page-main">
                 <div class="step-container">

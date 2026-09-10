@@ -27,7 +27,8 @@
                 <!-- 分类表格 -->
                 <div v-show="cat.expanded || displayCategories.length == 1" :key="'cat-body-' + catIdx" class="vp-cat-body">
                     <Table :ref="'catTable_' + catIdx" :data="cat.pageData" :columns="catColumns" :border="false"
-                        size="small" highlight-row @on-row-click="onPointRowClick"
+                        size="small" highlight-row
+                        @on-row-click="(row, rowIdx) => onPointRowClick(catIdx, row, rowIdx)"
                         @on-selection-change="onCatSelectionChange(catIdx, $event)" no-data-text="" />
                     <!-- 分页 -->
                     <div class="vp-cat-footer">
@@ -96,6 +97,8 @@ export default {
                 )
                 return {
                     ...cat,
+                    // 搜索结果是临时分类对象，状态修改需要回写原始分类。
+                    sourceCategory: cat,
                     showPoints: filterPoints
                 }
             }).filter(cat => cat.showPoints.length > 0)
@@ -173,19 +176,39 @@ export default {
 
     },
     methods: {
-        onPointRowClick(row) {
-            this.$emit('zoom-to-point', row.x, row.y)
+        getSourceCategory(catIdx) {
+            const category = this.filteredCategories[catIdx]
+            return category && (category.sourceCategory || category)
+        },
+        getVisiblePoints(catIdx) {
+            const category = this.filteredCategories[catIdx]
+            return category ? (category.showPoints || category.points || []) : []
+        },
+        onPointRowClick(catIdx, row, rowIdx) {
+            const tableRef = this.$refs['catTable_' + catIdx]
+            const table = Array.isArray(tableRef) ? tableRef[0] : tableRef
+            const category = this.getSourceCategory(catIdx)
+            const isSelected = category &&
+                (category.selectedPoints || []).some(item => item.id === row.id)
+
+            // View UI 的 Table 使用当前页索引切换行选中状态。
+            // 已选中的行只执行定位，不允许通过行点击取消勾选。
+            if (!isSelected && table && typeof table.toggleSelect === 'function') {
+                table.toggleSelect(rowIdx)
+            }
+
+            this.$emit('zoom-to-point', row.x, row.y, row.id)
         },
         // ============ 折叠/展开 ============
         toggleCat(idx) {
-            const cat = this.filteredCategories[idx]
+            const cat = this.getSourceCategory(idx)
             if (cat) {
                 cat.expanded = !cat.expanded
             }
         },
         // ============ 表格选中变化 ============
         onCatSelectionChange(catIdx, rows) {
-            const cat = this.filteredCategories[catIdx]
+            const cat = this.getSourceCategory(catIdx)
             if (!cat) return
             const currentPageIds = new Set(
                 this.displayCategories[catIdx].pageData.map(p => p.id)
@@ -204,9 +227,9 @@ export default {
         },
         // ============ 分类全选/取消全选【方案A：只作用当前筛选可见数据，隐藏选中保留】 ============
         handleCatSelectAll(catIdx, checked) {
-            const cat = this.filteredCategories[catIdx]
+            const cat = this.getSourceCategory(catIdx)
             if (!cat) return
-            const sourcePoints = cat.showPoints ?? cat.points
+            const sourcePoints = this.getVisiblePoints(catIdx)
             if (checked) {
                 const existingIds = new Set(cat.selectedPoints.map(p => p.id))
                 sourcePoints.forEach(p => {
@@ -223,29 +246,29 @@ export default {
         },
         // ============ 判断分类全选状态 ============
         isCatAllSelected(catIdx) {
-            const cat = this.filteredCategories[catIdx]
+            const cat = this.getSourceCategory(catIdx)
             if (!cat) return false
-            const sourcePoints = cat.showPoints ?? cat.points
+            const sourcePoints = this.getVisiblePoints(catIdx)
             if (sourcePoints.length === 0) return false
             return sourcePoints.every(item => cat.selectedPoints.some(p => p.id === item.id))
         },
         isCatIndeterminate(catIdx) {
-            const cat = this.filteredCategories[catIdx]
+            const cat = this.getSourceCategory(catIdx)
             if (!cat) return false
-            const sourcePoints = cat.showPoints ?? cat.points
+            const sourcePoints = this.getVisiblePoints(catIdx)
             const visibleSelectedCount = sourcePoints.filter(item => cat.selectedPoints.some(p => p.id === item.id)).length
             return visibleSelectedCount > 0 && visibleSelectedCount < sourcePoints.length
         },
         // ============ 分页切换 ============
         onCatPageChange(catIdx, page) {
-            const cat = this.filteredCategories[catIdx]
+            const cat = this.getSourceCategory(catIdx)
             if (cat) {
                 cat.currentPage = page
             }
         },
         // ============ 每页条数变更 ============
         onCatPageSizeChange(catIdx, size) {
-            const cat = this.filteredCategories[catIdx]
+            const cat = this.getSourceCategory(catIdx)
             if (cat) {
                 cat.pageSize = size
                 cat.currentPage = 1
@@ -253,14 +276,16 @@ export default {
         },
         // ============ 搜索 ============
         onSearch() {
-            this.filteredCategories.forEach(cat => {
+            this.filteredCategories.forEach((_, index) => {
+                const cat = this.getSourceCategory(index)
                 cat.currentPage = 1
             })
         },
         // ============ 获取所有分类选中完整数据 ============
         getSelectedData() {
             const result = {}
-            this.filteredCategories.forEach(cat => {
+            this.filteredCategories.forEach((_, index) => {
+                const cat = this.getSourceCategory(index)
                 result[cat.name] = cat.selectedPoints || []
             })
             return result
@@ -268,7 +293,8 @@ export default {
         // ============ 获取所有选中项ID数组 ============
         getSelectedIds() {
             const ids = []
-            this.filteredCategories.forEach(cat => {
+            this.filteredCategories.forEach((_, index) => {
+                const cat = this.getSourceCategory(index)
                 cat.selectedPoints.forEach(item => {
                     if (!ids.includes(item.id)) {
                         ids.push(item.id)
@@ -279,7 +305,8 @@ export default {
         },
         // ============ 清空所有选中 ============
         clearAllSelection() {
-            this.filteredCategories.forEach(cat => {
+            this.filteredCategories.forEach((_, index) => {
+                const cat = this.getSourceCategory(index)
                 if (cat.selectedPoints) {
                     cat.selectedPoints = []
                 }

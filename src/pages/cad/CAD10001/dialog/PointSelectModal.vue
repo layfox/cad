@@ -68,6 +68,10 @@ export default {
     visible: {
       type: Boolean,
       default: false
+    },
+    TZPZ_NO: {
+      type: String,
+      default: ""
     }
   },
   data() {
@@ -125,7 +129,8 @@ export default {
         const res = await this.postData('/api/scaqyzt/getIotSelect', {
           pageSize: String(this.pageSize),
           pageNum: String(this.currentPage),
-          searchText: this.searchText?.trim() || ''
+          searchText: this.searchText?.trim() || '',
+          TZPZ_NO: this.TZPZ_NO
         })
         if (res.success && res.data) {
           const list = res.data.data || []

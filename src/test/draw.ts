@@ -29,179 +29,179 @@ import { createAnyLine, createAnyLine1 } from "./compoents/ThreeAnyLine";
 
 export class MyText extends MxDbText {
 
-  public isDrawUnderline:boolean = true;
+  public isDrawUnderline: boolean = true;
   public create(): MyText {
-    return new MyText();
+	return new MyText();
   }
 
   public getTypeName(): string {
-    return "MyText";
+	return "MyText";
   }
 
   public worldDraw(pWorldDraw: McGiWorldDraw): void {
-    super.worldDraw(pWorldDraw);
-    // 绘制文字下划线。
-    if(this.isDrawUnderline){
-      const box = new THREE.Box3()
-      let bakParent = this.spriteText.parent;
-      this.spriteText.parent = null;
-      box.expandByObject(this.spriteText)
-      this.spriteText.parent = bakParent;
-      let linept1 = new THREE.Vector3(box.min.x, box.min.y - this.height * 0.1, 0)
-      let linept2 = new THREE.Vector3(box.max.x, box.min.y - this.height * 0.1, 0)
-      var lineGeometry = new THREE.Geometry()
-      let lineMaterial = new THREE.LineBasicMaterial({
-        color: pWorldDraw.getColor(),
-        transparent: true,
-        depthTest: false
-      })
-      lineGeometry.vertices.push(linept1, linept2)
-      var mLine = new THREE.Line(lineGeometry, lineMaterial)
-      pWorldDraw.drawEntity(mLine)
-    }
-    
+	super.worldDraw(pWorldDraw);
+	// 绘制文字下划线。
+	if (this.isDrawUnderline) {
+		const box = new THREE.Box3();
+		const bakParent = this.spriteText.parent;
+		this.spriteText.parent = null;
+		box.expandByObject(this.spriteText);
+		this.spriteText.parent = bakParent;
+		const linept1 = new THREE.Vector3(box.min.x, box.min.y - this.height * 0.1, 0);
+		const linept2 = new THREE.Vector3(box.max.x, box.min.y - this.height * 0.1, 0);
+		const lineGeometry = new THREE.Geometry();
+		const lineMaterial = new THREE.LineBasicMaterial({
+		color: pWorldDraw.getColor(),
+		transparent: true,
+		depthTest: false,
+		});
+		lineGeometry.vertices.push(linept1, linept2);
+		const mLine = new THREE.Line(lineGeometry, lineMaterial);
+		pWorldDraw.drawEntity(mLine);
+	}
+
   }
 }
 
 
-let iTest = 0;
+const iTest = 0;
 let isHide = true;
 const SampleDrawCommand = {
-    async BR_Text() {
-        const getPoint = new MrxDbgUiPrPoint();
-        getPoint.setMessage("\n 点取文字插入点:");
-        let ptVal: THREE.Vector3 | null = await getPoint.go();
-        if (ptVal == null) {
-            return;
-        }
+	async BR_Text() {
+		const getPoint = new MrxDbgUiPrPoint();
+		getPoint.setMessage("\n 点取文字插入点:");
+		const ptVal: THREE.Vector3 | null = await getPoint.go();
+		if (ptVal == null) {
+			return;
+		}
 
-        let text = new MyText();
-        text.position = ptVal;
-        text.height = MxFun.screenCoordLong2Doc(50);
-        text.text = "测试绘制";
-        text.color = 0xffffff;
-        text.opacity = 0.8;
-        let id = MxFun.addToCurrentSpace(text);
+		const text = new MyText();
+		text.position = ptVal;
+		text.height = MxFun.screenCoordLong2Doc(50);
+		text.text = "测试绘制";
+		text.color = 0xffffff;
+		text.opacity = 0.8;
+		const id = MxFun.addToCurrentSpace(text);
 
 
-        //let box = text.getGeomExtents();
-        //if (box) {
-        //    console.log("xxxx:" + (box.max.x - box.min.x));
-        //}
+		// let box = text.getGeomExtents();
+		// if (box) {
+		//    console.log("xxxx:" + (box.max.x - box.min.x));
+		// }
 
-        //let ent: any = MxFun.getCurrentDraw().getMxEntity(id);
-        // ent.position = new THREE.Vector3(100, 100, 0);
-        // ent.setNeedUpdateDisplay();
-    },
+		// let ent: any = MxFun.getCurrentDraw().getMxEntity(id);
+		// ent.position = new THREE.Vector3(100, 100, 0);
+		// ent.setNeedUpdateDisplay();
+	},
 
-    TestDrawImage() {
-        let mxObj = MxFun.getCurrentDraw();
-        let viewH = mxObj.getViewHeight();
-        let viewW = mxObj.getViewWidth();
-        let ptView = new THREE.Vector3(viewW * 0.5, viewH * 0.5, 0);
+	TestDrawImage() {
+		const mxObj = MxFun.getCurrentDraw();
+		const viewH = mxObj.getViewHeight();
+		const viewW = mxObj.getViewWidth();
+		const ptView = new THREE.Vector3(viewW * 0.5, viewH * 0.5, 0);
 
-        //加载图片
-        MxThreeJS.createImage(ptView, 300, 200, "./models/img/mxcad.jpg", (obj) => {
-            if (obj) {
-                mxObj.addViewObject(obj);
-                mxObj.updateDisplay();
-            }
-        });
-    },
+		// 加载图片
+		MxThreeJS.createImage(ptView, 300, 200, "./models/img/mxcad.jpg", (obj) => {
+			if (obj) {
+				mxObj.addViewObject(obj);
+				mxObj.updateDisplay();
+			}
+		});
+	},
 
-    BR_OpenFile() {
-        //SampleDrawCommand.TestDrawImage();
+	BR_OpenFile() {
+		// SampleDrawCommand.TestDrawImage();
 
-        MxFun.getCurrentDraw().addEvent("loadComplete", () => {
-            SampleDrawCommand.TestDrawImage();
-        });
+		MxFun.getCurrentDraw().addEvent("loadComplete", () => {
+			SampleDrawCommand.TestDrawImage();
+		});
 
-        MxFun.openFile("/demo/buf/test2.dwg?token=123456");
-        //MxFun.openFile("/demo/buf/test2.dwg");
-    },
+		MxFun.openFile("/demo/buf/test2.dwg?token=123456");
+		// MxFun.openFile("/demo/buf/test2.dwg");
+	},
 
-    BR_AddLayer() {
-        let database = MxFun.getCurrentDatabase();
+	BR_AddLayer() {
+		const database = MxFun.getCurrentDatabase();
 
-        database.addLayer("MyLayerName");
-        database.setCurrentLayer("MyLayerName");
-        alert('添加图层"MyLayerName"成功');
-    },
+		database.addLayer("MyLayerName");
+		database.setCurrentLayer("MyLayerName");
+		alert('添加图层"MyLayerName"成功');
+	},
 
-    BR_HideLayer() {
-        let database = MxFun.getCurrentDatabase();
+	BR_HideLayer() {
+		const database = MxFun.getCurrentDatabase();
 
-        database.getLayer("MyLayerName").setVisible(!isHide);
-        isHide = !isHide;
-        MxFun.updateDisplay();
-    },
+		database.getLayer("MyLayerName").setVisible(!isHide);
+		isHide = !isHide;
+		MxFun.updateDisplay();
+	},
 
-    async BR_Test() {
+	async BR_Test() {
 
-  
 
-        //MxFun.docCoord2Cad
-        //  MxFun.sendStringToExecute("BR_DimensionMeasurement");
-        //  MxDbLine.Test();
-        //MxFun.getCurrentDraw().enableViewControls(false);
-        /*
+
+		// MxFun.docCoord2Cad
+		//  MxFun.sendStringToExecute("BR_DimensionMeasurement");
+		//  MxDbLine.Test();
+		// MxFun.getCurrentDraw().enableViewControls(false);
+		/*
       let aryId = MxFun.getCurrentDraw().getMxCurrentSelect();
       if (aryId.length == 0) {
       return;
       }
-  
+
     let ent: MxDbEntity =  MxFun.getCurrentDraw().getMxEntity(aryId[0]);
     ent.visible = false;
     ent.setNeedUpdateDisplay();
     */
 
-    const getPoint = new MrxDbgUiPrPoint();
-      getPoint.setMessage("\n指定第一点:");
-      let pt1:THREE.Vector3|null = await getPoint.go();
-     
-      let _pt2:THREE.Vector3|null = await getPoint.go();
-      let _pt3:THREE.Vector3|null = await getPoint.go();
-      let _pt4:THREE.Vector3|null = await getPoint.go();
-      if(pt1 === null || _pt2 == null || _pt3 === null || _pt4 === null){
-        return;
-      }
-     const obj = createAnyLine([pt1, _pt2, _pt3, _pt4])
-      MxFun.getCurrentDraw().addObject(obj)
- 
-      let cadpt = MxFun.docCoord2Cad(pt1.x,pt1.y,pt1.z);
-      console.log("xxx:" + cadpt);
+	const getPoint = new MrxDbgUiPrPoint();
+	getPoint.setMessage("\n指定第一点:");
+	const pt1: THREE.Vector3|null = await getPoint.go();
+
+	const _pt2: THREE.Vector3|null = await getPoint.go();
+	const _pt3: THREE.Vector3|null = await getPoint.go();
+	const _pt4: THREE.Vector3|null = await getPoint.go();
+	if (pt1 === null || _pt2 == null || _pt3 === null || _pt4 === null) {
+		return;
+		}
+	const obj = createAnyLine([pt1, _pt2, _pt3, _pt4]);
+	MxFun.getCurrentDraw().addObject(obj);
+
+	const cadpt = MxFun.docCoord2Cad(pt1.x, pt1.y, pt1.z);
+	console.log("xxx:" + cadpt);
 
 
-      getPoint.setUserDraw((curPoint,pDraw)=>{
-        pDraw.setColor(0x00FF00);
-        pDraw.drawLine(pt1 as THREE.Vector3,curPoint);
-      });
-  
-      getPoint.setMessage("\n指定第二点:");
-      getPoint.setInputToucheType(MxType.InputToucheType.kGetEnd)
-      let pt2:THREE.Vector3|null = await getPoint.go();
-      if(pt1 == null || pt2 == null){
-        return;
-      }
-      
-      let line  = new MxDbLine() 
-      line.pt1 = pt1;
-      line.pt2 = pt2;
-  
-      let database = MxFun.getCurrentDatabase();
-  
-      database.addLayer("aa");
-      database.setCurrentLayer("aa");
-  
-      database.addEntity(line);
-      line.setLayer("0")
-      line.setNeedUpdateDisplay()
-      console.log(database.getLayer("0"))
-      console.log(database)
-      
-      
+	getPoint.setUserDraw((curPoint, pDraw) => {
+		pDraw.setColor(0x00FF00);
+		pDraw.drawLine(pt1 as THREE.Vector3, curPoint);
+		});
 
-        /*
+	getPoint.setMessage("\n指定第二点:");
+	getPoint.setInputToucheType(MxType.InputToucheType.kGetEnd);
+	const pt2: THREE.Vector3|null = await getPoint.go();
+	if (pt1 == null || pt2 == null) {
+		return;
+		}
+
+	const line  = new MxDbLine();
+	line.pt1 = pt1;
+	line.pt2 = pt2;
+
+	const database = MxFun.getCurrentDatabase();
+
+	database.addLayer("aa");
+	database.setCurrentLayer("aa");
+
+	database.addEntity(line);
+	line.setLayer("0");
+	line.setNeedUpdateDisplay();
+	console.log(database.getLayer("0"));
+	console.log(database);
+
+
+
+		/*
     const getPoint = new MrxDbgUiPrPoint();
     getPoint.setMessage("\n点取插入点:");
     let ptVal: THREE.Vector3 | null = await getPoint.go();
@@ -216,16 +216,16 @@ const SampleDrawCommand = {
     svg.setSvgPath(`models/svg/62.svg`);
     svg.setSvgPostion(pt);
 
-    
+
     svg.setRenderOrder(100);
     let iSize = 5000;
     svg.setSvgSize(new THREE.Vector2(iSize, 0 ));
-    
+
     svg.useSvgColor = true;
     svg.setSvgAlignmentRatio(new THREE.Vector2(0.5,0));
     //svg.svgReverse = true;
     //svg.svgMargin.x = 0.2;
-    
+
     svg.color = 0xffffff;
     let svgTxt: MxDbSVGText = new MxDbSVGText();
     svgTxt.txt = "70°";
@@ -236,12 +236,12 @@ const SampleDrawCommand = {
       0
     );
     svgTxt.txtHeight = lTextH;
-    
+
 
     svg.addText(svgTxt);
     MxFun.addToCurrentSpace(svg);
     */
-        /*
+		/*
     const getPoint = new MrxDbgUiPrPoint();
     getPoint.setMessage("\n点取插入点:");
     let ptVal: THREE.Vector3 | null = await getPoint.go();
@@ -252,12 +252,12 @@ const SampleDrawCommand = {
     let pt: THREE.Vector3 = ptVal;
 
     let svg = new MxDbSVG();
-  
+
     svg.setSvgPath(`models/svg/test.svg`);
     //svg.setSvgPath(`models/svg/people.svg`);
     svg.setSvgPostion(pt);
 
-    
+
     svg.setRenderOrder(100);
     let iSize = 50;
     svg.setSvgSize(new THREE.Vector2(iSize, 0 ));
@@ -269,7 +269,7 @@ const SampleDrawCommand = {
     //svg.color = 0xff0000;
     MxFun.addToCurrentSpace(svg);
     */
-        /*
+		/*
     if(iTest == 0)
     {
       const getPoint = new MrxDbgUiPrPoint();
@@ -282,22 +282,22 @@ const SampleDrawCommand = {
         pDraw.setColor(0x00FF00);
         pDraw.drawLine(pt1 as THREE.Vector3,curPoint);
       });
-  
+
       getPoint.setMessage("\n指定第二点:");
       let pt2:THREE.Vector3|null = await getPoint.go();
       if(pt2 == null){
         return;
       }
-      
-      let line  = new MxDbLine() 
+
+      let line  = new MxDbLine()
       line.pt1 = pt1;
       line.pt2 = pt2;
-  
+
       let database = MxFun.getCurrentDatabase();
-  
+
       database.addLayer("aa");
       database.setCurrentLayer("aa");
-  
+
       database.addEntity(line);
       iTest = 1;
     }
@@ -307,7 +307,7 @@ const SampleDrawCommand = {
       MxFun.updateDisplay();
 
     }*/
-        /*
+		/*
     let aryPoint: Array<THREE.Vector3> = [];
     aryPoint.push(new THREE.Vector3(0, 0, 0));
     aryPoint.push(new THREE.Vector3(0, 100, 0));
@@ -317,7 +317,7 @@ const SampleDrawCommand = {
     if (McGeTool.pointInPolyline(pt, aryPoint)) {
       console.log("in");
     }*/
-        /*
+		/*
     let pt = Mxassembly.NewMcGePoint3d();
     let pts = Mxassembly.NewMcGePoint3dArray();
     pt.x = 0;
@@ -339,9 +339,9 @@ const SampleDrawCommand = {
     let area = McGeTool.calcArea(pts);
     console.log(area);
 */
-        //MxFun.getCurrentDraw().newFile(0,0,1000,1000);
-        //MxFun.getCurrentDraw().updateCanvasSize();
-        /*
+		// MxFun.getCurrentDraw().newFile(0,0,1000,1000);
+		// MxFun.getCurrentDraw().updateCanvasSize();
+		/*
   const getPoint = new MrxDbgUiPrPoint();
     getPoint.setMessage("\n点取插入点:");
   let pt:THREE.Vector3|null = await getPoint.go();
@@ -362,8 +362,8 @@ const SampleDrawCommand = {
   //rect.setFilter(new MxFilters().channel({r:33,g:0,b:0}));
   MxFun.getCurrentDraw().addMxEntity(rect);
 */
-        //let cen = MxFun.getCurrentDraw().getViewCenterDocCoord();
-        /*
+		// let cen = MxFun.getCurrentDraw().getViewCenterDocCoord();
+		/*
     const getPoint = new MrxDbgUiPrPoint();
     getPoint.setMessage("\n点取插入点:");
     let ptVal: THREE.Vector3 | null = await getPoint.go();
@@ -416,7 +416,7 @@ const SampleDrawCommand = {
       pt.x = pt.x + Dist;
     }
     */
-        /*
+		/*
   const getPoint = new MrxDbgUiPrPoint();
     getPoint.setMessage("\n指定第一点:");
   let pt:THREE.Vector3|null = await getPoint.go();
@@ -433,14 +433,14 @@ const SampleDrawCommand = {
     mxobj.addMxEntity(image);
   }
   */
-        /*
+		/*
   getPoint.go().then((pt:THREE.Vector3)=>{
 
   });
 */
-        /*
+		/*
 
-	
+
 
     const getPoint = new MrxDbgUiPrPoint();
     getPoint.setMessage("\n指定第一点:");
@@ -450,7 +450,7 @@ const SampleDrawCommand = {
         }
         const pt1 = getPoint.value();
 
-        
+
         getPoint.setBasePt(pt1);
         getPoint.setUseBasePt(true);
 
@@ -469,15 +469,15 @@ const SampleDrawCommand = {
             line.setPoint1(pt1);
             line.setPoint2(getPoint.value());
             MxFun.getCurrentDraw().addMxEntity(line);
-    	
+
         });
     });
 */
-        // 重新打开一个新的文件.
-        //MxFun.openFile("./demo/buf/$t2.dwg.mxb1.wgh",);
-        /*
+		// 重新打开一个新的文件.
+		// MxFun.openFile("./demo/buf/$t2.dwg.mxb1.wgh",);
+		/*
   const mxobj = MxFun.getCurrentDraw()
-	
+
   let pt = MxFun.screenCoord2Doc(100,100,0);
   let dScale = MxFun.screenCoordLong2Doc(100);
   let dDist = MxFun.screenCoordLong2Doc(10);
@@ -486,7 +486,7 @@ const SampleDrawCommand = {
   MxThreeJS.loadSVG(`models/svg/twinkle.svg`,color,(obj:any,meterials:Array<THREE.MeshBasicMaterial>):any=>{
 
         if(obj){
-          obj.renderOrder = 12000;       
+          obj.renderOrder = 12000;
         obj.scale.multiplyScalar(dScale / 500)
                     obj.position.x = pt.x
                     obj.position.y = pt.y
@@ -503,73 +503,73 @@ const SampleDrawCommand = {
     }
       });
     */
-        /*
+		/*
   let aryPoint:Array<THREE.Vector3> = [];
   aryPoint.push(new THREE.Vector3(0,0,0));
   aryPoint.push(new THREE.Vector3(0,100,0));
   aryPoint.push(new THREE.Vector3(100,100,0));
   aryPoint.push(new THREE.Vector3(100,0,0));
-	
+
   let pt:THREE.Vector3 = new THREE.Vector3(150,150);
   if(MxFun.pointInPolyline(pt,aryPoint) ){
     console.log("in");
   }*/
-    },
+	},
 
-    init() {
-        MxFun.addCommand("BR_Line", BR_Line);
-        MxFun.addCommand("BR_Lines", BR_Lines);
-        MxFun.addCommand("BR_Arc", BR_Arc);
-        MxFun.addCommand("BR_AngleSurveying", BR_AngleSurveying);
-        MxFun.addCommand("BR_Ellipse", BR_Ellipse);
-        MxFun.addCommand("BR_AnyLine", BR_AnyLine);
-        MxFun.addCommand("BR_CloudLine", BR_CloudLine);
-        MxFun.addCommand("BR_ThreeRegularPolygon", BR_ThreeRegularPolygon);
-        MxFun.addCommand("BR_CheckDraw", BR_CheckDraw);
-        MxFun.addCommand("BR_Text", this.BR_Text);
-        MxFun.addCommand("BR_Test", this.BR_Test);
-        MxFun.addCommand("BR_OpenFile", this.BR_OpenFile);
+	init() {
+		MxFun.addCommand("BR_Line", BR_Line);
+		MxFun.addCommand("BR_Lines", BR_Lines);
+		MxFun.addCommand("BR_Arc", BR_Arc);
+		MxFun.addCommand("BR_AngleSurveying", BR_AngleSurveying);
+		MxFun.addCommand("BR_Ellipse", BR_Ellipse);
+		MxFun.addCommand("BR_AnyLine", BR_AnyLine);
+		MxFun.addCommand("BR_CloudLine", BR_CloudLine);
+		MxFun.addCommand("BR_ThreeRegularPolygon", BR_ThreeRegularPolygon);
+		MxFun.addCommand("BR_CheckDraw", BR_CheckDraw);
+		MxFun.addCommand("BR_Text", this.BR_Text);
+		MxFun.addCommand("BR_Test", this.BR_Test);
+		MxFun.addCommand("BR_OpenFile", this.BR_OpenFile);
 
-        MxFun.addCommand("BR_Circle", BR_Circle);
-        MxFun.addCommand("BR_SplineCurve", BR_SplineCurve);
-        MxFun.addCommand("BR_AddLayer", this.BR_AddLayer);
-        MxFun.addCommand("BR_HideLayer", this.BR_HideLayer);
-    },
+		MxFun.addCommand("BR_Circle", BR_Circle);
+		MxFun.addCommand("BR_SplineCurve", BR_SplineCurve);
+		MxFun.addCommand("BR_AddLayer", this.BR_AddLayer);
+		MxFun.addCommand("BR_HideLayer", this.BR_HideLayer);
+	},
 };
 
 export function init() {
-    MxFun.addCommand("Mx_DrawRect", Mx_DrawRect);
-    MxFun.addCommand("Mx_MyDrawRect", Mx_MyDrawRect);
-    
-    MxFun.addCommand("Mx_DrawTag", Mx_DrawTag);
-    MxFun.addCommand("Mx_DrawImageTag", Mx_DrawImageTag);
-    MxFun.addCommand("Mx_DrawRectTag", Mx_DrawRectTag);
-    MxFun.addCommand("Mx_DrawGIFImage", Mx_DrawGIFImage);
+	MxFun.addCommand("Mx_DrawRect", Mx_DrawRect);
+	MxFun.addCommand("Mx_MyDrawRect", Mx_MyDrawRect);
 
-    MxFun.addCommand("Mx_DeleteEntity", Mx_DeleteEntity);
-    MxFun.addCommand("Mx_DeleteTag", Mx_DeleteTag);
-    MxFun.addCommand("Mx_DeleteTag_A2", Mx_DeleteTag_A2);
-    MxFun.addCommand("Mx_DrawImage", Mx_DrawImage);
-    MxFun.addCommand("Mx_RoatateImage", Mx_RoatateImage);
+	MxFun.addCommand("Mx_DrawTag", Mx_DrawTag);
+	MxFun.addCommand("Mx_DrawImageTag", Mx_DrawImageTag);
+	MxFun.addCommand("Mx_DrawRectTag", Mx_DrawRectTag);
+	MxFun.addCommand("Mx_DrawGIFImage", Mx_DrawGIFImage);
 
-    MxFun.addCommand("Mx_DrawFixImage", Mx_DrawFixImage);
-    MxFun.addCommand("Mx_FixImageToNoFix", Mx_FixImageToNoFix);
-    MxFun.addCommand("Mx_NoFixImageToFix", Mx_NoFixImageToFix);
-    MxFun.addCommand("Mx_SaveAllMxEntity", Mx_SaveAllMxEntity);
-    MxFun.addCommand("Mx_SaveDwg", Mx_SaveDwg);
+	MxFun.addCommand("Mx_DeleteEntity", Mx_DeleteEntity);
+	MxFun.addCommand("Mx_DeleteTag", Mx_DeleteTag);
+	MxFun.addCommand("Mx_DeleteTag_A2", Mx_DeleteTag_A2);
+	MxFun.addCommand("Mx_DrawImage", Mx_DrawImage);
+	MxFun.addCommand("Mx_RoatateImage", Mx_RoatateImage);
 
-    MxFun.addCommand("Mx_LoadAllMxEntity", Mx_LoadAllMxEntity);
+	MxFun.addCommand("Mx_DrawFixImage", Mx_DrawFixImage);
+	MxFun.addCommand("Mx_FixImageToNoFix", Mx_FixImageToNoFix);
+	MxFun.addCommand("Mx_NoFixImageToFix", Mx_NoFixImageToFix);
+	MxFun.addCommand("Mx_SaveAllMxEntity", Mx_SaveAllMxEntity);
+	MxFun.addCommand("Mx_SaveDwg", Mx_SaveDwg);
 
-    MxFun.addCommand("BR_SaveViewport", BR_SaveViewport);
-    MxFun.addCommand("BR_RestoreViewport", BR_RestoreViewport);
-    MxFun.addCommand("BR_WriteImage", BR_WriteImage);
-    MxFun.addCommand("BR_DisabledZoom", BR_DisabledZoom);
-    MxFun.addCommand("BR_DisabledPan", BR_DisabledPan);
-    MxFun.addCommand("BR_CreateGroup", BR_CreateGroup);
-    MxFun.addCommand("BR_DeleteGroup", BR_DeleteGroup);
+	MxFun.addCommand("Mx_LoadAllMxEntity", Mx_LoadAllMxEntity);
 
-    MxFun.addCommand("BR_LeadTag", BR_LeadTag);
+	MxFun.addCommand("BR_SaveViewport", BR_SaveViewport);
+	MxFun.addCommand("BR_RestoreViewport", BR_RestoreViewport);
+	MxFun.addCommand("BR_WriteImage", BR_WriteImage);
+	MxFun.addCommand("BR_DisabledZoom", BR_DisabledZoom);
+	MxFun.addCommand("BR_DisabledPan", BR_DisabledPan);
+	MxFun.addCommand("BR_CreateGroup", BR_CreateGroup);
+	MxFun.addCommand("BR_DeleteGroup", BR_DeleteGroup);
 
-    MxFun.addCommand("magnifyLensTest", magnifyLensTest);
-    SampleDrawCommand.init();
+	MxFun.addCommand("BR_LeadTag", BR_LeadTag);
+
+	MxFun.addCommand("magnifyLensTest", magnifyLensTest);
+	SampleDrawCommand.init();
 }

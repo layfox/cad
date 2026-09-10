@@ -109,7 +109,7 @@ export default {
             highlightLineGroup: null,
             highlightMeshList: [],
             highlightUseTempLine: false,
-            isDev: true,
+            isDev: false,
             pointParsed: false,
             annotationMeshMap: new Map(),
             annotationById: new Map(),
@@ -123,7 +123,8 @@ export default {
             markerShared: null,
             renderTaskId: 0,
             raycaster: new THREE.Raycaster(),
-            pointerNdc: new THREE.Vector2()
+            pointerNdc: new THREE.Vector2(),
+            isDefault: false,
         }
     },
     components: {
@@ -321,6 +322,9 @@ export default {
         if (params.get('TZPZ_NO')) {
             this.entity.TZPZ_NO = params.get('TZPZ_NO')
             this.getTzpzInfo()
+        } else {
+            this.entity.TZPZ_USR_NAM = params.get('userName')
+            this.entity.TZPZ_USR = params.get('userId')
         }
         this.currentStep = 0
     },
@@ -752,7 +756,7 @@ export default {
         },
         closeManualPop() {
             this.showManualMatchPop = false;
-            this.destroyTempLine();
+            this._clearHighlights()
             this.popData = { realPoint: null, drawPoint: null, matchGap: 0 };
             this.popoverTargetObj = null;
         },
@@ -1091,14 +1095,18 @@ export default {
             this.postData('/api/scaqyzt/setDefaultTZPZ', data).then(data => {
                 if (data.data.flg) {
                     this.$Message.success('设置默认页成功')
+                    this.isDefault = true
                 } else {
                     this.$Message.error('设置默认页失败')
                 }
             })
         },
         upsertTzpp(data) {
-            this.postData('/api/scaqyzt/upsertTzpp', data).then(data => {
-                this.entity.TZPZ_NO = data.data.TZPZ_NO || this.entity.TZPZ_NO
+            this.postData('/api/scaqyzt/upsertTzpp', data).then(data1 => {
+                this.entity.TZPZ_NO = data1.data.TZPZ_NO || this.entity.TZPZ_NO
+                if (data.TZPZ_STA == '05') {
+                    this.currentStep = 2
+                }
                 this.getTzpzInfo()
             })
         },
@@ -1116,6 +1124,16 @@ export default {
                 this.lastFileUrl = this.fileUrlInput
                 if (this.entity.TZPZ_STA && this.entity.TZPZ_STA != '01') {
                     this.pointParsed = true
+                }
+                if (this.entity.TZPZ_STA == '04') {
+                    this.getDefaultTz()
+                }
+            })
+        },
+        getDefaultTz() {
+            this.postData('/api/scaqyzt/getDefaultTZPZ').then(data => {
+                if (data.data.TZPZ_NO == this.entity.TZPZ_NO) {
+                    this.isDefault = true
                 }
             })
         },
@@ -1147,14 +1165,14 @@ export default {
                     item.y = item.Y_VALUE
                     return item
                 })
-                if (flag) {
+                // if (flag) {
                     this.renderMarkersByList(this.pointList.map(item => {
                         item.id = item.POINT_NO,
                             item.name = item.pointName,
                             item.type = '1'
                         return item
                     }));
-                }
+                // }
             })
         },
         upsertIot(data) {
@@ -1177,7 +1195,7 @@ export default {
         },
         autoMatch(data) {
             this.postData('/api/scaqyzt/autoMatch', data).then((data) => {
-                this.$Message.success(`已成功匹配${data.cnt}个测点`)
+                this.$Message.success(data.data.cnt ? `已成功匹配${data.data.cnt}个测点` : '无匹配成功的测点')
                 this.refreshViewer1Data()
                 this.getPoint()
             })
@@ -1191,16 +1209,19 @@ export default {
         autoAddAndMatch(data) {
             this.postData('/api/scaqyzt/autoAddAndMatch', data).then(() => {
                 this.refreshViewer1Data()
+                this.getPoint()
             })
         },
         manualAddAndMatch(data) {
             this.postData('/api/scaqyzt/manualAddAndMatch', data).then(() => {
                 this.refreshViewer1Data()
+                this.getPoint()
             })
         },
         cancelMatch(data) {
             this.postData('/api/scaqyzt/cancelMatch', data).then(() => {
                 this.refreshViewer1Data()
+                this.getPoint()
             })
         },
         onFabu() {
@@ -1276,6 +1297,7 @@ export default {
                     return
                 }
                 this.currentStep = index
+                this.panelCollapsed1 = true
             } else if (index == 2) {
                 if (this.entity.TZPZ_STA === '01' || !this.entity.TZPZ_STA) {
                     this.$Message.error('请完成解析图纸后再进行下一步操作')
@@ -1504,7 +1526,7 @@ export default {
                 console.error("切换图层失败:", e);
             }
         },
-        zoomToPoint(x, y, id, zoomFactor = 3) {
+        zoomToPoint(x, y, id, zoomFactor = 2) {
             const strX = String(x ?? '').trim();
             const strY = String(y ?? '').trim();
             if (strX === '' || strY === '') {
@@ -1530,14 +1552,14 @@ export default {
                 console.error('[zoomToPoint] 失败:', e);
             }
         },
-        async zoomToPoint1(row, zoomFactor = 3) {
+        async zoomToPoint1(row, zoomFactor = 2) {
             try {
-                if (row.MATCH_STA == '02' && !this.hasMarkerById(row.PT_NO)) {
+                if (row.PT_X_VALUE !== '' && row.PT_Y_VALUE !== ''  && !this.hasMarkerById(row.PT_NO)) {
                     this.addBindMarker({
                         id: row.PT_NO,
                         name: row.PT_NAM,
-                        x: row.PT_X_VALUE || row.POINT_X_VALUE,
-                        y: row.PT_Y_VALUE || row.POINT_Y_VALUE,
+                        x: row.PT_X_VALUE,
+                        y: row.PT_Y_VALUE,
                         z: 0,
                         type: '2',
                         ...row
@@ -1678,6 +1700,7 @@ export default {
                     ...survey
                 })
             });
+            this.zoomToPoint(valid[0].x, valid[0].y, valid[0].PT_NO)
             this.autoAddAndMatch({
                 "TZPZ_NO": this.entity.TZPZ_NO,
                 I2P_NO: valid[0].I2P_NO
@@ -1994,8 +2017,33 @@ export default {
                 }
                 const entityIds = modelSpace.getAllEntityId();
                 const pointList = [];
+                const layerInfoCache = new Map();
+                const validPointHandles = new Set();
                 let pointIndex = 0;
                 let blockIndex = 0;
+                const isValidPosition = (position) => position &&
+                    Number.isFinite(position.x) && Number.isFinite(position.y) && Number.isFinite(position.z || 0);
+                const getLayerInfo = (entity) => {
+                    const layerId = entity.layerId;
+                    const cacheKey = layerId && typeof layerId.getHandle === 'function' ? layerId.getHandle() : '';
+                    if (cacheKey && layerInfoCache.has(cacheKey)) return layerInfoCache.get(cacheKey);
+                    const fallback = { name: '未知图层', handle: '', isVisible: true };
+                    if (!layerId) return fallback;
+                    try {
+                        const record = layerId.getMcDbLayerTableRecord();
+                        if (!record) return fallback;
+                        const info = {
+                            name: record.name || '未知图层',
+                            handle: typeof record.getHandle === 'function' ? record.getHandle() : '',
+                            // SDK 不同版本可能不提供 isOff/isFrozen；只有明确为 true 才过滤。
+                            isVisible: record.isOff !== true && record.isFrozen !== true
+                        };
+                        if (cacheKey) layerInfoCache.set(cacheKey, info);
+                        return info;
+                    } catch (e) {
+                        return fallback;
+                    }
+                };
                 // 分片配置，每批50个实体，可根据图纸大小调整，越大越快越容易溢出
                 const batchSize = 50;
                 const total = entityIds.length;
@@ -2009,21 +2057,14 @@ export default {
                             // 1. 处理McDbPoint点实体
                             if (entId.isKindOf("McDbPoint")) {
                                 const pointEnt = entId.getMcDbEntity();
-                                if (!pointEnt || !pointEnt.position) continue;
+                                if (!pointEnt || !isValidPosition(pointEnt.position)) continue;
 
                                 const pos = pointEnt.position;
-                                let layerName = "未知图层";
-                                let layerHandle = "";
-                                try {
-                                    const lid = pointEnt.layerId;
-                                    if (lid) {
-                                        const layerRec = lid.getMcDbLayerTableRecord();
-                                        if (layerRec) {
-                                            layerName = layerRec.name || "未知图层";
-                                            layerHandle = typeof layerRec.getHandle === 'function' ? layerRec.getHandle() : '';
-                                        }
-                                    }
-                                } catch (e) { }
+                                const layer = getLayerInfo(pointEnt);
+                                if (!layer.isVisible) continue;
+                                const handle = typeof pointEnt.getHandle === 'function' ? pointEnt.getHandle() : '';
+                                if (handle && validPointHandles.has(handle)) continue;
+                                if (handle) validPointHandles.add(handle);
                                 pointIndex++;
                                 pointList.push({
                                     id: entId,
@@ -2032,39 +2073,29 @@ export default {
                                     x: pos.x,
                                     y: pos.y,
                                     z: pos.z || 0,
-                                    LAYER_NAM: layerName,
-                                    LAYER_ID: layerHandle,
-                                    description: `图层: ${layerName}`,
+                                    LAYER_NAM: layer.name,
+                                    LAYER_ID: layer.handle,
+                                    description: `图层: ${layer.name}`,
                                     visible: true,
                                     index: pointList.length + 1,
-                                    no: typeof pointEnt.getHandle === 'function' ? pointEnt.getHandle() : ''
+                                    no: handle
                                 });
                             }
                             // 2. 处理McDbBlockReference块引用
                             if (entId.isKindOf("McDbBlockReference")) {
                                 const blkRef = entId.getMcDbEntity();
-                                if (!blkRef || !blkRef.position) continue;
+                                if (!blkRef || !isValidPosition(blkRef.position)) continue;
                                 const pos = blkRef.position;
                                 const blockName = blkRef.blockName || "未知块";
-                                let layerName = "未知图层";
-                                let layerHandle = "";
-                                try {
-                                    const lid = blkRef.layerId;
-                                    if (lid) {
-                                        const layerRec = lid.getMcDbLayerTableRecord();
-                                        if (layerRec) {
-                                            layerName = layerRec.name || "未知图层";
-                                            layerHandle = typeof layerRec.getHandle === 'function' ? layerRec.getHandle() : '';
-                                        }
-                                    }
-                                } catch (e) { }
+                                const layer = getLayerInfo(blkRef);
+                                if (!layer.isVisible) continue;
                                 let attributes = [];
                                 let pointName = "";
                                 let pointDesc = "";
                                 try {
                                     if (typeof blkRef.getAllAttribute === 'function') {
                                         const attrIds = blkRef.getAllAttribute();
-                                        if (attrIds && Array.isArray(attrIds) && attrIds.length > 0) {
+                                        if (attrIds && typeof attrIds.length === 'number' && attrIds.length > 0) {
                                             for (let j = 0; j < attrIds.length; j++) {
                                                 try {
                                                     const attrEnt = attrIds[j].getMcDbEntity();
@@ -2082,15 +2113,19 @@ export default {
                                         }
                                     }
                                 } catch (e) { }
-                                if (attributes.length > 0) {
+                                const validAttributes = attributes.filter(({ value }) => String(value).trim());
+                                if (validAttributes.length > 0) {
                                     pointDesc = attributes.map((a) => `${a.tag}: ${a.value}`).join(", ");
                                 } else {
-                                    pointDesc = `块: ${blockName}, 图层: ${layerName}`;
+                                    pointDesc = `块: ${blockName}, 图层: ${layer.name}`;
                                 }
                                 if (!pointName) {
-                                    blockIndex++;
-                                    pointName = `${blockName}${blockIndex}`;
+                                    pointName = validAttributes.length > 0 ? validAttributes[0].value : `${blockName}${++blockIndex}`;
                                 }
+                                const handle = typeof blkRef.getHandle === 'function' ? blkRef.getHandle() : '';
+                                if (handle && validPointHandles.has(handle)) continue;
+                                if (handle) validPointHandles.add(handle);
+                                blockIndex++;
                                 pointList.push({
                                     id: entId,
                                     type: "block",
@@ -2099,12 +2134,12 @@ export default {
                                     x: pos.x,
                                     y: pos.y,
                                     z: pos.z || 0,
-                                    LAYER_NAM: layerName,
-                                    LAYER_ID: layerHandle,
+                                    LAYER_NAM: layer.name,
+                                    LAYER_ID: layer.handle,
                                     description: pointDesc,
                                     attributes: attributes,
                                     visible: true,
-                                    no: entId.getMcDbEntity().getHandle(),
+                                    no: handle,
                                     index: pointList.length + 1
                                 });
                             }

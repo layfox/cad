@@ -1,7 +1,7 @@
 <template>
     <div class="viewer-panel-wrapper">
         <!-- 工具栏 -->
-        <div class="vp-toolbar" v-if="status!=='04'&&status!='05'">
+        <div class="vp-toolbar" v-if="status!=='04'">
             <Button type="primary" @click="onAdd" size="large" ghost><img src="../../css/images/icon1.png" alt="">添加测点</Button>
             <span class="vp-toolbar-label">坐标匹配容差</span>
             <InputNumber v-model="tolerance" :min="0" style="width: 80px" />
@@ -100,6 +100,7 @@
         >
             <PointSelectModal
                 :visible="pointModalVisible"
+                :TZPZ_NO="tzpzNo"
                 @update:visible="pointModalVisible = $event"
                 @confirm="onPointSelectConfirm"
             />
@@ -135,7 +136,7 @@ export default {
             tolerance: 4,
             pointModalVisible: false,
             orgNo: '',
-            isDev: true,
+            isDev: false,
             pointColumns: [
                 { type: 'selection', width: 60, align: 'center' },
                 { slot: 'seq', title: '序号', key: 'seq', width: 60, align: 'center', render: (h, { row, index }) => {

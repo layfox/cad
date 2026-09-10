@@ -1,4 +1,5 @@
 import ViewerPanel from '../components/ViewerPanel/ViewerPanel.vue';
+import RiskWarning from '../components/RiskWarning/RiskWarning.vue';
 import PersonInfoModal from '../dialog/PersonInfoModal.vue';
 import SafetyCheckModal from '../dialog/SafetyCheckModal.vue';
 import AlarmHandleModal from '../dialog/AlarmHandleModal.vue';
@@ -64,6 +65,13 @@ export default {
             rafId: null,
             needUpdatePop: false,
             annotationPoints: [],
+            annotationById: new Map(),
+            markerRoot: null,
+            markerPickables: [],
+            markerGeometry: null,
+            renderTaskId: 0,
+            raycaster: new THREE.Raycaster(),
+            pointerNdc: new THREE.Vector2(),
             lastHoverGroup: null,
             currentData: null,
             markerTextureCache: new Map(),
@@ -77,13 +85,18 @@ export default {
             // =========优化新增参数========
             hoverThrottleTimer: null, // hover节流定时器
             MAX_RIPPLE_PER_MARKER: 3, // 每个告警marker最大波纹数量，防止波纹Mesh爆炸
-            batchChunkSize: 30, // 分片创建marker每批数量
+            batchChunkSize: 100, // 分片创建marker每批数量
             isCanvasVisibleBounds: null, // 视口边界
         }
     },
     beforeDestroy() {
+        this.renderTaskId++;
         this.destroyAnnotationEvent();
         this.clearAllBindMarkers()
+        this.markerGeometry?.dispose();
+        this.markerGeometry = null;
+        this.markerTextureCache.forEach(texture => texture.dispose());
+        this.markerTextureCache.clear();
         this.unlistenViewChange()
         if (this.rafId) {
             cancelAnimationFrame(this.rafId);
@@ -104,7 +117,8 @@ export default {
         SafetyCheckModal,
         AlarmHandleModal,
         EquipInfoModal,
-        TzModal
+        TzModal,
+        RiskWarning
     },
     mounted() {
         const params = new URLSearchParams(location.search)
@@ -283,14 +297,7 @@ export default {
         clearAllBindMarkers() {
             const mxObj = MxFun.getCurrentDraw();
             if (!mxObj) return;
-            const scene = mxObj.getScene?.();
-            if (!scene) return;
-            const toRemove = [];
-            scene.traverse((obj) => {
-                if (obj.userData && obj.userData.isAnnotationPoint) {
-                    toRemove.push(obj);
-                }
-            });
+            const toRemove = this.markerRoot ? [...this.markerRoot.children] : this.annotationPoints.map(item => item.mesh).filter(Boolean);
             toRemove.forEach(group => {
                 group.userData._destroyed = true;
                 if (group.userData.rippleList) {
@@ -302,9 +309,8 @@ export default {
                 }
                 group.traverse(child => {
                     if (child.isMesh) {
-                        child.geometry?.dispose();
+                        if (child.geometry !== this.markerGeometry) child.geometry?.dispose();
                         if (child.material) {
-                            if (child.material.map) child.material.map.dispose();
                             if (Array.isArray(child.material)) {
                                 child.material.forEach(mat => mat.dispose());
                             } else {
@@ -314,10 +320,13 @@ export default {
                         }
                     }
                 });
-                mxObj.removeObject(group);
+                if (group.parent) group.parent.remove(group);
             });
             this.lastHoverGroup = null;
             this.annotationPoints = [];
+            this.annotationById.clear();
+            this.markerPickables = [];
+            this.markerRoot = null;
             this.activeWarningGroups = new Set();
             this.stopGlobalWarningAnimate();
             this.selectedPointIds = []
@@ -338,14 +347,18 @@ export default {
             this.stopGlobalWarningAnimate();
             this.annotationPoints = [];
             // 分片创建marker，避免大数据量阻塞主线程
+            const taskId = ++this.renderTaskId;
             const total = newData.length;
             let index = 0;
             while (index < total) {
+                if (taskId !== this.renderTaskId) return;
                 const slice = newData.slice(index, index + this.batchChunkSize);
                 slice.forEach(bindItem => {
                     const group = this.createBindMarker1(bindItem);
                     if (group) {
-                        this.annotationPoints.push({ ...bindItem, mesh: group });
+                        const point = { ...bindItem, mesh: group };
+                        this.annotationPoints.push(point);
+                        this.annotationById.set(point.id, point);
                     }
                 })
                 index += this.batchChunkSize;
@@ -437,10 +450,15 @@ export default {
             const docX = bindItem.x;
             const docY = bindItem.y;
             const docZ = bindItem.z || 0;
+            if (!this.markerRoot) {
+                this.markerRoot = new THREE.Group();
+                this.markerRoot.userData.isMarkerRoot = true;
+                mxObj.addObject(this.markerRoot);
+            }
             const group = new THREE.Object3D();
             group.position.set(docX, docY, docZ);
             let imgUrl = this.getImg(bindItem);
-            const geometry = new THREE.PlaneGeometry(1, 1);
+            const geometry = this.markerGeometry || (this.markerGeometry = new THREE.PlaneGeometry(1, 1));
             const material = new THREE.MeshBasicMaterial({
                 transparent: true,
                 depthTest: false,
@@ -466,7 +484,8 @@ export default {
                 if (!this.activeWarningGroups) this.activeWarningGroups = new Set();
                 this.activeWarningGroups.add(group);
             }
-            mxObj.addObject(group);
+            this.markerRoot.add(group);
+            this.markerPickables.push(mesh);
             const createSingleRipple = () => {
                 const ringGeo = new THREE.RingGeometry(0.4, 0.5, 32);
                 const ringMat = new THREE.MeshBasicMaterial({
@@ -495,7 +514,6 @@ export default {
                     const cacheTex = this.markerTextureCache.get(imgUrl);
                     material.map = cacheTex;
                     material.needsUpdate = true;
-                    mxObj.updateDisplay(true);
                 } else {
                     const img = new Image();
                     img.crossOrigin = 'anonymous';
@@ -512,7 +530,6 @@ export default {
                             texture.magFilter = THREE.LinearFilter;
                             texture.needsUpdate = true;
                             this.markerTextureCache.set(imgUrl, texture);
-                            if (material.map) material.map.dispose();
                             material.map = texture;
                             material.needsUpdate = true;
                             mxObj.updateDisplay(true);
@@ -524,15 +541,18 @@ export default {
                     img.src = imgUrl;
                 }
             }
-            mxObj.updateDisplay(true);
             return group;
         },
         renderMarkersByList(data) {
             this.clearAllBindMarkers();
+            const taskId = ++this.renderTaskId;
             data.forEach(bind => {
+                if (taskId !== this.renderTaskId) return;
                 const mesh = this.createBindMarker1(bind);
                 if (mesh) {
-                    this.annotationPoints.push({ ...bind, mesh: mesh });
+                    const point = { ...bind, mesh };
+                    this.annotationPoints.push(point);
+                    this.annotationById.set(point.id, point);
                 }
             });
             if (this.activeWarningGroups.size > 0) {
@@ -569,11 +589,9 @@ export default {
                     if (!camera) return;
                     const ndcX = (mouseX / rect.width) * 2 - 1;
                     const ndcY = -(mouseY / rect.height) * 2 + 1;
-                    const raycaster = new THREE.Raycaster();
-                    raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
-                    // =========优化：不遍历整个scene，只拾取annotationPoints的mesh对象，缩小射线检测范围========
-                    const rayTargets = this.annotationPoints.map(p => p.mesh).filter(Boolean);
-                    const intersects = raycaster.intersectObjects(rayTargets, true);
+                    this.pointerNdc.set(ndcX, ndcY);
+                    this.raycaster.setFromCamera(this.pointerNdc, camera);
+                    const intersects = this.raycaster.intersectObjects(this.markerPickables, false);
                     let hoverTargetGroup = null;
                     for (const intersect of intersects) {
                         let curObj = intersect.object;
@@ -586,7 +604,8 @@ export default {
                         }
                         if (hoverTargetGroup) break;
                     }
-                    if (this.lastHoverGroup) {
+                    const hoverChanged = this.lastHoverGroup !== hoverTargetGroup;
+                    if (this.lastHoverGroup && this.lastHoverGroup !== hoverTargetGroup) {
                         if (this.lastHoverGroup.userData.originScale) {
                             this.lastHoverGroup.scale.copy(this.lastHoverGroup.userData.originScale);
                         }
@@ -596,7 +615,7 @@ export default {
                         }
                         this.lastHoverGroup = null;
                     }
-                    if (hoverTargetGroup) {
+                    if (hoverTargetGroup && this.lastHoverGroup !== hoverTargetGroup) {
                         if (!hoverTargetGroup.userData.originScale) {
                             hoverTargetGroup.userData.originScale = hoverTargetGroup.scale.clone();
                         }
@@ -606,12 +625,17 @@ export default {
                         if (mesh?.material) {
                             mesh.material.opacity = 1;
                         }
+                        const hoverItem = this.annotationById.get(hoverTargetGroup.userData.annotationId)
+                        this.tooltip.show = hoverItem.GJ_FLG==='Y' ? true : false;
                         this.markNeedUpdate();
+                    } else if (hoverTargetGroup) {
+                        const hoverItem = this.annotationById.get(hoverTargetGroup.userData.annotationId)
+                        this.tooltip.show = hoverItem.GJ_FLG==='Y' ? true : false;
                     } else {
                         this.tooltip.show = false;
                     }
                     canvas.style.cursor = hoverTargetGroup ? "pointer" : "";
-                    mxObj.updateDisplay(true);
+                    if (hoverChanged) mxObj.updateDisplay(true);
                 } catch (err) {
                     console.error("hover异常", err);
                 } finally {
@@ -634,16 +658,15 @@ export default {
                 if (!camera) return;
                 const ndcX = (clickX / rect.width) * 2 - 1;
                 const ndcY = -(clickY / rect.height) * 2 + 1;
-                const raycaster = new THREE.Raycaster();
-                raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
-                const rayTargets = this.annotationPoints.map(p => p.mesh).filter(Boolean);
-                const intersects = raycaster.intersectObjects(rayTargets, true);
+                this.pointerNdc.set(ndcX, ndcY);
+                this.raycaster.setFromCamera(this.pointerNdc, camera);
+                const intersects = this.raycaster.intersectObjects(this.markerPickables, false);
                 for (const intersect of intersects) {
                     let curObj = intersect.object;
                     while (curObj) {
                         if (curObj.userData && curObj.userData.isAnnotationPoint) {
                             const id = curObj.userData.annotationId;
-                            const bindItem = this.annotationPoints.find(b => b.id === id);
+                            const bindItem = this.annotationById.get(id);
                             if (bindItem) {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -683,14 +706,15 @@ export default {
                 const worldPos = new THREE.Vector3();
                 worldPos.setFromMatrixPosition(this.lastHoverGroup.matrixWorld);
                 const res = this.world2Screen(worldPos);
-                const hoverItem = this.annotationPoints.find(item => item.id === this.lastHoverGroup.userData.annotationId)
+                const hoverItem = this.annotationById.get(this.lastHoverGroup.userData.annotationId)
+                console.log(hoverItem, 222)
                 if (res) {
                     const rawX = res.x;
                     const rawY = res.y - 54;
                     this.tooltip = {
                         x: rawX,
                         y: rawY,
-                        show: true,
+                        show: hoverItem.GJ_FLG==='Y' ? true : false,
                         text: hoverItem ? hoverItem.value : ''
                     };
                 }
@@ -698,10 +722,10 @@ export default {
         },
         async renderMarkersDiffV2(newData) {
             newData = newData || []
+            const taskId = ++this.renderTaskId;
             const mxObj = MxFun.getCurrentDraw();
             if (!mxObj) return;
-            const scene = mxObj.getScene?.();
-            if (!scene) return;
+            const viewBeforeRender = this.getCurrentViewBounds();
             this.lastHoverGroup = null;
             if (!this.activeWarningGroups) this.activeWarningGroups = new Set();
             const oldMap = new Map();
@@ -745,21 +769,19 @@ export default {
                     this.activeWarningGroups.delete(oldGroup);
                     oldGroup.traverse(child => {
                         if (child.isMesh) {
-                            child.geometry?.dispose();
+                            if (child.geometry !== this.markerGeometry) child.geometry?.dispose();
                             if (child.material) {
                                 if (Array.isArray(child.material)) {
                                     child.material.forEach(mat => {
-                                        mat.map?.dispose();
                                         mat.dispose();
                                     });
                                 } else {
-                                    child.material.map?.dispose();
                                     child.material.dispose();
                                 }
                             }
                         }
                     });
-                    mxObj.removeObject(oldGroup);
+                    if (oldGroup.parent) oldGroup.parent.remove(oldGroup);
                 }
                 const newGroup = this.createBindMarker1(newBind);
                 if (newGroup) {
@@ -769,6 +791,7 @@ export default {
             // 分片批量新增marker，防止主线程阻塞
             let addIdx = 0;
             while (addIdx < addList.length) {
+                if (taskId !== this.renderTaskId) return;
                 const chunk = addList.slice(addIdx, addIdx + this.batchChunkSize);
                 chunk.forEach(bind => {
                     const newGroup = this.createBindMarker1(bind);
@@ -796,24 +819,25 @@ export default {
                     this.activeWarningGroups.delete(oldGroup);
                     oldGroup.traverse(child => {
                         if (child.isMesh) {
-                            child.geometry?.dispose();
+                            if (child.geometry !== this.markerGeometry) child.geometry?.dispose();
                             if (child.material) {
                                 if (Array.isArray(child.material)) {
                                     child.material.forEach(mat => {
-                                        mat.map?.dispose();
                                         mat.dispose();
                                     });
                                 } else {
-                                    child.material.map?.dispose();
                                     child.material.dispose();
                                 }
                             }
                         }
                     });
-                    mxObj.removeObject(oldGroup);
+                    if (oldGroup.parent) oldGroup.parent.remove(oldGroup);
                 }
             }
             this.annotationPoints = finalPoints;
+            this.annotationById.clear();
+            finalPoints.forEach(item => this.annotationById.set(item.id, item));
+            this.markerPickables = this.markerPickables.filter(mesh => mesh.parent);
             if (this.activeWarningGroups.size > 0) {
                 this.startGlobalWarningAnimate();
             } else {
@@ -821,6 +845,103 @@ export default {
             }
             if (hasMeshChange) {
                 mxObj.updateDisplay(false);
+                this.$nextTick(() => {
+                    requestAnimationFrame(() => {
+                        if (taskId !== this.renderTaskId) return;
+                        this.fitViewToMarkers(this.annotationPoints, viewBeforeRender);
+                    });
+                });
+            }
+        },
+        /**
+         * 根据当前标记点范围自动调整视图，确保所有标记都在可视区域内。
+         */
+        getCurrentViewBounds() {
+            if (!this.mxcad || typeof this.mxcad.getViewCADCoord !== 'function') {
+                return null;
+            }
+
+            try {
+                const view = this.mxcad.getViewCADCoord();
+                const viewPoints = [view.pt1, view.pt2, view.pt3, view.pt4]
+                    .filter(point => point && Number.isFinite(Number(point.x)) && Number.isFinite(Number(point.y)));
+                if (viewPoints.length < 2) return null;
+
+                let minX = Infinity;
+                let maxX = -Infinity;
+                let minY = Infinity;
+                let maxY = -Infinity;
+                viewPoints.forEach(point => {
+                    const x = Number(point.x);
+                    const y = Number(point.y);
+                    minX = Math.min(minX, x);
+                    maxX = Math.max(maxX, x);
+                    minY = Math.min(minY, y);
+                    maxY = Math.max(maxY, y);
+                });
+
+                if (maxX <= minX || maxY <= minY) return null;
+                return { minX, maxX, minY, maxY };
+            } catch (error) {
+                console.warn('[getCurrentViewBounds] 获取当前视图范围失败:', error);
+                return null;
+            }
+        },
+        fitViewToMarkers(points, viewBeforeRender = null) {
+            if (!this.mxcad || typeof this.mxcad.zoomW !== 'function' || !points || points.length === 0) {
+                return;
+            }
+
+            const validPoints = points
+                .map(item => ({
+                    x: Number(item.x),
+                    y: Number(item.y)
+                }))
+                .filter(item => Number.isFinite(item.x) && Number.isFinite(item.y));
+
+            if (validPoints.length === 0) return;
+
+            let minX = Infinity;
+            let maxX = -Infinity;
+            let minY = Infinity;
+            let maxY = -Infinity;
+            validPoints.forEach(item => {
+                minX = Math.min(minX, item.x);
+                maxX = Math.max(maxX, item.x);
+                minY = Math.min(minY, item.y);
+                maxY = Math.max(maxY, item.y);
+            });
+
+            // 预留标记图标和边缘空间，避免 zoomW 传入零尺寸范围。
+            const range = Math.max(maxX - minX, maxY - minY);
+            const padding = Math.max(range * 0.15, 20);
+            let fitMinX = minX - padding;
+            let fitMaxX = maxX + padding;
+            let fitMinY = minY - padding;
+            let fitMaxY = maxY + padding;
+
+            // 所有点位最多相对打点前视图放大 2 倍，避免自动适配过度放大。
+            if (viewBeforeRender) {
+                const currentWidth = viewBeforeRender.maxX - viewBeforeRender.minX;
+                const currentHeight = viewBeforeRender.maxY - viewBeforeRender.minY;
+                const fitWidth = Math.max(fitMaxX - fitMinX, currentWidth / 2);
+                const fitHeight = Math.max(fitMaxY - fitMinY, currentHeight / 2);
+                const centerX = (minX + maxX) / 2;
+                const centerY = (minY + maxY) / 2;
+                fitMinX = centerX - fitWidth / 2;
+                fitMaxX = centerX + fitWidth / 2;
+                fitMinY = centerY - fitHeight / 2;
+                fitMaxY = centerY + fitHeight / 2;
+            }
+
+            try {
+                this.mxcad.zoomW(
+                    new McGePoint3d(fitMinX, fitMinY, 0),
+                    new McGePoint3d(fitMaxX, fitMaxY, 0)
+                );
+                this.mxcad.updateDisplay && this.mxcad.updateDisplay();
+            } catch (error) {
+                console.warn('[fitViewToMarkers] 自动适配视图失败:', error);
             }
         },
         getDefaultTz() {
@@ -1209,9 +1330,12 @@ export default {
                 allSelectedIds.push(...ids)
             })
             this.globalAllSelectedIds = [...new Set(allSelectedIds)]
-            if (this.globalAllSelectedIds && this.globalAllSelectedIds.length) {
-                this.renderMarkersDiffV2(this.globalAllSelectedIds.map(id => this.realData[id]).filter(item => item))
-            }
+            // 选中项为空时也要执行 diff，才能移除画布上残留的最后一个标记。
+            this.renderMarkersDiffV2(
+                this.globalAllSelectedIds
+                    .map(id => this.realData[id])
+                    .filter(item => item)
+            )
         },
         clearAllPanelsSelect() {
             const panelRefs = [this.$refs.panel1Ref, this.$refs.panel2Ref, this.$refs.panel3Ref, this.$refs.panel4Ref].filter(Boolean)
@@ -1346,15 +1470,28 @@ export default {
         onFileLoaded() {
             this.loading = false
         },
-        zoomToPoint(x, y, zoomFactor = 3) {
-            if (!x || !y) {
-                return
+        zoomToPoint(x, y, id, zoomFactor = 2) {
+            const strX = String(x ?? '').trim();
+            const strY = String(y ?? '').trim();
+            if (strX === '' || strY === '') {
+                return;
             }
+            const numX = Number(x);
+            const numY = Number(y);
+            if (isNaN(numX) || isNaN(numY)) {
+                return;
+            }
+            if (!this.mxcad || !this.mxcad.zoomCenter || !this.mxcad.zoomScale) return;
             try {
-                if (!this.mxcad || !this.mxcad.zoomCenter || !this.mxcad.zoomScale) return;
-                this.mxcad.zoomCenter(x, y);
+                const { minPt, maxPt } = this.mxcad.getDatabase().currentSpace.getBoundingBox();
+                if (numX < minPt.x || numX > maxPt.x || numY < minPt.y || numY > maxPt.y) {
+                    return;
+                }
+                this.mxcad.zoomCenter(numX, numY);
                 this.mxcad.zoomScale(zoomFactor);
-                console.log(`[zoomToPoint] 定位到 (${x}, ${y}) scale=${zoomFactor}`);
+                // this.clearAnnotationHighlight()
+                // if (id) this.toggleAnnotationHighlightById(id)
+                this.mxcad.updateDisplay();
             } catch (e) {
                 console.error('[zoomToPoint] 失败:', e);
             }

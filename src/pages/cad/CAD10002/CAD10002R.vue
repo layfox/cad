@@ -73,6 +73,7 @@
                     {{ tooltip.text }}
                   </div>
             </div>
+          <RiskWarning :orgNo="orgNo" />
         </div>
       </div>
 
@@ -166,6 +167,7 @@
 </template>
 
 <script>
+import RiskWarning from './components/RiskWarning/RiskWarning.vue';
 import CAD10002R from './js/CAD10002R';
 export default {
   name: 'CAD10002R',
