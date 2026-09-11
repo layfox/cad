@@ -9,11 +9,11 @@ import { BR_Arrow } from "./BR_Arrow";
 
 
 export function drawShapeInit() {
-    MxFun.addCommand("BR_MxDbCircleArc", BR_MxDbCircleArc);
-    MxFun.addCommand("BR_MxDbEllipseArc", BR_MxDbEllipseArc);
-    MxFun.addCommand("BR_MxDbArcShape", BR_MxDbArcShape);
-    MxFun.addCommand("BR_MxDbRingShape", BR_MxDbRingShape);
-    MxFun.addCommand("BR_MxDbStarShape", BR_MxDbStarShape);
-    MxFun.addCommand("BR_MxDbPolygonShape", BR_MxDbPolygonShape);
-    MxFun.addCommand("BR_Arrow", BR_Arrow)
+	MxFun.addCommand("BR_MxDbCircleArc", BR_MxDbCircleArc);
+	MxFun.addCommand("BR_MxDbEllipseArc", BR_MxDbEllipseArc);
+	MxFun.addCommand("BR_MxDbArcShape", BR_MxDbArcShape);
+	MxFun.addCommand("BR_MxDbRingShape", BR_MxDbRingShape);
+	MxFun.addCommand("BR_MxDbStarShape", BR_MxDbStarShape);
+	MxFun.addCommand("BR_MxDbPolygonShape", BR_MxDbPolygonShape);
+	MxFun.addCommand("BR_Arrow", BR_Arrow);
 }

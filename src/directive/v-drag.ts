@@ -35,11 +35,9 @@ export const drag = Vue.directive('drag', {
 					let left = e.touches[0].pageX - x;
 					let top = e.touches[0].pageY - y;
 
-					if (left < 0) { left = 0; }
-					else if (left > wMax) { left = wMax; }
+					if (left < 0) { left = 0; } else if (left > wMax) { left = wMax; }
 
-					if (top < 0) { top = 0; }
-					else if (top > hMax) { top = hMax; }
+					if (top < 0) { top = 0; } else if (top > hMax) { top = hMax; }
 
 					el.style.left = left + 'px';
 					el.style.top = top + 'px';

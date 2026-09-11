@@ -69,6 +69,7 @@ export default {
             markerRoot: null,
             markerPickables: [],
             markerGeometry: null,
+            markerRippleGeometry: null,
             renderTaskId: 0,
             raycaster: new THREE.Raycaster(),
             pointerNdc: new THREE.Vector2(),
@@ -79,16 +80,18 @@ export default {
             activeWarningGroups: new Set(),
             globalAnimateRaf: null,
             globalAnimateLastTime: 0,
+            globalAnimateLastRenderTime: 0,
             globalAnimateLastVisibilityTime: 0,
             globalAnimateWorldPos: new THREE.Vector3(),
             globalAnimateCanvasRect: null,
+            markerDisplayRaf: null,
             realData: {},
             globalAllSelectedIds: [],
             timer: null,
             orgNo: '',
             // =========优化新增参数========
             hoverThrottleTimer: null, // hover节流定时器
-            MAX_RIPPLE_PER_MARKER: 3, // 每个告警marker最大波纹数量，防止波纹Mesh爆炸
+            WARNING_ANIMATE_INTERVAL: 120, // 告警动画刷新间隔
             batchChunkSize: 100, // 分片创建marker每批数量
             isCanvasVisibleBounds: null, // 视口边界
         }
@@ -99,8 +102,11 @@ export default {
         this.clearAllBindMarkers()
         this.markerGeometry?.dispose();
         this.markerGeometry = null;
+        this.markerRippleGeometry?.dispose();
+        this.markerRippleGeometry = null;
         this.markerTextureCache.forEach(texture => texture.dispose());
         this.markerTextureCache.clear();
+        this.stopGlobalWarningAnimate();
         this.unlistenViewChange()
         if (this.rafId) {
             cancelAnimationFrame(this.rafId);
@@ -113,6 +119,10 @@ export default {
         if (this.hoverThrottleTimer) {
             clearTimeout(this.hoverThrottleTimer);
             this.hoverThrottleTimer = null;
+        }
+        if (this.markerDisplayRaf) {
+            cancelAnimationFrame(this.markerDisplayRaf);
+            this.markerDisplayRaf = null;
         }
     },
     components: {
@@ -301,19 +311,22 @@ export default {
         clearAllBindMarkers() {
             const mxObj = MxFun.getCurrentDraw();
             if (!mxObj) return;
-            const toRemove = this.markerRoot ? [...this.markerRoot.children] : this.annotationPoints.map(item => item.mesh).filter(Boolean);
+            const markerRoot = this.markerRoot;
+            const toRemove = markerRoot ? [...markerRoot.children] : this.annotationPoints.map(item => item.mesh).filter(Boolean);
             toRemove.forEach(group => {
                 group.userData._destroyed = true;
-                if (group.userData.rippleList) {
-                    group.userData.rippleList.forEach(ripple => {
-                        ripple.mesh.geometry?.dispose();
+                if (group.userData.ripplePool) {
+                    group.userData.ripplePool.forEach(ripple => {
                         ripple.mesh.material?.dispose();
                     })
-                    group.userData.rippleList = [];
+                    group.userData.ripplePool = [];
                 }
                 group.traverse(child => {
                     if (child.isMesh) {
-                        if (child.geometry !== this.markerGeometry) child.geometry?.dispose();
+                        if (child.geometry !== this.markerGeometry &&
+                            child.geometry !== this.markerRippleGeometry) {
+                            child.geometry?.dispose();
+                        }
                         if (child.material) {
                             if (Array.isArray(child.material)) {
                                 child.material.forEach(mat => mat.dispose());
@@ -326,6 +339,13 @@ export default {
                 });
                 if (group.parent) group.parent.remove(group);
             });
+            if (markerRoot) {
+                try {
+                    mxObj.removeObject(markerRoot, false);
+                } catch (e) {
+                    if (markerRoot.parent) markerRoot.parent.remove(markerRoot);
+                }
+            }
             this.lastHoverGroup = null;
             this.annotationPoints = [];
             this.annotationById.clear();
@@ -374,99 +394,80 @@ export default {
             mxObj.updateDisplay(true);
         },
         startGlobalWarningAnimate() {
-            if (this.globalAnimateRaf) return;
+            if (this.globalAnimateRaf || this.activeWarningGroups.size === 0) return;
             const mxObj = MxFun.getCurrentDraw();
             if (!mxObj) return;
             const period = 1200;
-            const maxScaleRate = 1.2;
             const rippleSpawnInterval = 500;
             let rippleSpawnTimer = 0;
-            const loop = () => {
+            const loop = (timestamp) => {
                 if (this.activeWarningGroups.size === 0) {
                     this.globalAnimateRaf = null;
                     return;
                 }
-                const now = performance.now();
-                if (!this.globalAnimateLastTime) {
-                    this.globalAnimateLastTime = now;
-                }
+                const now = timestamp || performance.now();
+                if (!this.globalAnimateLastTime) this.globalAnimateLastTime = now;
                 const deltaTime = Math.min(now - this.globalAnimateLastTime, 100);
-                // 告警动画不需要以 CAD 的最高刷新率运行，降低到约 30fps，
-                // 可明显减少 WASM/CAD 重绘和大量标注同时计算时的主线程占用。
-                if (now - this.globalAnimateLastTime < 33) {
+                if (now - this.globalAnimateLastTime < this.WARNING_ANIMATE_INTERVAL) {
                     this.globalAnimateRaf = requestAnimationFrame(loop);
                     return;
                 }
                 this.globalAnimateLastTime = now;
                 rippleSpawnTimer += deltaTime;
-                const needSpawnRipple = rippleSpawnTimer > rippleSpawnInterval;
-                if (needSpawnRipple) rippleSpawnTimer = 0;
-                if (
-                    !this.globalAnimateCanvasRect ||
-                    now - this.globalAnimateLastVisibilityTime > 100
-                ) {
-                    const canvasDom = document.getElementById("mxcad");
-                    this.globalAnimateCanvasRect = canvasDom
-                        ? canvasDom.getBoundingClientRect()
-                        : null;
-                    this.globalAnimateLastVisibilityTime = now;
-                }
+                const needSpawnRipple = rippleSpawnTimer >= rippleSpawnInterval;
+                if (needSpawnRipple) rippleSpawnTimer %= rippleSpawnInterval;
+                let changed = false;
                 for (const group of this.activeWarningGroups) {
                     if (group.userData._destroyed) {
                         this.activeWarningGroups.delete(group);
                         continue;
                     }
                     if (this.lastHoverGroup === group) continue;
-                    // =========视口剔除优化：不在画布视口直接跳过动画计算=========
-                    this.globalAnimateWorldPos.setFromMatrixPosition(group.matrixWorld);
-                    const screenRes = MxFun.worldCoord2Screen(
-                        this.globalAnimateWorldPos.x,
-                        this.globalAnimateWorldPos.y,
-                        this.globalAnimateWorldPos.z
-                    );
-                    if (this.globalAnimateCanvasRect && screenRes) {
-                        const rect = this.globalAnimateCanvasRect;
-                        if (screenRes.x < -100 || screenRes.x > rect.width + 100 ||
-                            screenRes.y < -100 || screenRes.y > rect.height + 100) {
-                            continue;
-                        }
-                    }
                     const offset = group.userData.phaseOffset || 0;
                     const t = ((now + offset) % period) / period;
                     const factor = (Math.sin(t * Math.PI * 2) + 1) / 2;
-                    const currentRate = 1 + factor * (maxScaleRate - 1);
-                    const opacity = 0.5 + factor * 0.5;
-                    group.scale.copy(group.userData.originScale).multiplyScalar(currentRate);
+                    const scaleRate = 1 + factor * 0.2;
+                    const opacity = 0.55 + factor * 0.45;
                     const mesh = group.userData.mesh;
-                    if (mesh?.material) {
+                    if (Math.abs(group.scale.x - group.userData.originScale.x * scaleRate) > 0.01) {
+                        group.scale.copy(group.userData.originScale).multiplyScalar(scaleRate);
+                        changed = true;
+                    }
+                    if (mesh?.material && Math.abs(mesh.material.opacity - opacity) > 0.01) {
                         mesh.material.opacity = opacity;
+                        changed = true;
                     }
-                    const rippleList = group.userData.rippleList;
-                    if (needSpawnRipple && rippleList.length < this.MAX_RIPPLE_PER_MARKER) {
-                        rippleList.push(group.userData.createSingleRipple());
+                    if (needSpawnRipple && group.userData.ripplePool?.length) {
+                        const ripple = group.userData.ripplePool[group.userData.nextRippleIndex];
+                        group.userData.nextRippleIndex =
+                            (group.userData.nextRippleIndex + 1) % group.userData.ripplePool.length;
+                        ripple.life = 0;
+                        ripple.mesh.visible = true;
+                        changed = true;
                     }
-                    for (let i = rippleList.length - 1; i >= 0; i--) {
-                        const ripple = rippleList[i];
+                    const ripplePool = group.userData.ripplePool || [];
+                    ripplePool.forEach(ripple => {
+                        if (!ripple.mesh.visible) return;
                         ripple.life += deltaTime;
                         const progress = ripple.life / ripple.maxLife;
                         if (progress >= 1) {
-                            ripple.mesh.geometry?.dispose();
-                            ripple.mesh.material?.dispose();
-                            group.remove(ripple.mesh);
-                            rippleList.splice(i, 1);
-                            continue;
+                            ripple.mesh.visible = false;
+                            return;
                         }
                         const rippleScale = 1 + progress * ripple.maxScale;
                         ripple.mesh.scale.set(rippleScale, rippleScale, 1);
                         ripple.mesh.material.opacity = 0.6 * (1 - progress);
-                    }
+                        changed = true;
+                    });
                 }
-                mxObj.updateDisplay(true);
+                if (changed && now - this.globalAnimateLastRenderTime >= this.WARNING_ANIMATE_INTERVAL) {
+                    this.globalAnimateLastRenderTime = now;
+                    mxObj.updateDisplay(false);
+                }
                 this.globalAnimateRaf = requestAnimationFrame(loop);
-            }
+            };
             this.globalAnimateLastTime = 0;
-            this.globalAnimateLastVisibilityTime = 0;
-            this.globalAnimateCanvasRect = null;
+            this.globalAnimateLastRenderTime = 0;
             this.globalAnimateRaf = requestAnimationFrame(loop);
         },
         stopGlobalWarningAnimate() {
@@ -475,8 +476,17 @@ export default {
                 this.globalAnimateRaf = null;
             }
             this.globalAnimateLastTime = 0;
+            this.globalAnimateLastRenderTime = 0;
             this.globalAnimateLastVisibilityTime = 0;
             this.globalAnimateCanvasRect = null;
+        },
+        scheduleMarkerDisplayUpdate() {
+            if (this.markerDisplayRaf) return;
+            this.markerDisplayRaf = requestAnimationFrame(() => {
+                this.markerDisplayRaf = null;
+                const mxObj = MxFun.getCurrentDraw();
+                if (mxObj) mxObj.updateDisplay(false);
+            });
         },
         createBindMarker1(bindItem) {
             const mxObj = MxFun.getCurrentDraw();
@@ -515,33 +525,36 @@ export default {
             group.userData.rippleList = [];
             if (bindItem.isWarning) {
                 group.userData.phaseOffset = Math.random() * 1200;
+                group.userData.ripplePool = [];
+                group.userData.nextRippleIndex = 0;
+                const rippleGeometry = this.markerRippleGeometry ||
+                    (this.markerRippleGeometry = new THREE.RingGeometry(0.4, 0.5, 24));
+                for (let i = 0; i < 2; i++) {
+                    const rippleMaterial = new THREE.MeshBasicMaterial({
+                        color: 0xff3333,
+                        transparent: true,
+                        opacity: 0,
+                        depthTest: false,
+                        depthWrite: false,
+                        side: THREE.DoubleSide
+                    });
+                    const rippleMesh = new THREE.Mesh(rippleGeometry, rippleMaterial);
+                    rippleMesh.renderOrder = 9998;
+                    rippleMesh.raycast = () => { };
+                    rippleMesh.visible = false;
+                    group.add(rippleMesh);
+                    group.userData.ripplePool.push({
+                        mesh: rippleMesh,
+                        life: 0,
+                        maxLife: 2200,
+                        maxScale: 1.1
+                    });
+                }
                 if (!this.activeWarningGroups) this.activeWarningGroups = new Set();
                 this.activeWarningGroups.add(group);
             }
             this.markerRoot.add(group);
             this.markerPickables.push(mesh);
-            const createSingleRipple = () => {
-                const ringGeo = new THREE.RingGeometry(0.4, 0.5, 32);
-                const ringMat = new THREE.MeshBasicMaterial({
-                    color: 0xff3333,
-                    transparent: true,
-                    opacity: 0.6,
-                    depthTest: false,
-                    depthWrite: false,
-                    side: THREE.DoubleSide
-                });
-                const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-                ringMesh.renderOrder = 9998;
-                ringMesh.raycast = () => { };
-                group.add(ringMesh);
-                return {
-                    mesh: ringMesh,
-                    life: 0,
-                    maxLife: 2200,
-                    maxScale: 1.1
-                }
-            }
-            group.userData.createSingleRipple = createSingleRipple;
             // 纹理缓存优化，避免重复new Image加载相同图片
             if (imgUrl) {
                 if (this.markerTextureCache.has(imgUrl)) {
@@ -566,7 +579,7 @@ export default {
                             this.markerTextureCache.set(imgUrl, texture);
                             material.map = texture;
                             material.needsUpdate = true;
-                            mxObj.updateDisplay(true);
+                            this.scheduleMarkerDisplayUpdate();
                         } catch (e) {
                         }
                     };
@@ -792,17 +805,19 @@ export default {
                 const oldGroup = oldItem.mesh;
                 if (oldGroup) {
                     oldGroup.userData._destroyed = true;
-                    if (oldGroup.userData.rippleList) {
-                        oldGroup.userData.rippleList.forEach(ripple => {
-                            ripple.mesh.geometry?.dispose();
+                    if (oldGroup.userData.ripplePool) {
+                        oldGroup.userData.ripplePool.forEach(ripple => {
                             ripple.mesh.material?.dispose();
                         })
-                        oldGroup.userData.rippleList = [];
+                        oldGroup.userData.ripplePool = [];
                     }
                     this.activeWarningGroups.delete(oldGroup);
                     oldGroup.traverse(child => {
                         if (child.isMesh) {
-                            if (child.geometry !== this.markerGeometry) child.geometry?.dispose();
+                            if (child.geometry !== this.markerGeometry &&
+                                child.geometry !== this.markerRippleGeometry) {
+                                child.geometry?.dispose();
+                            }
                             if (child.material) {
                                 if (Array.isArray(child.material)) {
                                     child.material.forEach(mat => {
@@ -842,17 +857,19 @@ export default {
                         this.lastHoverGroup = null;
                     }
                     oldGroup.userData._destroyed = true;
-                    if (oldGroup.userData.rippleList) {
-                        oldGroup.userData.rippleList.forEach(ripple => {
-                            ripple.mesh.geometry?.dispose();
+                    if (oldGroup.userData.ripplePool) {
+                        oldGroup.userData.ripplePool.forEach(ripple => {
                             ripple.mesh.material?.dispose();
                         })
-                        oldGroup.userData.rippleList = [];
+                        oldGroup.userData.ripplePool = [];
                     }
                     this.activeWarningGroups.delete(oldGroup);
                     oldGroup.traverse(child => {
                         if (child.isMesh) {
-                            if (child.geometry !== this.markerGeometry) child.geometry?.dispose();
+                            if (child.geometry !== this.markerGeometry &&
+                                child.geometry !== this.markerRippleGeometry) {
+                                child.geometry?.dispose();
+                            }
                             if (child.material) {
                                 if (Array.isArray(child.material)) {
                                     child.material.forEach(mat => {

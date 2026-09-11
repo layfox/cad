@@ -18,25 +18,25 @@ import {
 
 export class MyArea extends MxDbArea {
 	public getDimText(): string {
-		let lArea = McGeTool.calcArea(this.points);
+		const lArea = McGeTool.calcArea(this.points);
 		return lArea.toFixed(2) + "m=2";
 	}
-  
+
 	public create(): MyArea {
 		return new MyArea();
 	}
-  
+
 	public getTypeName(): string {
 		return "MyArea";
 	}
-	onViewChange() {
-		this.setNeedUpdateDisplay(true)
-		return true
+	public onViewChange() {
+		this.setNeedUpdateDisplay(true);
+		return true;
 	}
-   
+
 }
 
-  
+
 
 // 面积自定义实体。
 export class MeasureArea {
@@ -48,12 +48,12 @@ export class MeasureArea {
 				return;
 			}
 			const pt1 = getPoint.value();
-			let area = new MyArea();
+			const area = new MyArea();
 			area.addPoint(pt1);
 			const worldDrawComment = new McEdGetPointWorldDrawObject();
 			worldDrawComment.setDraw(
 				(currentPoint: THREE.Vector3, pWorldDraw) => {
-					let tmp:MxDbArea = area.clone() as MxDbArea;
+					const tmp: MxDbArea = area.clone() as MxDbArea;
 					tmp.addPoint(currentPoint);
 					worldDrawComment.drawCustomEntity(tmp);
 				}
@@ -76,15 +76,15 @@ export class MeasureArea {
                     mxDbHatch.setRenderOrder(MxType.MxDefaultRenderOrder.kMxEntityRenderOrder -2);
                     MxFun.getCurrentDraw().addMxEntity(mxDbHatch);
                     */
-					
+
 					area.isFill = true;
 					area.fillOpacity = 0.7;
 					area.fillColor = 0x663244;
 					MxFun.getCurrentDraw().addMxEntity(area);
-					
+
 				}
 			);
-			
+
 		});
 	}
 }

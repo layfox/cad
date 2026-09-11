@@ -7,11 +7,11 @@ export default function() {
 	// 绘制控件
 	const mxDraw = MxFun.getCurrentDraw()
     
-    const angleDim = new MxDb2LineAngularDimension()
+ const angleDim = new MxDb2LineAngularDimension()
 
     // 开启连续点击
-    const worldDraw = new McEdGetPointWorldDrawObject()
-    point.setMessage("\n指定第一点:");
+ const worldDraw = new McEdGetPointWorldDrawObject()
+ point.setMessage("\n指定第一点:");
 	point.go((status) => {
         if(status !== 0) {
             return
