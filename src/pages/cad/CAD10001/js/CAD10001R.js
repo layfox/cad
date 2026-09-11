@@ -1297,7 +1297,7 @@ export default {
                     return
                 }
                 this.currentStep = index
-                this.panelCollapsed1 = true
+                this.panelCollapsed1 = false
             } else if (index == 2) {
                 if (this.entity.TZPZ_STA === '01' || !this.entity.TZPZ_STA) {
                     this.$Message.error('请完成解析图纸后再进行下一步操作')

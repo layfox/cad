@@ -78,6 +78,10 @@ export default {
             isDev: false,
             activeWarningGroups: new Set(),
             globalAnimateRaf: null,
+            globalAnimateLastTime: 0,
+            globalAnimateLastVisibilityTime: 0,
+            globalAnimateWorldPos: new THREE.Vector3(),
+            globalAnimateCanvasRect: null,
             realData: {},
             globalAllSelectedIds: [],
             timer: null,
@@ -372,6 +376,7 @@ export default {
         startGlobalWarningAnimate() {
             if (this.globalAnimateRaf) return;
             const mxObj = MxFun.getCurrentDraw();
+            if (!mxObj) return;
             const period = 1200;
             const maxScaleRate = 1.2;
             const rippleSpawnInterval = 500;
@@ -382,10 +387,30 @@ export default {
                     return;
                 }
                 const now = performance.now();
-                const deltaTime = 16;
+                if (!this.globalAnimateLastTime) {
+                    this.globalAnimateLastTime = now;
+                }
+                const deltaTime = Math.min(now - this.globalAnimateLastTime, 100);
+                // 告警动画不需要以 CAD 的最高刷新率运行，降低到约 30fps，
+                // 可明显减少 WASM/CAD 重绘和大量标注同时计算时的主线程占用。
+                if (now - this.globalAnimateLastTime < 33) {
+                    this.globalAnimateRaf = requestAnimationFrame(loop);
+                    return;
+                }
+                this.globalAnimateLastTime = now;
                 rippleSpawnTimer += deltaTime;
                 const needSpawnRipple = rippleSpawnTimer > rippleSpawnInterval;
                 if (needSpawnRipple) rippleSpawnTimer = 0;
+                if (
+                    !this.globalAnimateCanvasRect ||
+                    now - this.globalAnimateLastVisibilityTime > 100
+                ) {
+                    const canvasDom = document.getElementById("mxcad");
+                    this.globalAnimateCanvasRect = canvasDom
+                        ? canvasDom.getBoundingClientRect()
+                        : null;
+                    this.globalAnimateLastVisibilityTime = now;
+                }
                 for (const group of this.activeWarningGroups) {
                     if (group.userData._destroyed) {
                         this.activeWarningGroups.delete(group);
@@ -393,13 +418,16 @@ export default {
                     }
                     if (this.lastHoverGroup === group) continue;
                     // =========视口剔除优化：不在画布视口直接跳过动画计算=========
-                    const worldPos = new THREE.Vector3();
-                    worldPos.setFromMatrixPosition(group.matrixWorld);
-                    const screenRes = MxFun.worldCoord2Screen(worldPos.x, worldPos.y, worldPos.z);
-                    const canvasDom = document.getElementById("mxcad");
-                    if (canvasDom && screenRes) {
-                        const rect = canvasDom.getBoundingClientRect();
-                        if (screenRes.x < -100 || screenRes.x > rect.width + 100 || screenRes.y < -100 || screenRes.y > rect.height + 100) {
+                    this.globalAnimateWorldPos.setFromMatrixPosition(group.matrixWorld);
+                    const screenRes = MxFun.worldCoord2Screen(
+                        this.globalAnimateWorldPos.x,
+                        this.globalAnimateWorldPos.y,
+                        this.globalAnimateWorldPos.z
+                    );
+                    if (this.globalAnimateCanvasRect && screenRes) {
+                        const rect = this.globalAnimateCanvasRect;
+                        if (screenRes.x < -100 || screenRes.x > rect.width + 100 ||
+                            screenRes.y < -100 || screenRes.y > rect.height + 100) {
                             continue;
                         }
                     }
@@ -436,6 +464,9 @@ export default {
                 mxObj.updateDisplay(true);
                 this.globalAnimateRaf = requestAnimationFrame(loop);
             }
+            this.globalAnimateLastTime = 0;
+            this.globalAnimateLastVisibilityTime = 0;
+            this.globalAnimateCanvasRect = null;
             this.globalAnimateRaf = requestAnimationFrame(loop);
         },
         stopGlobalWarningAnimate() {
@@ -443,6 +474,9 @@ export default {
                 cancelAnimationFrame(this.globalAnimateRaf);
                 this.globalAnimateRaf = null;
             }
+            this.globalAnimateLastTime = 0;
+            this.globalAnimateLastVisibilityTime = 0;
+            this.globalAnimateCanvasRect = null;
         },
         createBindMarker1(bindItem) {
             const mxObj = MxFun.getCurrentDraw();
@@ -707,7 +741,6 @@ export default {
                 worldPos.setFromMatrixPosition(this.lastHoverGroup.matrixWorld);
                 const res = this.world2Screen(worldPos);
                 const hoverItem = this.annotationById.get(this.lastHoverGroup.userData.annotationId)
-                console.log(hoverItem, 222)
                 if (res) {
                     const rawX = res.x;
                     const rawY = res.y - 54;
@@ -1246,7 +1279,7 @@ export default {
                         }
                     })
                     if (this.timer) {
-                        this.clearInterval(this.timer)
+                        clearInterval(this.timer)
                         this.timer = null
                     }
                     this.timer = setInterval(() => {
