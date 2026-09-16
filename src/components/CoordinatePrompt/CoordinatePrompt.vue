@@ -8,9 +8,9 @@ import { Component, Vue } from "vue-property-decorator";
   name: "CoordinatePrompt",
 })
 export default class CoordinatePrompt extends Vue {
-     get tipCoord() {
-        return this.$store.state.tipCoord
-    } 
+		get tipCoord() {
+		return this.$store.state.tipCoord;
+	}
 }
 </script>
 

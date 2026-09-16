@@ -99,12 +99,12 @@ export default {
         _fillFromSurvey(survey) {
             this.form.code = survey.PT_ID || ''
             this.form.name = survey.PT_NAM || ''
-            const existing = this._parseExistingCoord(survey)
-            // 如果已有坐标值（画布拾取回填的），不覆盖
-            if (existing && (this.form.x === null || this.form.y === null)) {
-                this.form.x = existing[0]
-                this.form.y = existing[1]
-            }
+            // const existing = this._parseExistingCoord(survey)
+            // // 如果已有坐标值（画布拾取回填的），不覆盖
+            // if (existing && (this.form.x === null || this.form.y === null)) {
+            //     this.form.x = existing[0]
+            //     this.form.y = existing[1]
+            // }
         },
         _parseExistingCoord(survey) {
             if (survey.PT_X_VALUE && survey.PT_Y_VALUE) return [parseFloat(survey.PT_X_VALUE), parseFloat(survey.PT_Y_VALUE)]

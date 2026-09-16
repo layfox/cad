@@ -216,327 +216,327 @@ import { MxFun } from "mxdraw";
 @Component
 export default class IvCadViewer extends Vue {
   // 文件 URL
-  fileUrlInput = "./HDMY-XJH.mxweb";
-  fileName = "";
+  public fileUrlInput = "./HDMY-XJH.mxweb";
+  public fileName = "";
 
   // 加载状态
-  loading = true;
-  loadingText = "正在初始化 MxCAD 查看器...";
-  loadingStep = "准备中";
-  loadingProgress = 0;
+  public loading = true;
+  public loadingText = "正在初始化 MxCAD 查看器...";
+  public loadingStep = "准备中";
+  public loadingProgress = 0;
 
   // Viewer 状态
-  viewerReady = false;
-  mxcad: any = null;
-  mxDraw: any = null;
+  public viewerReady = false;
+  public mxcad: any = null;
+  public mxDraw: any = null;
 
   // 图层数据
-  layerCount = 0;
-  layers: any[] = [];
-  showLayers = false;
+  public layerCount = 0;
+  public layers: any[] = [];
+  public showLayers = false;
 
   // 帮助弹窗
-  showHelp = false;
+  public showHelp = false;
 
-  mounted() {
-    this.initViewer();
+  public mounted() {
+	this.initViewer();
   }
 
-  beforeDestroy() {
-    this.destroyViewer();
+  public beforeDestroy() {
+	this.destroyViewer();
   }
 
   /**
    * 初始化 Viewer
    */
-  async initViewer() {
-    try {
-      this.loading = true;
-      this.loadingText = "正在初始化 MxCAD 查看器...";
-      this.loadingStep = "加载核心模块";
-      this.loadingProgress = 10;
+  public async initViewer() {
+	try {
+		this.loading = true;
+		this.loadingText = "正在初始化 MxCAD 查看器...";
+		this.loadingStep = "加载核心模块";
+		this.loadingProgress = 10;
 
-      const useST = !("SharedArrayBuffer" in window);
-      const wasmPath = useST ? "./wasm/2d-st/" : "./wasm/2d/";
+		const useST = !("SharedArrayBuffer" in window);
+		const wasmPath = useST ? "./wasm/2d-st/" : "./wasm/2d/";
 
-      console.log("WASM 路径:", wasmPath);
+		console.log("WASM 路径:", wasmPath);
 
-      this.loadingStep = "初始化 WASM 模块";
-      this.loadingProgress = 30;
+		this.loadingStep = "初始化 WASM 模块";
+		this.loadingProgress = 30;
 
-      const mxcad = await createMxCad({
-        canvas: "#mxcad",
-        locateFile: (fileName: string) => {
-          return new URL(wasmPath + fileName, window.location.origin + window.location.pathname).href;
-        },
-        fileUrl: "./HDMY-XJH.mxweb",
-        browse: true,
-        multipleSelect: false,
-        middlePan: 1,
-        authorized_service: "same_current_page_url",
-        onInit: () => {
-          console.log("MxCAD 初始化回调，加载字体...");
-          try {
-            MxCpp.App.addNetworkLoadingFont([
-              "txt.shx",
-              "simplex.shx",
-              "gdt.shx",
-              "aaa.shx",
-              "ltypeshp.shx",
-              "complex.shx",
-              "isocp.shx",
-              "isoct.shx",
-              "romans.shx"
-            ]);
-            MxCpp.App.addNetworkLoadingBigFont([
-              "hztxt.shx",
-              "gbcbig.shx",
-              "tssdchn.shx",
-              "gbhzfs.shx"
-            ]);
-          } catch (e) {
-            console.warn("字体加载警告:", e);
-          }
-        }
-      });
+		const mxcad = await createMxCad({
+		canvas: "#mxcad",
+		locateFile: (fileName: string) => {
+			return new URL(wasmPath + fileName, window.location.origin + window.location.pathname).href;
+		},
+		fileUrl: "./HDMY-XJH.mxweb",
+		browse: true,
+		multipleSelect: false,
+		middlePan: 1,
+		authorized_service: "same_current_page_url",
+		onInit: () => {
+			console.log("MxCAD 初始化回调，加载字体...");
+			try {
+			MxCpp.App.addNetworkLoadingFont([
+				"txt.shx",
+				"simplex.shx",
+				"gdt.shx",
+				"aaa.shx",
+				"ltypeshp.shx",
+				"complex.shx",
+				"isocp.shx",
+				"isoct.shx",
+				"romans.shx",
+			]);
+			MxCpp.App.addNetworkLoadingBigFont([
+				"hztxt.shx",
+				"gbcbig.shx",
+				"tssdchn.shx",
+				"gbhzfs.shx",
+			]);
+			} catch (e) {
+			console.warn("字体加载警告:", e);
+			}
+		},
+		});
 
-      console.log("MxCAD 实例创建成功:", mxcad);
+		console.log("MxCAD 实例创建成功:", mxcad);
 
-      this.mxcad = mxcad;
-      this.mxDraw = mxcad.mxdraw;
+		this.mxcad = mxcad;
+		this.mxDraw = mxcad.mxdraw;
 
-      this.loadingStep = "初始化完成";
-      this.loadingProgress = 90;
+		this.loadingStep = "初始化完成";
+		this.loadingProgress = 90;
 
-      // 监听文件加载完成
-      mxcad.mxdraw.on("openFileComplete", () => {
-        console.log("文件加载完成");
-        this.onFileLoaded();
-      });
+		// 监听文件加载完成
+		mxcad.mxdraw.on("openFileComplete", () => {
+		console.log("文件加载完成");
+		this.onFileLoaded();
+		});
 
-      // 监听图层数据更新
-      mxcad.mxdraw.on("uiSetLayerData", (listLayer: any[]) => {
-        console.log("图层数据更新:", listLayer);
-        this.layers = listLayer.map(v => ({
-          name: v.name,
-          id: v.id,
-          off: v.off,
-          colorValue: v.colorValue
-        }));
-        this.layerCount = this.layers.length;
-      });
+		// 监听图层数据更新
+		mxcad.mxdraw.on("uiSetLayerData", (listLayer: any[]) => {
+		console.log("图层数据更新:", listLayer);
+		this.layers = listLayer.map((v) => ({
+			name: v.name,
+			id: v.id,
+			off: v.off,
+			colorValue: v.colorValue,
+		}));
+		this.layerCount = this.layers.length;
+		});
 
-      this.viewerReady = true;
-      this.loading = false;
-      this.loadingProgress = 100;
-      this.fileName = "HDMY-XJH.mxweb";
+		this.viewerReady = true;
+		this.loading = false;
+		this.loadingProgress = 100;
+		this.fileName = "HDMY-XJH.mxweb";
 
-      this.$Message.success("MxCAD 查看器初始化成功");
+		this.$Message.success("MxCAD 查看器初始化成功");
 
-    } catch (error) {
-      console.error("MxCAD 初始化失败:", error);
-      this.loading = false;
-      this.$Message.error("MxCAD 查看器初始化失败: " + (error as Error).message);
-    }
+	} catch (error) {
+		console.error("MxCAD 初始化失败:", error);
+		this.loading = false;
+		this.$Message.error("MxCAD 查看器初始化失败: " + (error as Error).message);
+	}
   }
 
   /**
    * 文件加载完成回调
    */
-  onFileLoaded() {
-    console.log("文件加载完成");
-    this.zoomAll();
+  public onFileLoaded() {
+	console.log("文件加载完成");
+	this.zoomAll();
   }
 
   /**
    * 加载示例图纸
    */
-  loadExample() {
-    this.fileUrlInput = "./demo/test2.mxweb";
-    this.loadFromUrl();
+  public loadExample() {
+	this.fileUrlInput = "./demo/test2.mxweb";
+	this.loadFromUrl();
   }
 
   /**
    * 从 URL 加载
    */
-  loadFromUrl() {
-    if (!this.fileUrlInput) {
-      this.$Message.warning("请输入文件 URL");
-      return;
-    }
-    // 重新加载
-    this.destroyViewer();
-    this.$nextTick(() => {
-      this.initViewerWithFile(this.fileUrlInput);
-    });
+  public loadFromUrl() {
+	if (!this.fileUrlInput) {
+		this.$Message.warning("请输入文件 URL");
+		return;
+	}
+	// 重新加载
+	this.destroyViewer();
+	this.$nextTick(() => {
+		this.initViewerWithFile(this.fileUrlInput);
+	});
   }
 
   /**
    * 带文件初始化
    */
-  async initViewerWithFile(fileUrl: string) {
-    try {
-      this.loading = true;
-      this.loadingText = "正在加载图纸...";
-      this.loadingStep = "创建渲染实例";
-      this.loadingProgress = 50;
+  public async initViewerWithFile(fileUrl: string) {
+	try {
+		this.loading = true;
+		this.loadingText = "正在加载图纸...";
+		this.loadingStep = "创建渲染实例";
+		this.loadingProgress = 50;
 
-      const useST = !("SharedArrayBuffer" in window);
-      const wasmPath = useST ? "./wasm/2d-st/" : "./wasm/2d/";
+		const useST = !("SharedArrayBuffer" in window);
+		const wasmPath = useST ? "./wasm/2d-st/" : "./wasm/2d/";
 
-      const mxcad = await createMxCad({
-        canvas: "#mxcad",
-        locateFile: (fileName: string) => {
-          return new URL(wasmPath + fileName, window.location.origin + window.location.pathname).href;
-        },
-        fileUrl: fileUrl,
-        browse: true,
-        multipleSelect: false,
-        middlePan: 1,
-        authorized_service: "same_current_page_url",
-        onInit: () => {
-          try {
-            MxCpp.App.addNetworkLoadingFont([
-              "txt.shx", "simplex.shx", "gdt.shx", "aaa.shx",
-              "ltypeshp.shx", "complex.shx", "isocp.shx", "isoct.shx", "romans.shx"
-            ]);
-            MxCpp.App.addNetworkLoadingBigFont([
-              "hztxt.shx", "gbcbig.shx", "tssdchn.shx", "gbhzfs.shx"
-            ]);
-          } catch (e) {
-            console.warn("字体加载警告:", e);
-          }
-        }
-      });
+		const mxcad = await createMxCad({
+		canvas: "#mxcad",
+		locateFile: (fileName: string) => {
+			return new URL(wasmPath + fileName, window.location.origin + window.location.pathname).href;
+		},
+		fileUrl,
+		browse: true,
+		multipleSelect: false,
+		middlePan: 1,
+		authorized_service: "same_current_page_url",
+		onInit: () => {
+			try {
+			MxCpp.App.addNetworkLoadingFont([
+				"txt.shx", "simplex.shx", "gdt.shx", "aaa.shx",
+				"ltypeshp.shx", "complex.shx", "isocp.shx", "isoct.shx", "romans.shx",
+			]);
+			MxCpp.App.addNetworkLoadingBigFont([
+				"hztxt.shx", "gbcbig.shx", "tssdchn.shx", "gbhzfs.shx",
+			]);
+			} catch (e) {
+			console.warn("字体加载警告:", e);
+			}
+		},
+		});
 
-      this.mxcad = mxcad;
-      this.mxDraw = mxcad.mxdraw;
-      this.fileName = fileUrl.split("/").pop() || "unknown";
+		this.mxcad = mxcad;
+		this.mxDraw = mxcad.mxdraw;
+		this.fileName = fileUrl.split("/").pop() || "unknown";
 
-      mxcad.mxdraw.on("openFileComplete", () => {
-        this.onFileLoaded();
-      });
+		mxcad.mxdraw.on("openFileComplete", () => {
+		this.onFileLoaded();
+		});
 
-      mxcad.mxdraw.on("uiSetLayerData", (listLayer: any[]) => {
-        this.layers = listLayer.map(v => ({
-          name: v.name,
-          id: v.id,
-          off: v.off,
-          colorValue: v.colorValue
-        }));
-        this.layerCount = this.layers.length;
-      });
+		mxcad.mxdraw.on("uiSetLayerData", (listLayer: any[]) => {
+		this.layers = listLayer.map((v) => ({
+			name: v.name,
+			id: v.id,
+			off: v.off,
+			colorValue: v.colorValue,
+		}));
+		this.layerCount = this.layers.length;
+		});
 
-      this.viewerReady = true;
-      this.loading = false;
-      this.loadingProgress = 100;
+		this.viewerReady = true;
+		this.loading = false;
+		this.loadingProgress = 100;
 
-    } catch (error) {
-      console.error("文件加载失败:", error);
-      this.loading = false;
-      this.$Message.error("文件加载失败: " + (error as Error).message);
-    }
+	} catch (error) {
+		console.error("文件加载失败:", error);
+		this.loading = false;
+		this.$Message.error("文件加载失败: " + (error as Error).message);
+	}
   }
 
   /**
    * 上传前处理
    */
-  handleBeforeUpload(file: File) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      // TODO: 处理本地文件
-      this.$Message.info("本地文件加载功能开发中");
-    };
-    reader.readAsArrayBuffer(file);
-    return false;
+  public handleBeforeUpload(file: File) {
+	const reader = new FileReader();
+	reader.onload = (e) => {
+		// TODO: 处理本地文件
+		this.$Message.info("本地文件加载功能开发中");
+	};
+	reader.readAsArrayBuffer(file);
+	return false;
   }
 
   /**
    * 转换上传
    */
-  handleConvertUpload(file: File) {
-    this.$Message.info("DWG 转换功能需要后端服务支持");
-    return false;
+  public handleConvertUpload(file: File) {
+	this.$Message.info("DWG 转换功能需要后端服务支持");
+	return false;
   }
 
   /**
    * 缩放至全图
    */
-  zoomAll() {
-    if (this.mxDraw) {
-      this.mxDraw.zoomAll();
-    }
+  public zoomAll() {
+	if (this.mxDraw) {
+		this.mxDraw.zoomAll();
+	}
   }
 
   /**
    * 放大
    */
-  zoomIn() {
-    if (this.mxDraw) {
-      this.mxDraw.zoomScale(1.5);
-    }
+  public zoomIn() {
+	if (this.mxDraw) {
+		this.mxDraw.zoomScale(1.5);
+	}
   }
 
   /**
    * 缩小
    */
-  zoomOut() {
-    if (this.mxDraw) {
-      this.mxDraw.zoomScale(0.67);
-    }
+  public zoomOut() {
+	if (this.mxDraw) {
+		this.mxDraw.zoomScale(0.67);
+	}
   }
 
   /**
    * 重置视图
    */
-  resetView() {
-    this.zoomAll();
+  public resetView() {
+	this.zoomAll();
   }
 
   /**
    * 开始测量
    */
-  startMeasure() {
-    this.$Message.info("距离测量功能开发中");
+  public startMeasure() {
+	this.$Message.info("距离测量功能开发中");
   }
 
   /**
    * 面积测量
    */
-  startAreaMeasure() {
-    this.$Message.info("面积测量功能开发中");
+  public startAreaMeasure() {
+	this.$Message.info("面积测量功能开发中");
   }
 
   /**
    * 截图
    */
-  takeScreenshot() {
-    this.$Message.info("截图功能开发中");
+  public takeScreenshot() {
+	this.$Message.info("截图功能开发中");
   }
 
   /**
    * 切换图层
    */
-  toggleLayer(layerId: number, visible: boolean) {
-    if (this.mxDraw && MxFun) {
-      MxFun.showLayer(layerId, visible, false);
-    }
+  public toggleLayer(layerId: number, visible: boolean) {
+	if (this.mxDraw && MxFun) {
+		MxFun.showLayer(layerId, visible, false);
+	}
   }
 
   /**
    * 销毁查看器
    */
-  destroyViewer() {
-    try {
-      if (this.mxcad && this.mxcad.destroy) {
-        this.mxcad.destroy();
-      }
-      this.mxcad = null;
-      this.mxDraw = null;
-      this.viewerReady = false;
-    } catch (e) {
-      console.warn("销毁查看器时出错:", e);
-    }
+  public destroyViewer() {
+	try {
+		if (this.mxcad && this.mxcad.destroy) {
+		this.mxcad.destroy();
+		}
+		this.mxcad = null;
+		this.mxDraw = null;
+		this.viewerReady = false;
+	} catch (e) {
+		console.warn("销毁查看器时出错:", e);
+	}
   }
 }
 </script>

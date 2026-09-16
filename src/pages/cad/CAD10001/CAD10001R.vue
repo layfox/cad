@@ -10,6 +10,11 @@
                 <Button type="primary" @click="stopVersion" v-if="currentStep == 3">停用版本</Button>
                 <Button type="primary" @click="setDefault" v-if="currentStep == 3&&entity.TZPZ_STA==='04'&&!isDefault">设置默认页</Button>
                 <Button v-if="currentStep == 1 || currentStep == 2 || (currentStep == 3 && entity.TZPZ_STA!=='04')" @click="onStep(currentStep - 1)">返回上一步</Button>
+                <div class="btn-list">
+                    <div @click="toList" class="btn-list-box">
+                        <Icon title="打开列表" type="ios-list" />
+                    </div>
+                </div>
             </div>
             <div class="page-main">
                 <div class="step-container">
@@ -35,10 +40,10 @@
                                     </FormItem>
                                     </Col>
                                     <Col :span="6">
-                                    <FormItem label="图纸信息名称" prop="TZXX_ID"
+                                    <FormItem label="图纸类型名称" prop="TZXX_ID"
                                         :rules="[{ required: true, message: '请选择图纸信息', trigger: 'change' }]">
                                         <Input :disabled="entity.TZPZ_STA && entity.TZPZ_STA !== '01'"
-                                            v-model="entity.TZXX_ID" style="cursor:pointer">
+                                            v-model="entity.TZLX_NAM" style="cursor:pointer">
                                         <Button @click="selectTz" :disabled="entity.TZPZ_STA && entity.TZPZ_STA !== '01'" slot="append" icon="ios-more"></Button>
                                         </Input>
                                     </FormItem>
@@ -78,30 +83,19 @@
                     <div class="step-content" v-show="currentStep == 1 || currentStep == 2 || currentStep == 3">
                         <div class="step-content-header">{{ currentStep == 1 ? '图纸解析' : (currentStep == 2 ? '点位绑定' : '绑定结果') }}</div>
                         <div class="viewer-container">
-                            <div class="viewer-panel" :class="panelCollapsed ? '' : 'expand'" v-show="currentStep == 1">
-                                <ViewerPanel v-show="!panelCollapsed" :layers="layers" :points="pointList"
-                                    @toggle-layer="onToggleLayer" @zoom-to-point="zoomToPoint"
-                                    style="height:calc(100% - 36px);margin-bottom: 16px;" />
-                                <div v-if="panelCollapsed" class="viewer-panel-btn" @click="panelCollapsed = false">
-                                    <img src="./css/images/expand.png" alt="">
-                                </div>
-                                <div v-else class="viewer-panel-btn" @click="panelCollapsed = true">
-                                    <img src="./css/images/collapse.png" alt="">
-                                </div>
+                            <div class="viewer-panel" :class="panelCollapsed?'panel-collapsed':''" v-show="currentStep == 1">
+                                <ViewerPanel :layers="layers" :points="pointList"
+                                    @toggle-layer="onToggleLayer" @zoom-to-point="zoomToPoint" />
+                                <div class="collapse-btn" @click="panelCollapsed = !panelCollapsed"></div>
                             </div>
-                            <div class="viewer-panel panel1" :class="panelCollapsed1 ? '' : 'expand'"
+                            <div class="viewer-panel panel1" :class="panelCollapsed1?'panel-collapsed':''"
                                 v-show="currentStep == 2||currentStep==3">
-                                <ViewerPanel1 ref="viewerPanel1" :tzpz-no="entity.TZPZ_NO" :status="entity.TZPZ_STA" v-show="!panelCollapsed1" @zoom-to-point="zoomToPoint1"
+                                <ViewerPanel1 ref="viewerPanel1" :tzpz-no="entity.TZPZ_NO" :status="entity.TZPZ_STA" @zoom-to-point="zoomToPoint1"
                                     @delete-points="onDeletePoints" @auto-match="onAutoMatch"
                                     @manual-match="onManualMatch" @auto-place="onAutoPlace"
                                     @manual-place="onManualPlace" @unmatch="onUnmatch" @add-points="onAddPoints"
-                                    style="height:calc(100% - 36px);margin-bottom: 16px;" />
-                                <div v-if="panelCollapsed1" class="viewer-panel-btn" @click="panelCollapsed1 = false">
-                                    <img src="./css/images/expand.png" alt="">
-                                </div>
-                                <div v-else class="viewer-panel-btn" @click="panelCollapsed1 = true">
-                                    <img src="./css/images/collapse.png" alt="">
-                                </div>
+                                    style="height:100%;" />
+                                <div class="collapse-btn" @click="panelCollapsed1 = !panelCollapsed1"></div>
                             </div>
                             <div class="viewer-content">
                                 <div ref="viewerContainer" class="viewer-box">

@@ -79,21 +79,42 @@
     color: #333333;
 }
 
-.viewer-panel {
+#CAD10002R .viewer-panel {
     position: absolute;
-    left: 16px;
-    bottom: 16px;
-    padding: 16px;
+    width: 569px;
+    height: 94%;
+    max-height: 862px;
+    padding: 24px 56px 24px 32px;
+    top: 16px;
+    left: 10px;
     font-size: 0;
-    background: rgba(255,255,255,1);
-    box-shadow: 0px 0px 15px 0px rgba(0,0,0,0.05);
-    border-radius: 8px 8px 8px 8px;
+    background: url('./images/panel-bg.png') no-repeat center right;
+    background-size: 100% 100%;
     z-index: 100;
+    transform: translateX(0);
+    transition: all 0.3s;
 }
 
-#CAD10002R .viewer-panel.expand {
-    top: 16px;
-    width: 545px;
+#CAD10002R .viewer-panel.panel-collapsed {
+  transform: translateX(-541px);
+}
+
+#CAD10002R .viewer-panel.panel-collapsed .collapse-btn {
+    transform: rotate(180deg);
+    right: 14px;
+}
+
+#CAD10002R .collapse-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  width: 34px;
+  height: 100px;
+  margin-top: -50px;
+  cursor: pointer;
+  background: url('./images/collapse-icon.png') no-repeat 6px center;
+  background-size: 14px 12px;
+  cursor: pointer;
 }
 
 .viewer-panel-btn {
@@ -139,8 +160,44 @@
     animation: alarm-breath 1s infinite alternate;
 }
 
-.viewer-panel-box {
+#CAD10002R .viewer-panel-box {
   height: 100%;
+}
+
+.viewer-collapse-panel {
+  position: absolute;
+  width: 34px;
+  height: 90%;
+  max-height: 862px;
+  top: 16px;
+  left: 0;
+  font-size: 0;
+  z-index: 100;
+  background: url('./images/collapse-panel.png') no-repeat left center;
+}
+
+.expand-btn {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 34px;
+  height: 100px;
+  margin-top: -50px;
+  cursor: pointer;
+  background: url('./images/expand-icon.png') no-repeat 6px center;
+  background-size: 14px 12px;
+  cursor: pointer;
+}
+
+.viewer-panel-slide-enter-active,
+.viewer-panel-slide-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.viewer-panel-slide-enter,
+.viewer-panel-slide-leave-to {
+  opacity: 0;
+  transform: translateX(32px);
 }
 
 .mx-tooltip1 {

@@ -15,13 +15,13 @@ import { Component, Vue, Prop } from "vue-property-decorator";
 })
 
 export default class OperationInstruction extends Vue {
-    @Prop({
-        type: Number,
-        default: 0
-    }) left!: number
-    get msCmdTip() {
-        return this.$store.state.msCmdTip
-    } 
+	@Prop({
+		type: Number,
+		default: 0,
+	}) public left!: number;
+	get msCmdTip() {
+		return this.$store.state.msCmdTip;
+	}
 }
 </script>
 

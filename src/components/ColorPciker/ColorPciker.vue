@@ -7,28 +7,28 @@
 
 <script lang='ts'>
 import { Component, Vue, Prop } from "vue-property-decorator";
-import { Sketch } from 'vue-color'
+import { Sketch } from 'vue-color';
 @Component({
   name: "ColorPciker",
    components: {
-    Sketch
+	Sketch,
   },
 })
 export default class ColorPciker extends Vue {
-    @Prop({
-      default: "#ffffff"
-    }) value:any
-    isShowColorPicker = false
-    show() {
-        this.isShowColorPicker = true
-    }
-    hide() {
-        this.isShowColorPicker = false
-    }
-    onInput(color:any) {
-      this.$emit('input', color)
-    }
-    
+	@Prop({
+		default: "#ffffff",
+	}) public value: any;
+	public isShowColorPicker = false;
+	public show() {
+		this.isShowColorPicker = true;
+	}
+	public hide() {
+		this.isShowColorPicker = false;
+	}
+	public onInput(color: any) {
+		this.$emit('input', color);
+	}
+
 }
 </script>
 

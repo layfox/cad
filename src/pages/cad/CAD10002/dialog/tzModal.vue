@@ -114,9 +114,10 @@ export default {
       return [
         { type: 'selection', width: 45, align: 'center' },
         { title: '配置编码', key: 'TZPZ_ID', minWidth: 200 },
-        { title: '配置人员', key: 'TZPZ_USR', minWidth: 120 },
+        // { title: '配置人员', key: 'TZPZ_USR', minWidth: 120 },
         { title: '图纸信息编码', key: 'TZXX_ID', minWidth: 120 },
-        { title: '配置状态', key: 'TZPZ_STA_NAM', minWidth: 100, align: 'center' },
+        { title: '图纸类型名称', key: 'TZLX_NAM', minWidth: 160 },
+        // { title: '配置状态', key: 'TZPZ_STA_NAM', minWidth: 100, align: 'center' },
         { title: '图纸版本', key: 'TZ_VERSION', minWidth: 100, align: 'center' },
         { title: '配置日期', key: 'TZPZ_DAT', minWidth: 120, align: 'center' }
       ]

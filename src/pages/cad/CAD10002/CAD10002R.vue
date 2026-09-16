@@ -11,54 +11,51 @@
             </div>
         </div>
         <div class="page-content">
-          <div class="viewer-panel" :style="{width: panelCollapsed ? '' : '545px'}" :class="panelCollapsed?'':'expand'">
-            <div class="viewer-panel-box" style="height: calc(100% - 36px); margin-bottom: 16px;" v-show="tabIndex === 0&&!panelCollapsed">
-                <ViewerPanel
-                    ref="panel1Ref"
-                    :categories="categories"
-                    title="安全监测"
-                    @zoom-to-point="zoomToPoint"
-                    panel-key="safety"
-                    @select-change="onPanelSelectChange"
-                />
-            </div>
-            <div class="viewer-panel-box" style="height: calc(100% - 36px); margin-bottom: 16px;" v-show="tabIndex === 1&&!panelCollapsed">
-                <ViewerPanel
-                    ref="panel2Ref"
-                    title="水文监测"
-                    @zoom-to-point="zoomToPoint"
-                    :categories="categories1"
-                    panel-key="hydro"
-                    @select-change="onPanelSelectChange"
-                />
-            </div>
-            <div class="viewer-panel-box" style="height: calc(100% - 36px); margin-bottom: 16px;" v-show="tabIndex === 2&&!panelCollapsed">
-                <ViewerPanel
-                    ref="panel3Ref"
-                    title="瓦斯抽采"
-                    :categories="categories2"
-                    panel-key="gas"
-                    @zoom-to-point="zoomToPoint"
-                    @select-change="onPanelSelectChange"
-                />
-            </div>
-            <div class="viewer-panel-box" style="height: calc(100% - 36px); margin-bottom: 16px;" v-show="tabIndex === 3&&!panelCollapsed">
-                <ViewerPanel
-                    ref="panel4Ref"
-                    :categories="categories3"
-                    @zoom-to-point="zoomToPoint"
-                    title="人员定位站"
-                    panel-key="person"
-                    @select-change="onPanelSelectChange"
-                />
-            </div>
-              <div v-if="panelCollapsed" class="viewer-panel-btn" @click="panelCollapsed = false">
-                  <img src="./css/images/expand.png" alt="">
+          <!-- <transition name="vierer-panel-slide" mode="out-in"> -->
+            <div class="viewer-panel" :class="panelCollapsed?'panel-collapsed':''">
+              <div class="viewer-panel-box" v-show="tabIndex === 0">
+                  <ViewerPanel
+                      ref="panel1Ref"
+                      :categories="categories"
+                      title="安全监测"
+                      @zoom-to-point="zoomToPoint"
+                      panel-key="safety"
+                      @select-change="onPanelSelectChange"
+                  />
               </div>
-              <div v-else class="viewer-panel-btn" @click="panelCollapsed = true">
-                  <img src="./css/images/collapse.png" alt="">
+              <div class="viewer-panel-box" v-show="tabIndex === 1">
+                  <ViewerPanel
+                      ref="panel2Ref"
+                      title="水文监测"
+                      @zoom-to-point="zoomToPoint"
+                      :categories="categories1"
+                      panel-key="hydro"
+                      @select-change="onPanelSelectChange"
+                  />
               </div>
-          </div>
+              <div class="viewer-panel-box" v-show="tabIndex === 2">
+                  <ViewerPanel
+                      ref="panel3Ref"
+                      title="瓦斯抽采"
+                      :categories="categories2"
+                      panel-key="gas"
+                      @zoom-to-point="zoomToPoint"
+                      @select-change="onPanelSelectChange"
+                  />
+              </div>
+              <div class="viewer-panel-box" v-show="tabIndex === 3">
+                  <ViewerPanel
+                      ref="panel4Ref"
+                      :categories="categories3"
+                      @zoom-to-point="zoomToPoint"
+                      title="人员定位站"
+                      panel-key="person"
+                      @select-change="onPanelSelectChange"
+                  />
+              </div>
+              <div class="collapse-btn" @click="panelCollapsed = !panelCollapsed"></div>
+            </div>
+          <!-- </transition> -->
           <div ref="viewerContent" class="viewer-content">
                 <div ref="viewerContainer" class="viewer-box">
                     <canvas ref="mxcadCanvas" id="mxcad"></canvas>

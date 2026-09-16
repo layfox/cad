@@ -113,6 +113,37 @@ html, body {
   background: rgba(0,0,0,0.35);
 }
 
+.ivu-message {
+  /* 弹窗整体宽度变大 */
+  min-width: 420px !important;
+  padding: 16px 24px !important;
+}
+
+/* 容器背景，按类型强化背景色，更显眼 */
+.ivu-message-success {
+  color: #39b54a !important;
+}
+.ivu-message-error {
+  color: #ff4d4f !important;
+}
+.ivu-message-warning {
+  color: #ff7d00 !important;
+}
+.ivu-message-info {
+  color: #1890ff !important;
+}
+
+/* 字体放大 */
+.ivu-message .ivu-message-content {
+  font-size: 16px !important;
+  line-height: 1.6 !important;
+}
+
+/* 图标颜色改成白色，适配深色背景 */
+/* .ivu-message .ivu-icon {
+  color: #fff !important;
+} */
+
 router-view {
   flex: 1;
   overflow: hidden;

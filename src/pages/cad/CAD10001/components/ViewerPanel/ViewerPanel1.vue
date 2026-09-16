@@ -2,15 +2,15 @@
     <div class="viewer-panel-wrapper">
         <!-- 工具栏 -->
         <div class="vp-toolbar" v-if="status!=='04'">
-            <Button type="primary" @click="onAdd" size="large" ghost><img src="../../css/images/icon1.png" alt="">添加测点</Button>
+            <Button type="primary" @click="onAdd" size="large"><img src="../../css/images/icon1.png" alt="">添加测点</Button>
             <span class="vp-toolbar-label">坐标匹配容差</span>
             <InputNumber v-model="tolerance" :min="0" style="width: 80px" />
-            <Button type="primary" ghost @click="onAutoMatch"><img src="../../css/images/icon2.png" alt="">自动绑定</Button>
-            <Button type="primary" ghost @click="onManualMatch"><img src="../../css/images/icon3.png" alt="">人工绑定</Button>
-            <Button type="primary" ghost @click="onAutoPlace"><img src="../../css/images/icon4.png" alt="">自动布点</Button>
-            <Button type="primary" ghost @click="onManualPlace"><img src="../../css/images/icon4.png" alt="">人工布点</Button>
-            <Button type="primary" ghost @click="onUnmatch"><img src="../../css/images/icon5.png" alt="">解除绑定</Button>
-            <Button type="primary" ghost @click="onDeletePoints(selectedPoints)"><img src="../../css/images/icon6.png" alt="">删除测点</Button>
+            <Button type="primary" @click="onAutoMatch"><img src="../../css/images/icon2.png" alt="">自动绑定</Button>
+            <Button type="primary" @click="onManualMatch"><img src="../../css/images/icon3.png" alt="">人工绑定</Button>
+            <Button type="primary" @click="onAutoPlace"><img src="../../css/images/icon4.png" alt="">自动布点</Button>
+            <Button type="primary" @click="onManualPlace"><img src="../../css/images/icon4.png" alt="">人工布点</Button>
+            <Button type="primary" @click="onUnmatch"><img src="../../css/images/icon5.png" alt="">解除绑定</Button>
+            <Button type="primary" @click="onDeletePoints(selectedPoints)"><img src="../../css/images/icon6.png" alt="">删除测点</Button>
         </div>
 
         <!-- 统计栏 -->
@@ -136,7 +136,7 @@ export default {
             tolerance: 4,
             pointModalVisible: false,
             orgNo: '',
-            isDev: false,
+            isDev: false ,
             pointColumns: [
                 { type: 'selection', width: 60, align: 'center' },
                 { slot: 'seq', title: '序号', key: 'seq', width: 60, align: 'center', render: (h, { row, index }) => {
@@ -354,9 +354,9 @@ export default {
             this.isIndeterminate = false
         },
         onPointRowClick(row) {
-            if (row.PT_X_VALUE && row.PT_Y_VALUE) {
+            //if (row.PT_X_VALUE && row.PT_Y_VALUE) {
                 this.$emit('zoom-to-point', row)
-            }
+            // }
         },
         onDeletePoints(points) {
             this.$emit('delete-points', points)
@@ -387,7 +387,6 @@ export default {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    background: #fff;
 }
 
 /* 工具栏 */
@@ -395,8 +394,7 @@ export default {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 10px;
-    background: #fff;
+    gap: 6px;
     flex-wrap: wrap;
     margin-bottom: 16px;
 }
@@ -409,7 +407,7 @@ export default {
 
 .vp-toolbar .ivu-btn {
     height: 32px;
-    padding: 0 12px;
+    padding: 0 8px;
     font-size: 14px;
     border-radius: 4px;
 }
@@ -490,7 +488,7 @@ export default {
 .vp-body .ivu-table-header thead tr th {
     height: 42px;
     padding: 0 8px;
-    background: #EEF1F6;
+    background: #fff;
     border: none;
 }
 
@@ -498,6 +496,14 @@ export default {
     height: 42px;
     padding: 0 8px;
     border: none;
+}
+
+.vp-body .ivu-table-body tr:nth-child(2n + 1) td {
+    background: #EDF1F9;
+}
+
+.vp-body .ivu-table-body tr:nth-child(2n + 2) td {
+    background: #fff;
 }
 
 .vp-body .ivu-table-cell {
@@ -535,9 +541,9 @@ export default {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px;
+    padding: 8px 16px;
     /* border-top: 1px solid #e8eaec; */
-    background: #fff;
+    /* background: #fff; */
     font-size: 14px;
 }
 

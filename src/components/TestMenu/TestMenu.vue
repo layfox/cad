@@ -96,136 +96,136 @@
 
 <script lang="ts">
 import { Component, Vue, Prop } from "vue-property-decorator";
-import OperationInstruction from "@/components/OperationInstruction/OperationInstruction.vue"
+import OperationInstruction from "@/components/OperationInstruction/OperationInstruction.vue";
 export interface MenuItemType {
   icon: string;
   name: string;
   cmd?: string;
   children?: MenuItemType[];
-  changeCallback?: (item: MenuItemType, event: Event, index: number)=> void
+  changeCallback?: (item: MenuItemType, event: Event, index: number) => void;
 }
 
 @Component({
   name: "TestMenu",
   components: {
-    OperationInstruction
-  }
+	OperationInstruction,
+  },
 })
 export default class TestMenu extends Vue {
   @Prop({
-    type: Array,
-    default: () => {
-      return [
-        {
-          icon: "",
-          name: "",
-          cmd: "",
-          children: [
-            {
-              icon: "",
-              name: "",
-              cmd: "",
-            },
-          ],
-        },
-      ];
-    },
+	type: Array,
+	default: () => {
+		return [
+		{
+			icon: "",
+			name: "",
+			cmd: "",
+			children: [
+			{
+				icon: "",
+				name: "",
+				cmd: "",
+			},
+			],
+		},
+		];
+	},
   })
-  data!: MenuItemType[];
-  submenuData: MenuItemType[] = [];
+  public data!: MenuItemType[];
+  public submenuData: MenuItemType[] = [];
 
   // 子菜单定位
-  submenuLocation = {
-    x: 0,
-    y: 0,
+  public submenuLocation = {
+	x: 0,
+	y: 0,
   };
 
-  activeIndex = -1;
+  public activeIndex = -1;
   // 菜单列表高度最高值
-  menuBoxMaxHeight = 0;
-  isShowSubmenu = false;
-  isShowMenu = true;
-  mounted() {
-    const menu = this.$refs.menu as HTMLElement;
-    const top = this.$refs.top as HTMLElement;
+  public menuBoxMaxHeight = 0;
+  public isShowSubmenu = false;
+  public isShowMenu = true;
+  public mounted() {
+	const menu = this.$refs.menu as HTMLElement;
+	const top = this.$refs.top as HTMLElement;
 
-    let topHeight = 0;
-    for (let i = 0; i < top.children.length; i++) {
-      const el = top.children[i] as HTMLElement;
-      const height = el.scrollHeight;
-      const elStyle = window.getComputedStyle(el);
-      const marginTop = this.transformStylePxToNumber(elStyle.marginTop);
-      const marginBottom = this.transformStylePxToNumber(elStyle.marginBottom);
+	let topHeight = 0;
+	for (let i = 0; i < top.children.length; i++) {
+		const el = top.children[i] as HTMLElement;
+		const height = el.scrollHeight;
+		const elStyle = window.getComputedStyle(el);
+		const marginTop = this.transformStylePxToNumber(elStyle.marginTop);
+		const marginBottom = this.transformStylePxToNumber(elStyle.marginBottom);
 
-      topHeight = topHeight + marginTop + marginBottom + height;
-    }
-    this.menuBoxMaxHeight = menu.clientHeight - topHeight - 10;
+		topHeight = topHeight + marginTop + marginBottom + height;
+	}
+	this.menuBoxMaxHeight = menu.clientHeight - topHeight - 10;
 
-    this.submenuLocation.x = menu.clientWidth - 5;
-    (this.$refs.switch as HTMLElement).classList.add("switch-animation")
+	this.submenuLocation.x = menu.clientWidth - 5;
+	(this.$refs.switch as HTMLElement).classList.add("switch-animation");
   }
 
   // px转number
-  transformStylePxToNumber(str: string) {
-    const index = str.indexOf("px");
-    return Number(str.substring(0, index));
+  public transformStylePxToNumber(str: string) {
+	const index = str.indexOf("px");
+	return Number(str.substring(0, index));
   }
   // 判断是否为移动段
-  _isMobile() {
-    let flag = navigator.userAgent.match(/(phone|pad|pod|iPhone|iPod|ios|iPad|Android|Mobile|BlackBerry|IEMobile|MQQBrowser|JUC|Fennec|wOSBrowser|BrowserNG|WebOS|Symbian|Windows Phone)/i)
-    return flag;
+  public _isMobile() {
+	const flag = navigator.userAgent.match(/(phone|pad|pod|iPhone|iPod|ios|iPad|Android|Mobile|BlackBerry|IEMobile|MQQBrowser|JUC|Fennec|wOSBrowser|BrowserNG|WebOS|Symbian|Windows Phone)/i);
+	return flag;
   }
-  onHover(item: MenuItemType, event: MouseEvent | any, index: number) {
-    if(this._isMobile()) {
-      event.preventDefault();
-      if(!item.children || item.children?.length === 0) this.onChange(item, event, index)
-    }
-    
-    this.isShowSubmenu = true;
-    this.activeIndex = index;
-    let el = event.target as any;
-    if(el.tagName.toLowerCase() === "span" && el.className === "item-name") el = el.parentElement
-    this.submenuData = item.children as MenuItemType[];
-    if (el.tagName.toLowerCase() === "li") {
-      this.$nextTick(() => {
-        const submenu = this.$refs.submenu as HTMLElement;
-        const submenuBadge = this.$refs.submenuBadge as HTMLElement;
-        const winHeight = window.innerHeight;
-        const top = el.getBoundingClientRect().top;
-        
-        const bottom = winHeight - (event.clientY || event.changedTouches[0].clientY);
-        const submenuHeight = submenu.clientHeight;
-        if (bottom > submenuHeight) {
-          submenuBadge.className = "submenu-badge submenu-badge-top";
-          this.submenuLocation.y = top - el.clientHeight / 3
-        } else {
-          const menuTopSlot = this.$refs.top as HTMLElement;
-          submenuBadge.className = "submenu-badge submenu-badge-bottom";
-          this.submenuLocation.y =
-            top - submenuHeight + menuTopSlot.clientHeight
-        } 
-      });
-       
-    }
-   
-    this.$emit("hover", item, event, index);
+  public onHover(item: MenuItemType, event: MouseEvent | any, index: number) {
+	if (this._isMobile()) {
+		event.preventDefault();
+		if (!item.children || item.children?.length === 0) { this.onChange(item, event, index); }
+	}
+
+	this.isShowSubmenu = true;
+	this.activeIndex = index;
+	let el = event.target as any;
+	if (el.tagName.toLowerCase() === "span" && el.className === "item-name") { el = el.parentElement; }
+	this.submenuData = item.children as MenuItemType[];
+	if (el.tagName.toLowerCase() === "li") {
+		this.$nextTick(() => {
+		const submenu = this.$refs.submenu as HTMLElement;
+		const submenuBadge = this.$refs.submenuBadge as HTMLElement;
+		const winHeight = window.innerHeight;
+		const top = el.getBoundingClientRect().top;
+
+		const bottom = winHeight - (event.clientY || event.changedTouches[0].clientY);
+		const submenuHeight = submenu.clientHeight;
+		if (bottom > submenuHeight) {
+			submenuBadge.className = "submenu-badge submenu-badge-top";
+			this.submenuLocation.y = top - el.clientHeight / 3;
+		} else {
+			const menuTopSlot = this.$refs.top as HTMLElement;
+			submenuBadge.className = "submenu-badge submenu-badge-bottom";
+			this.submenuLocation.y =
+			top - submenuHeight + menuTopSlot.clientHeight;
+		}
+		});
+
+	}
+
+	this.$emit("hover", item, event, index);
   }
   /** 关闭子菜单 */
-  closeSubmenu() {
-    this.isShowSubmenu = false;
+  public closeSubmenu() {
+	this.isShowSubmenu = false;
   }
-  /** 关闭按钮激活状态 */ 
-  closeActive() {
-    this.activeIndex = -1
+  /** 关闭按钮激活状态 */
+  public closeActive() {
+	this.activeIndex = -1;
   }
   /** 关闭菜单 */
-  closeMenu() {
-    this.isShowMenu = false
+  public closeMenu() {
+	this.isShowMenu = false;
   }
-  onChange(item: MenuItemType, event: Event, index: number) {
-    item.changeCallback && item.changeCallback.call(this, item, event, index)
-    this.$emit("change", item, event, index);
-    this.closeSubmenu();
+  public onChange(item: MenuItemType, event: Event, index: number) {
+	item.changeCallback && item.changeCallback.call(this, item, event, index);
+	this.$emit("change", item, event, index);
+	this.closeSubmenu();
   }
 }
 </script>

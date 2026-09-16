@@ -36,7 +36,7 @@ export function createThreeDashedRectangle(pt1: Vector3, pt3: Vector3) {
 
 	const geometry = new Geometry();
 	geometry.setFromPoints(computeRectPoints(pt1, pt3));
-	let line = new LineLoop(geometry, new LineDashedMaterial({
+	const line = new LineLoop(geometry, new LineDashedMaterial({
 		color: 0x208CA6, // 线段的颜色
 		dashSize: 3,
 		gapSize: 1,

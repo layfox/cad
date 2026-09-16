@@ -32,6 +32,8 @@
         @on-select-cancel="onSelectCancel"
         @on-select-all="onSelectAll"
         @on-select-all-cancel="onSelectAllCancel"
+        @on-row-click="onRowClick"
+        @on-row-dblclick="onRowDblClick"
       />
     </div>
 
@@ -135,10 +137,10 @@ export default {
         if (res.success && res.data) {
           const list = res.data.data || []
           this.total = res.data.pageInfo ? res.data.pageInfo.totalCount : list.length
-          // 自动绑定 _isChecked，翻页自动回显勾选
+          // 自动绑定 _checked，翻页自动回显勾选
           this.pageData = list.map(item => ({
             ...item,
-            _isChecked: this.selectedPoints.some(p => p.PT_ID === item.PT_ID)
+            _checked: this.selectedPoints.some(p => p.PT_ID === item.PT_ID)
           }))
         }
       } finally {
@@ -160,6 +162,31 @@ export default {
       this.pageSize = size
       this.currentPage = 1
       this.fetchData()
+    },
+    selectRow(row, index) {
+      if (!row) return
+      const idx = this.selectedPoints.findIndex(p => p.PT_ID === row.PT_ID)
+      if (idx > -1) {
+        return
+      }
+
+      const table = this.$refs.pointTable
+      if (typeof index === 'number' && table && typeof table.toggleSelect === 'function') {
+        table.toggleSelect(index)
+        return
+      }
+
+      this.selectedPoints.push(row)
+      this.$set(row, '_checked', true)
+    },
+    onRowClick(row, index) {
+      this.selectRow(row, index)
+    },
+    onRowDblClick(row, index) {
+      this.selectRow(row, index)
+      this.$nextTick(() => {
+        this.onConfirm()
+      })
     },
     // iview3 @on-select(selection, row)
     onSelect(selection, row) {

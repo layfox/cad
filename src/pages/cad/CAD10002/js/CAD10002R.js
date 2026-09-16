@@ -76,7 +76,7 @@ export default {
             lastHoverGroup: null,
             currentData: null,
             markerTextureCache: new Map(),
-            isDev: false,
+            isDev: true,
             activeWarningGroups: new Set(),
             globalAnimateRaf: null,
             globalAnimateLastTime: 0,
@@ -85,6 +85,7 @@ export default {
             globalAnimateWorldPos: new THREE.Vector3(),
             globalAnimateCanvasRect: null,
             markerDisplayRaf: null,
+            rippleMaterialCache: new Map(),
             realData: {},
             globalAllSelectedIds: [],
             timer: null,
@@ -106,6 +107,8 @@ export default {
         this.markerRippleGeometry = null;
         this.markerTextureCache.forEach(texture => texture.dispose());
         this.markerTextureCache.clear();
+        this.rippleMaterialCache.forEach(mat => mat.dispose());
+        this.rippleMaterialCache.clear();
         this.stopGlobalWarningAnimate();
         this.unlistenViewChange()
         if (this.rafId) {
@@ -301,6 +304,7 @@ export default {
                 })
             }];
             this.initViewer()
+            this.panelCollapsed = false
             this.$nextTick(() => {
                 this.initCtrlPan();
             });
@@ -317,7 +321,7 @@ export default {
                 group.userData._destroyed = true;
                 if (group.userData.ripplePool) {
                     group.userData.ripplePool.forEach(ripple => {
-                        ripple.mesh.material?.dispose();
+                        ripple.mesh.material = null; // don't dispose shared material
                     })
                     group.userData.ripplePool = [];
                 }
@@ -400,6 +404,7 @@ export default {
             const period = 1200;
             const rippleSpawnInterval = 500;
             let rippleSpawnTimer = 0;
+            const canvas = document.getElementById('mxcad');
             const loop = (timestamp) => {
                 if (this.activeWarningGroups.size === 0) {
                     this.globalAnimateRaf = null;
@@ -417,10 +422,22 @@ export default {
                 const needSpawnRipple = rippleSpawnTimer >= rippleSpawnInterval;
                 if (needSpawnRipple) rippleSpawnTimer %= rippleSpawnInterval;
                 let changed = false;
+                // 视口剔除：只在视口内的报警 group 才执行动画，减少无效 CPU 和渲染开销
+                // 每次循环重新获取 rect，避免窗口 resize 后剔除失效
+                const rect = canvas ? canvas.getBoundingClientRect() : null;
+                const rectWidth = rect ? rect.width : 0;
+                const rectHeight = rect ? rect.height : 0;
                 for (const group of this.activeWarningGroups) {
                     if (group.userData._destroyed) {
                         this.activeWarningGroups.delete(group);
                         continue;
+                    }
+                    // 视口剔除：计算 group 屏幕坐标，不在视口内则跳过
+                    if (rectWidth > 0 && rectHeight > 0) {
+                        const sp = MxFun.worldCoord2Screen(group.position.x, group.position.y, group.position.z || 0);
+                        if (!sp || sp.x < -50 || sp.x > rectWidth + 50 || sp.y < -50 || sp.y > rectHeight + 50) {
+                            continue;
+                        }
                     }
                     if (this.lastHoverGroup === group) continue;
                     const offset = group.userData.phaseOffset || 0;
@@ -462,6 +479,7 @@ export default {
                 }
                 if (changed && now - this.globalAnimateLastRenderTime >= this.WARNING_ANIMATE_INTERVAL) {
                     this.globalAnimateLastRenderTime = now;
+                    // 必须让 MXDraw 自己完成一帧渲染，不能直接复用其内部 renderer。
                     mxObj.updateDisplay(false);
                 }
                 this.globalAnimateRaf = requestAnimationFrame(loop);
@@ -530,14 +548,21 @@ export default {
                 const rippleGeometry = this.markerRippleGeometry ||
                     (this.markerRippleGeometry = new THREE.RingGeometry(0.4, 0.5, 24));
                 for (let i = 0; i < 2; i++) {
-                    const rippleMaterial = new THREE.MeshBasicMaterial({
-                        color: 0xff3333,
-                        transparent: true,
-                        opacity: 0,
-                        depthTest: false,
-                        depthWrite: false,
-                        side: THREE.DoubleSide
-                    });
+                    const matKey = `ripple_0xff3333`;
+                    const rippleMaterial = this.rippleMaterialCache.has(matKey)
+                        ? this.rippleMaterialCache.get(matKey)
+                        : (() => {
+                            const mat = new THREE.MeshBasicMaterial({
+                                color: 0xff3333,
+                                transparent: true,
+                                opacity: 0,
+                                depthTest: false,
+                                depthWrite: false,
+                                side: THREE.DoubleSide
+                            });
+                            this.rippleMaterialCache.set(matKey, mat);
+                            return mat;
+                        })();
                     const rippleMesh = new THREE.Mesh(rippleGeometry, rippleMaterial);
                     rippleMesh.renderOrder = 9998;
                     rippleMesh.raycast = () => { };
@@ -551,7 +576,9 @@ export default {
                     });
                 }
                 if (!this.activeWarningGroups) this.activeWarningGroups = new Set();
-                this.activeWarningGroups.add(group);
+                if (!this.activeWarningGroups.has(group)) {
+                    this.activeWarningGroups.add(group);
+                }
             }
             this.markerRoot.add(group);
             this.markerPickables.push(mesh);
@@ -589,22 +616,6 @@ export default {
                 }
             }
             return group;
-        },
-        renderMarkersByList(data) {
-            this.clearAllBindMarkers();
-            const taskId = ++this.renderTaskId;
-            data.forEach(bind => {
-                if (taskId !== this.renderTaskId) return;
-                const mesh = this.createBindMarker1(bind);
-                if (mesh) {
-                    const point = { ...bind, mesh };
-                    this.annotationPoints.push(point);
-                    this.annotationById.set(point.id, point);
-                }
-            });
-            if (this.activeWarningGroups.size > 0) {
-                this.startGlobalWarningAnimate();
-            }
         },
         getImg(bindItem) {
             let imgUrl = './image/icon1.png'
@@ -673,11 +684,11 @@ export default {
                             mesh.material.opacity = 1;
                         }
                         const hoverItem = this.annotationById.get(hoverTargetGroup.userData.annotationId)
-                        this.tooltip.show = hoverItem.GJ_FLG==='Y' ? true : false;
+                        this.tooltip.show = hoverItem.GJ_FLG === 'Y' ? true : false;
                         this.markNeedUpdate();
                     } else if (hoverTargetGroup) {
                         const hoverItem = this.annotationById.get(hoverTargetGroup.userData.annotationId)
-                        this.tooltip.show = hoverItem.GJ_FLG==='Y' ? true : false;
+                        this.tooltip.show = hoverItem.GJ_FLG === 'Y' ? true : false;
                     } else {
                         this.tooltip.show = false;
                     }
@@ -760,7 +771,7 @@ export default {
                     this.tooltip = {
                         x: rawX,
                         y: rawY,
-                        show: hoverItem.GJ_FLG==='Y' ? true : false,
+                        show: hoverItem.GJ_FLG === 'Y' ? true : false,
                         text: hoverItem ? hoverItem.value : ''
                     };
                 }
@@ -782,7 +793,8 @@ export default {
             const newMap = new Map();
             newData.forEach(item => newMap.set(item.id, item));
             const finalPoints = [];
-            // 分片处理新增
+            // 分片处理 diff，避免大量点位同步阻塞主线程
+            const diffItems = [];
             const addList = [];
             for (const [id, newBind] of newMap) {
                 const oldItem = oldMap.get(id);
@@ -802,39 +814,46 @@ export default {
                     continue;
                 }
                 hasMeshChange = true;
-                const oldGroup = oldItem.mesh;
-                if (oldGroup) {
-                    oldGroup.userData._destroyed = true;
-                    if (oldGroup.userData.ripplePool) {
-                        oldGroup.userData.ripplePool.forEach(ripple => {
-                            ripple.mesh.material?.dispose();
-                        })
-                        oldGroup.userData.ripplePool = [];
-                    }
-                    this.activeWarningGroups.delete(oldGroup);
-                    oldGroup.traverse(child => {
-                        if (child.isMesh) {
-                            if (child.geometry !== this.markerGeometry &&
-                                child.geometry !== this.markerRippleGeometry) {
-                                child.geometry?.dispose();
-                            }
-                            if (child.material) {
-                                if (Array.isArray(child.material)) {
-                                    child.material.forEach(mat => {
-                                        mat.dispose();
-                                    });
-                                } else {
-                                    child.material.dispose();
+                diffItems.push({ oldItem, newBind });
+            }
+            // 分片处理变更点位的替换
+            let diffIdx = 0;
+            while (diffIdx < diffItems.length) {
+                if (taskId !== this.renderTaskId) return;
+                const chunk = diffItems.slice(diffIdx, diffIdx + this.batchChunkSize);
+                chunk.forEach(({ oldItem, newBind }) => {
+                    const oldGroup = oldItem.mesh;
+                    if (oldGroup) {
+                        oldGroup.userData._destroyed = true;
+                        if (oldGroup.userData.ripplePool) {
+                            oldGroup.userData.ripplePool.forEach(ripple => {
+                                ripple.mesh.material = null; // don't dispose shared material
+                            })
+                            oldGroup.userData.ripplePool = [];
+                        }
+                        this.activeWarningGroups.delete(oldGroup);
+                        oldGroup.traverse(child => {
+                            if (child.isMesh) {
+                                if (child.geometry !== this.markerGeometry &&
+                                    child.geometry !== this.markerRippleGeometry) {
+                                    child.geometry?.dispose();
+                                }
+                                if (child.material) {
+                                    if (Array.isArray(child.material)) {
+                                        child.material.forEach(mat => mat.dispose());
+                                    } else {
+                                        child.material.dispose();
+                                    }
                                 }
                             }
-                        }
-                    });
-                    if (oldGroup.parent) oldGroup.parent.remove(oldGroup);
-                }
-                const newGroup = this.createBindMarker1(newBind);
-                if (newGroup) {
-                    finalPoints.push({ ...newBind, mesh: newGroup });
-                }
+                        });
+                        if (oldGroup.parent) oldGroup.parent.remove(oldGroup);
+                    }
+                    const newGroup = this.createBindMarker1(newBind);
+                    if (newGroup) finalPoints.push({ ...newBind, mesh: newGroup });
+                });
+                diffIdx += this.batchChunkSize;
+                await new Promise(resolve => setTimeout(resolve, 0));
             }
             // 分片批量新增marker，防止主线程阻塞
             let addIdx = 0;
@@ -848,6 +867,8 @@ export default {
                 addIdx += this.batchChunkSize;
                 await new Promise(resolve => setTimeout(resolve, 0));
             }
+            // 分片处理移除点位的清理
+            const removeItems = [];
             for (const [id, oldItem] of oldMap) {
                 if (!newMap.has(id)) {
                     hasMeshChange = true;
@@ -856,10 +877,19 @@ export default {
                     if (this.lastHoverGroup === oldGroup) {
                         this.lastHoverGroup = null;
                     }
+                    removeItems.push(oldItem);
+                }
+            }
+            let removeIdx = 0;
+            while (removeIdx < removeItems.length) {
+                if (taskId !== this.renderTaskId) return;
+                const chunk = removeItems.slice(removeIdx, removeIdx + this.batchChunkSize);
+                chunk.forEach(oldItem => {
+                    const oldGroup = oldItem.mesh;
                     oldGroup.userData._destroyed = true;
                     if (oldGroup.userData.ripplePool) {
                         oldGroup.userData.ripplePool.forEach(ripple => {
-                            ripple.mesh.material?.dispose();
+                            ripple.mesh.material = null; // don't dispose shared material
                         })
                         oldGroup.userData.ripplePool = [];
                     }
@@ -872,9 +902,7 @@ export default {
                             }
                             if (child.material) {
                                 if (Array.isArray(child.material)) {
-                                    child.material.forEach(mat => {
-                                        mat.dispose();
-                                    });
+                                    child.material.forEach(mat => mat.dispose());
                                 } else {
                                     child.material.dispose();
                                 }
@@ -882,7 +910,9 @@ export default {
                         }
                     });
                     if (oldGroup.parent) oldGroup.parent.remove(oldGroup);
-                }
+                });
+                removeIdx += this.batchChunkSize;
+                await new Promise(resolve => setTimeout(resolve, 0));
             }
             this.annotationPoints = finalPoints;
             this.annotationById.clear();
@@ -1007,7 +1037,7 @@ export default {
                 "TZPZ_NO": this.TZPZ_NO
             }).then(data => {
                 this.fileUrlInput = data.data.resourceUrl || ''
-                this.fileName = data.data.TZXX_ID || ''
+                this.fileName = data.data.TZLX_NAM || ''
                 if (!this.mxcad) {
                     this.initViewer()
                     this.$nextTick(() => {
@@ -1295,6 +1325,7 @@ export default {
                             })
                         }
                     })
+                    this.panelCollapsed = false
                     if (this.timer) {
                         clearInterval(this.timer)
                         this.timer = null
@@ -1437,6 +1468,108 @@ export default {
         },
         onAlarmDispatch() {
             this.$Message.success('派单成功')
+        },
+        enhanceTextColor() {
+            try {
+                if (!this.mxcad) {
+                    console.warn("[文字增强] mxcad 实例不存在");
+                    return;
+                }
+
+                console.log("[文字增强] 开始强制文字黑色...");
+
+                const database = this.mxcad.getDatabase();
+                const blockTable = database.getBlockTable();
+                const blockRecordIds = blockTable.getAllRecordId();
+
+                let textCount = 0;
+                let changedCount = 0;
+
+                if (!this.originalTextColors) this.originalTextColors = new Map();
+
+                for (let i = 0; i < blockRecordIds.length; i++) {
+                    try {
+                        const blkRecId = blockRecordIds[i];
+                        const blkRec = blkRecId.getMcDbBlockTableRecord();
+                        if (!blkRec) continue;
+
+                        const entityIds = blkRec.getAllEntityId();
+
+                        for (let j = 0; j < entityIds.length; j++) {
+                            try {
+                                const entId = entityIds[j];
+
+                                const isText = entId.isKindOf("McDbText");
+                                const isMText = entId.isKindOf("McDbMText");
+                                const isAttribute = entId.isKindOf("McDbAttribute");
+                                const isAttributeDef = entId.isKindOf("McDbAttributeDefinition");
+                                const isDimension = entId.isKindOf("McDbDimension");
+
+                                const isMainText = isText || isMText || isAttribute || isAttributeDef;
+
+                                if (!isMainText && !isDimension) continue;
+
+                                textCount++;
+
+                                const ent = entId.getMcDbEntity();
+                                if (!ent) continue;
+
+                                // 保存原始信息，方便回滚
+                                this.originalTextColors.set(entId, {
+                                    originalColorIndex: ent.colorIndex,
+                                    trueColor: ent.trueColor
+                                });
+
+                                // 直接强制黑色
+                                ent.trueColor = new McCmColor(0, 0, 0);
+                                changedCount++;
+
+                                // 尺寸标注内部文字也强制黑色
+                                if (isDimension) {
+                                    try {
+                                        const subEntIds = ent.getSubEntityIds ? ent.getSubEntityIds() : null;
+                                        if (subEntIds && subEntIds.length) {
+                                            for (let k = 0; k < subEntIds.length; k++) {
+                                                const subId = subEntIds[k];
+                                                const isSubText = subId.isKindOf("McDbText") || subId.isKindOf("McDbMText");
+                                                if (!isSubText) continue;
+
+                                                const subEnt = subId.getMcDbEntity();
+                                                if (!subEnt) continue;
+
+                                                subEnt.trueColor = new McCmColor(0, 0, 0);
+                                                changedCount++;
+                                            }
+                                        }
+                                    } catch (e) {
+                                        console.warn("[文字增强] Dimension 子文字处理失败", e);
+                                    }
+                                }
+                            } catch (e) {
+                                console.warn("[文字增强] 实体处理异常", e);
+                            }
+                        }
+                    } catch (e) {
+                        console.warn("[文字增强] 块记录处理异常", e);
+                    }
+                }
+
+                try {
+                    if (this.mxcad.updateDisplay) this.mxcad.updateDisplay();
+                } catch (e) {
+                    console.warn("[文字增强] updateDisplay 失败", e);
+                }
+
+                try {
+                    if (typeof this.mxcad.regen === "function") this.mxcad.regen();
+                } catch (e) {
+                    console.warn("[文字增强] mxcad.regen 失败", e);
+                }
+
+                console.log(`[文字增强] 处理完成：共 ${textCount} 个文字，已强制黑色 ${changedCount} 个`);
+            } catch (e) {
+                console.error("增强文字颜色失败:", e);
+            }
         },
         async initViewer() {
             try {
@@ -1583,7 +1716,7 @@ export default {
             }
         },
         handleCtrlPanMouseDown(e) {
-            if (!e.ctrlKey || e.button !== 0) {
+            if (e.button !== 0) {
                 return;
             }
             if (this.currentCommand) {
@@ -1600,7 +1733,7 @@ export default {
             }
         },
         handleCtrlPanMouseMove(e) {
-            if (!e.ctrlKey || e.buttons !== 1) {
+            if (e.buttons !== 1) {
                 return;
             }
             if (this.currentCommand) {
@@ -1612,7 +1745,7 @@ export default {
             this.simulateMiddleButtonEvent(e, "mousemove");
         },
         handleCtrlPanMouseUp(e) {
-            if (!e.ctrlKey || e.button !== 0) {
+            if (e.button !== 0) {
                 return;
             }
             e.preventDefault();

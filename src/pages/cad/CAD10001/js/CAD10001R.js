@@ -141,6 +141,7 @@ export default {
         } else {
             this.entity.TZPZ_USR_NAM = params.get('userName')
             this.entity.TZPZ_USR = params.get('userId')
+            this.entity.TZPZ_DAT = this.getDateYmd(new Date())
         }
         if (this.isDev) {
             this.pointList = [
@@ -317,7 +318,7 @@ export default {
                 "TZPZ_ID": "",
                 "TZXX_NO": "11",
                 "TZPZ_USR": "111",
-                "TZPZ_DAT": "2026-11-12",
+                "TZPZ_DAT": this.getDateYmd(new Date()),
                 "TZPZ_STA": "03",
                 "resourceUrl": "./models/YTSF-001.mxweb",
                 "TZXX_ID": "22",
@@ -325,7 +326,7 @@ export default {
                 "TZ_VERSION": "",
                 TZPZ_NO: "",
             }
-            this.fileUrlInput = './models/HDMY-XJH-v2.mxweb'
+            this.fileUrlInput = './models/YTSF-001.mxweb'
         }
         this.currentStep = 0
     },
@@ -365,6 +366,11 @@ export default {
         this.manualPlaceHasCoordFill = false;
     },
     methods: {
+        toList() {
+            if (parent && parent.toList) {
+                parent.toList()
+            }
+        },
         onCopy() {
             this.postData('/api/scaqyzt/copyTzpp', {
                 TZPZ_NO: this.entity.TZPZ_NO,
@@ -439,20 +445,30 @@ export default {
             const mxObj = MxFun.getCurrentDraw();
             mxObj && mxObj.updateDisplay(true);
         },
+        disposeMarkerGroup(group) {
+            if (!group) return;
+            const sharedValues = this.markerShared ? Object.values(this.markerShared) : [];
+            group.traverse(child => {
+                if (child.material) {
+                    const disposeMaterial = (material) => {
+                        if (sharedValues.includes(material)) return;
+                        if (material.map) material.map.dispose();
+                        material.dispose();
+                    };
+                    if (Array.isArray(child.material)) child.material.forEach(disposeMaterial);
+                    else disposeMaterial(child.material);
+                }
+                if (child.geometry && !sharedValues.includes(child.geometry)) {
+                    child.geometry.dispose();
+                }
+            });
+        },
         removeBindMarkerById(id) {
             if (!this.annotationMeshMap.has(id)) return;
             const group = this.annotationMeshMap.get(id);
             const mxObj = MxFun.getCurrentDraw();
             //释放资源
-            group.traverse(child => {
-                if (child.isMesh) {
-                    if (child.geometry && !this.markerShared) child.geometry.dispose();
-                    if (child.material && !this.markerShared) {
-                        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
-                        else child.material.dispose();
-                    }
-                }
-            });
+            this.disposeMarkerGroup(group);
             mxObj?.removeObject(group);
             this.annotationMeshMap.delete(id);
             this.annotationIdSet.delete(id);
@@ -675,6 +691,7 @@ export default {
                 raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
                 const intersects = raycaster.intersectObjects(this.markerPickables, false);
                 if (this.matchMode === 'manual-match') {
+                    // this.currentCommand = true
                     if (!this.selectedSurveyPoint) return;
                     for (const inter of intersects) {
                         if (inter.object.userData?.isWaveRing) continue;
@@ -856,18 +873,7 @@ export default {
             if (!mxObj) return;
             const toRemove = this.markerRoot ? [...this.markerRoot.children] : [...this.annotationMeshMap.values()];
             toRemove.forEach(group => {
-                group.traverse(child => {
-                    if (child.isMesh) {
-                        if (child.geometry && !this.markerShared) child.geometry.dispose();
-                        if (child.material && !this.markerShared) {
-                            if (Array.isArray(child.material)) {
-                                child.material.forEach(mat => mat.dispose());
-                            } else {
-                                child.material.dispose();
-                            }
-                        }
-                    }
-                });
+                this.disposeMarkerGroup(group);
                 if (group.parent) group.parent.remove(group);
             });
             this.annotationMeshMap.clear();
@@ -888,18 +894,7 @@ export default {
             if (!mxObj) return;
             const toRemove = [...idSet].map(id => this.annotationMeshMap.get(id)).filter(Boolean);
             toRemove.forEach(group => {
-                group.traverse(child => {
-                    if (child.isMesh) {
-                        if (child.geometry) child.geometry.dispose();
-                        if (child.material) {
-                            if (Array.isArray(child.material)) {
-                                child.material.forEach(mat => mat.dispose());
-                            } else {
-                                child.material.dispose();
-                            }
-                        }
-                    }
-                });
+                this.disposeMarkerGroup(group);
                 if (group.parent) group.parent.remove(group);
                 const aid = group.userData.annotationId;
                 const idx = this.annotationPoints.findIndex(item => item.id === aid);
@@ -1165,6 +1160,9 @@ export default {
                     item.y = item.Y_VALUE
                     return item
                 })
+                if (this.currentStep === 1) {
+                    this.panelCollapsed = false
+                }
                 // if (flag) {
                     this.renderMarkersByList(this.pointList.map(item => {
                         item.id = item.POINT_NO,
@@ -1261,7 +1259,8 @@ export default {
                             "TZPZ_DAT": this.getDateYmd(this.entity.TZPZ_DAT),
                             "TZPZ_STA": this.entity.TZPZ_STA,
                             "TZPZ_NO": this.entity.TZPZ_NO,
-                            "TZPZ_USR_NAM": this.entity.TZPZ_USR_NAM
+                            "TZPZ_USR_NAM": this.entity.TZPZ_USR_NAM,
+                            "TZLX_NAM": this.entity.TZLX_NAM
                         })
                         this.$Message.success('保存图纸信息成功')
                     })
@@ -1304,6 +1303,7 @@ export default {
                     return
                 }
                 this.currentStep = index
+                this.panelCollapsed1 = false
             } else if (index == 1) {
                 this.$refs.sForm.validate(async (valid) => {
                     if (!valid) {
@@ -1321,6 +1321,7 @@ export default {
                         this.lastFileUrl = this.fileUrlInput;
                     }
                     this.currentStep = index
+                    // this.panelCollapsed = false
                 })
             } else {
                 this.currentStep = index
@@ -1545,7 +1546,26 @@ export default {
                 this.mxcad.zoomCenter(numX, numY);
                 this.mxcad.zoomScale(zoomFactor);
                 this.clearAnnotationHighlight()
-                if (id) this.toggleAnnotationHighlightById(id)
+                if (id) {
+                    const bindItem = this.annotationById.get(id)
+                    if (!this.hasMarkerById(id)) {
+                        this.addBindMarker(bindItem);
+                    }
+                    const group = this.annotationMeshMap.get(id);
+                    if (group) {
+                        this.detailTargetObj = group;
+                        this.selectedAnnotationSet.add(id);
+                        this.setGroupHighlight(group, true);
+                    }
+                    const displayName = bindItem.name;
+                    this.pointInfo = bindItem.type === "1" ? `图纸点位：${displayName}` : `实时测点：${displayName}`;
+                    this.showPointInfoModal = true;
+                    clearTimeout(this.pointInfoTimer);
+                    this.pointInfoTimer = setTimeout(() => {
+                        this.showPointInfoModal = false;
+                    }, 3000);
+                    this.markNeedUpdate();
+                }
                 this.mxcad.updateDisplay();
             } catch (e) {
                 console.error('[zoomToPoint] 失败:', e);
@@ -1567,6 +1587,22 @@ export default {
                 this.zoomToPoint(row.PT_X_VALUE || row.POINT_X_VALUE, row.PT_Y_VALUE || row.POINT_Y_VALUE);
                 this.panelCollapsed1 = true
                 this.$nextTick(() => {
+                    const bindItem = this.annotationById.get(row.PT_NO);
+                    const group = this.annotationMeshMap.get(row.PT_NO);
+                    if (group) {
+                        this.detailTargetObj = group;
+                        this.selectedAnnotationSet.add(row.PT_NO);
+                        this.setGroupHighlight(group, true);
+                    }
+                    if (bindItem) {
+                        this.pointInfo = bindItem.type === "1" ? `图纸点位：${bindItem.name}` : `实时测点：${bindItem.name}`;
+                        this.showPointInfoModal = true;
+                        clearTimeout(this.pointInfoTimer);
+                        this.pointInfoTimer = setTimeout(() => {
+                            this.showPointInfoModal = false;
+                        }, 3000);
+                    }
+                    this.markNeedUpdate();
                     this.setAnnotationHighlightById(row.PT_NO, row.POINT_NO)
                 })
             } catch (e) {
@@ -1717,10 +1753,11 @@ export default {
                 return;
             }
             this.selectedSurveyPoint = unmatched[0];
-            if (this.selectedSurveyPoint.PT_X_VALUE && this.selectedSurveyPoint.PT_Y_VALUE) {
-                this.$Message.warning('请选择没有坐标的测点');
-                return;
-            }
+            // if (this.selectedSurveyPoint.PT_X_VALUE && this.selectedSurveyPoint.PT_Y_VALUE) {
+            //     this.$Message.warning('请选择没有坐标的测点');
+            //     return;
+            // }
+            this.currentCommand = true
             this._hidePanel1();
             this.$refs.manualPlaceForm.resetPos()
             this.manualPlaceVisible = true;
@@ -1736,7 +1773,7 @@ export default {
             }
             this.$Modal.confirm({
                 title: '提示',
-                content: '请选择已匹配状态的测点。点击后弹出提示：解除匹配后不可撤销，确定吗？',
+                content: '解除匹配后不可撤销，确定吗？',
                 onOk: () => {
                     //if (parent && parent.cancelMatch) {
                     this.cancelMatch({
@@ -1769,15 +1806,15 @@ export default {
             const survey = this.selectedSurveyPoint;
             const { x, y } = coords;
             // 添加标记
-            this.addBindMarker({
-                id: survey.PT_NO,
-                name: survey.PT_NAM,
-                x: x,
-                y: y,
-                z: 0,
-                type: '2',
-                ...survey
-            })
+            // this.addBindMarker({
+            //     id: survey.PT_NO,
+            //     name: survey.PT_NAM,
+            //     x: x,
+            //     y: y,
+            //     z: 0,
+            //     type: '2',
+            //     ...survey
+            // })
             this.manualAddAndMatch({
                 "TZPZ_NO": this.entity.TZPZ_NO,
                 I2P_NO: survey.I2P_NO,
@@ -1790,6 +1827,7 @@ export default {
                 this.stopCommand();
             });
             this.manualPlaceVisible = false
+            this.currentCommand = false
         },
         stopCommand() {
             if (MxFun) {
@@ -1810,6 +1848,7 @@ export default {
             this.selectedSurveyPoint = null;
             this._clearHighlights();
             this.manualPlaceVisible = false
+            this.currentCommand = false
         },
         _clearHighlights() {
             this.clearAnnotationHighlight();
@@ -2215,7 +2254,7 @@ export default {
          */
         handleCtrlPanMouseDown(e) {
             // 只处理 Ctrl + 左键
-            if (!e.ctrlKey || e.button !== 0) {
+            if (e.button !== 0) {
                 return;
             }
             // 如果正在执行命令，不处理平移
@@ -2239,7 +2278,7 @@ export default {
          */
         handleCtrlPanMouseMove(e) {
             // 只处理 Ctrl + 左键按下的情况
-            if (!e.ctrlKey || e.buttons !== 1) {
+            if (e.buttons !== 1) {
                 return;
             }
             // 如果正在执行命令，不处理平移
@@ -2257,7 +2296,7 @@ export default {
          */
         handleCtrlPanMouseUp(e) {
             // 只处理 Ctrl + 左键释放的情况
-            if (!e.ctrlKey || e.button !== 0) {
+            if (e.button !== 0) {
                 return;
             }
             e.preventDefault();

@@ -15,15 +15,16 @@
 #CAD10001R .page-header {
   display: flex;
   align-items: center;
-  height: 56px;
+  justify-content: space-between;
+  height: 50px;
   background: #fff;
   gap: 10px;
   padding: 0 16px;
 }
 
 #CAD10001R .page-main {
-  height: calc(100% - 56px);
-  padding: 16px;
+  height: calc(100% - 50px);
+  padding: 10px;
 }
 
 .step-container {
@@ -31,7 +32,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 98px;
+    height: 72px;
     background: #fff;
     border-radius: 8px;
     gap: 10px;
@@ -107,9 +108,43 @@
     color: #A9833A;
 }
 
+.btn-list {
+  display: inline-flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex: 1;
+}
+
+.btn-list-box {
+  display: inline-flex;
+  width: 25px;
+  height: 25px;
+  align-items: center;
+  justify-content: center;
+  line-height: 25px;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 0 6px #d1d1d1;
+}
+
+.btn-list-box:hover {
+  box-shadow: 0 0 10px #4f8dff;
+  background: #4173e5;
+}
+
+.btn-list-box:hover .ivu-icon {
+  color: #fff;
+}
+
+.btn-list-box .ivu-icon {
+  color: #333;
+  font-size: 22px;
+  font-weight: bold;
+}
+
 #CAD10001R .page-content {
-    margin-top: 16px;
-    height: calc(100% - 114px);
+    margin-top: 10px;
+    height: calc(100% - 82px);
     overflow-y: auto;
     overflow-x: hidden;
 }
@@ -123,9 +158,9 @@
 
 .step-content-header {
     position: relative;
-    height: 70px;
+    height: 50px;
     background: #fff;
-    padding: 16px 20px;
+    padding: 8px 16px;
     font-weight: bold;
     font-size: 18px;
     color: #333333;
@@ -140,38 +175,64 @@
     border-radius: 1px 1px 1px 1px;
     content: '';
     left: 20px;
-    top: 50px;
+    top: 40px;
 }
 
 .form-container {
-    height: calc(100% - 70px);
+    height: calc(100% - 50px);
     background: #fff;
 }
 
 .viewer-container {
     position: relative;
-    height: calc(100% - 70px);
+    height: calc(100% - 50px);
 }
 
-.viewer-panel {
+#CAD10001R .viewer-panel {
     position: absolute;
-    left: 16px;
-    bottom: 16px;
-    padding: 16px;
-    font-size: 0;
-    background: rgba(255,255,255,1);
-    box-shadow: 0px 0px 15px 0px rgba(0,0,0,0.05);
-    border-radius: 8px 8px 8px 8px;
-    z-index: 100;
-}
-
-.viewer-panel.expand {
+    height: 94%;
+    padding: 24px 56px 24px 32px;
     top: 16px;
+    left: 0;
     width: 600px;
+    font-size: 0;
+    background: url('./images/panel-bg1.png') no-repeat right center;
+    background-size: 100% 100%;
+    z-index: 100;
+    transform: translateX(0);
+    transition: all 0.3s;
 }
 
-.viewer-panel.expand.panel1 {
-    width: 1100px;
+#CAD10001R .viewer-panel.panel-collapsed {
+  transform: translateX(-565px);
+}
+
+#CAD10001R .viewer-panel.panel1 {
+    width: 952px;
+    background: url('./images/panel-bg.png') no-repeat right center;
+    background-size: 100% 100%;
+}
+
+#CAD10001R .viewer-panel.panel1.panel-collapsed {
+  transform: translateX(-917px);
+}
+
+#CAD10001R .viewer-panel.panel-collapsed .collapse-btn {
+    transform: rotate(180deg);
+    right: 14px;
+}
+
+#CAD10001R .collapse-btn {
+  position: absolute;
+  right: 8px;
+  top: 52%;
+  width: 34px;
+  height: 100px;
+  margin-top: -49px;
+  cursor: pointer;
+  background: url('./images/collapse-icon.png') no-repeat 6px center;
+  background-size: 14px 12px;
+  cursor: pointer;
 }
 
 .viewer-panel-btn {

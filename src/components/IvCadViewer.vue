@@ -240,443 +240,443 @@ import * as THREE from "three";
 @Component
 export default class IvCadViewer extends Vue {
   // 文件 URL
-  fileUrlInput = "./models/YTSF-001.mxweb";
-  fileName = "";
+  public fileUrlInput = "./models/YTSF-001.mxweb";
+  public fileName = "";
 
   // 加载状态
-  loading = true;
-  loadingText = "正在初始化查看器...";
-  loadingStep = "准备中";
-  loadingProgress = 0;
+  public loading = true;
+  public loadingText = "正在初始化查看器...";
+  public loadingStep = "准备中";
+  public loadingProgress = 0;
 
   // Viewer 状态
-  viewerReady = false;
-  mxcad: any = null;
-  mxDraw: any = null;
+  public viewerReady = false;
+  public mxcad: any = null;
+  public mxDraw: any = null;
 
   // 图层数据
-  layerCount = 0;
-  layers: any[] = [];
-  showLayers = false;
+  public layerCount = 0;
+  public layers: any[] = [];
+  public showLayers = false;
 
   // 帮助弹窗
-  showHelp = false;
+  public showHelp = false;
 
   // 编辑文字弹窗
-  showEditTextModal = false;
-  editTextValue = "";
-  editTextType = "";
-  editTextEntity: any = null;
+  public showEditTextModal = false;
+  public editTextValue = "";
+  public editTextType = "";
+  public editTextEntity: any = null;
 
   // 当前命令
-  currentCommand = "";
+  public currentCommand = "";
 
   // 测量结果
-  measureResult = "";
+  public measureResult = "";
 
   // 面板收缩状态
-  panelCollapsed = false;
+  public panelCollapsed = false;
 
   // Ctrl + 左键平移状态
-  isCtrlPanning = false;
-  lastMouseX = 0;
-  lastMouseY = 0;
+  public isCtrlPanning = false;
+  public lastMouseX = 0;
+  public lastMouseY = 0;
 
-  mounted() {
-    this.initViewer();
-    // 监听 ESC 键取消命令
-    document.addEventListener("keydown", this.handleKeydown);
-    // 监听 Ctrl + 左键平移
-    this.$nextTick(() => {
-      this.initCtrlPan();
-    });
+  public mounted() {
+	this.initViewer();
+	// 监听 ESC 键取消命令
+	document.addEventListener("keydown", this.handleKeydown);
+	// 监听 Ctrl + 左键平移
+	this.$nextTick(() => {
+		this.initCtrlPan();
+	});
   }
 
-  beforeDestroy() {
-    this.destroyViewer();
-    document.removeEventListener("keydown", this.handleKeydown);
+  public beforeDestroy() {
+	this.destroyViewer();
+	document.removeEventListener("keydown", this.handleKeydown);
 
-    // 移除 Ctrl + 左键平移事件监听
-    const canvas = document.getElementById("mxcad") as HTMLCanvasElement;
-    if (canvas) {
-      canvas.removeEventListener("mousedown", this.handleCtrlPanMouseDown);
-      canvas.removeEventListener("mousemove", this.handleCtrlPanMouseMove);
-      canvas.removeEventListener("mouseup", this.handleCtrlPanMouseUp);
-      canvas.removeEventListener("mouseleave", this.handleCtrlPanMouseUp);
-    }
+	// 移除 Ctrl + 左键平移事件监听
+	const canvas = document.getElementById("mxcad") as HTMLCanvasElement;
+	if (canvas) {
+		canvas.removeEventListener("mousedown", this.handleCtrlPanMouseDown);
+		canvas.removeEventListener("mousemove", this.handleCtrlPanMouseMove);
+		canvas.removeEventListener("mouseup", this.handleCtrlPanMouseUp);
+		canvas.removeEventListener("mouseleave", this.handleCtrlPanMouseUp);
+	}
   }
 
   /**
    * 键盘事件处理
    */
-  handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Escape") {
-      this.stopCommand();
-    }
+  public handleKeydown(e: KeyboardEvent) {
+	if (e.key === "Escape") {
+		this.stopCommand();
+	}
   }
 
   /**
    * 初始化 Viewer
    */
-  async initViewer() {
-    try {
-      this.loading = true;
-      this.loadingText = "正在初始化查看器...";
-      this.loadingStep = "加载核心模块";
-      this.loadingProgress = 10;
+  public async initViewer() {
+	try {
+		this.loading = true;
+		this.loadingText = "正在初始化查看器...";
+		this.loadingStep = "加载核心模块";
+		this.loadingProgress = 10;
 
-      // 注册所有命令和自定义实体
-      console.log("注册命令和自定义实体...");
-      RegistMxCommands();
-      RxInitMxEntity();
+		// 注册所有命令和自定义实体
+		console.log("注册命令和自定义实体...");
+		RegistMxCommands();
+		RxInitMxEntity();
 
-      const useST = !("SharedArrayBuffer" in window);
-      const wasmPath = useST ? "./wasm/2d-st/" : "./wasm/2d/";
+		const useST = !("SharedArrayBuffer" in window);
+		const wasmPath = useST ? "./wasm/2d-st/" : "./wasm/2d/";
 
-      console.log("WASM 路径:", wasmPath);
+		console.log("WASM 路径:", wasmPath);
 
-      this.loadingStep = "初始化 WASM 模块";
-      this.loadingProgress = 30;
-const now = new Date().getTime()
-      const mxcad = await createMxCad({
-        canvas: "#mxcad",
-        locateFile: (fileName: string) => {
-          return new URL(wasmPath + fileName, window.location.origin + window.location.pathname).href;
-        },
-        // fileUrl: "./models/HDMY-XJH.mxweb",
-        // fileUrl:"./models/HDMY-XJH-v2.mxweb",
-        fileUrl:"./models/YTSF-001.mxweb",
-        browse: true,
-        multipleSelect: false,
-        middlePan: 1,
-        authorized_service: "same_current_page_url",
-        onInit: () => {
-          console.log("MxCAD 初始化回调，加载字体...");
-          try {
-            MxCpp.App.addNetworkLoadingFont([
-              "txt.shx",
-              "simplex.shx",
-              "gdt.shx",
-              "aaa.shx",
-              "ltypeshp.shx",
-              "complex.shx",
-              "isocp.shx",
-              "isoct.shx",
-              "romans.shx"
-            ]);
-            MxCpp.App.addNetworkLoadingBigFont([
-              "hztxt.shx",
-              "gbcbig.shx",
-              "tssdchn.shx",
-              "gbhzfs.shx"
-            ]);
-          } catch (e) {
-            console.warn("字体加载警告:", e);
-          }
-        }
-      });
+		this.loadingStep = "初始化 WASM 模块";
+		this.loadingProgress = 30;
+		const now = new Date().getTime();
+		const mxcad = await createMxCad({
+		canvas: "#mxcad",
+		locateFile: (fileName: string) => {
+			return new URL(wasmPath + fileName, window.location.origin + window.location.pathname).href;
+		},
+		// fileUrl: "./models/HDMY-XJH.mxweb",
+		// fileUrl:"./models/HDMY-XJH-v2.mxweb",
+		fileUrl: "./models/YTSF-001.mxweb",
+		browse: true,
+		multipleSelect: false,
+		middlePan: 1,
+		authorized_service: "same_current_page_url",
+		onInit: () => {
+			console.log("MxCAD 初始化回调，加载字体...");
+			try {
+			MxCpp.App.addNetworkLoadingFont([
+				"txt.shx",
+				"simplex.shx",
+				"gdt.shx",
+				"aaa.shx",
+				"ltypeshp.shx",
+				"complex.shx",
+				"isocp.shx",
+				"isoct.shx",
+				"romans.shx",
+			]);
+			MxCpp.App.addNetworkLoadingBigFont([
+				"hztxt.shx",
+				"gbcbig.shx",
+				"tssdchn.shx",
+				"gbhzfs.shx",
+			]);
+			} catch (e) {
+			console.warn("字体加载警告:", e);
+			}
+		},
+		});
 
-      console.log("MxCAD 实例创建成功:", mxcad);
-console.log(new Date().getTime() - now, 22222)
-      this.mxcad = mxcad;
-      this.mxDraw = mxcad.mxdraw;
-      this.fileUrl = "./models/YTSF-001.mxweb"; // 记录当前文件URL
+		console.log("MxCAD 实例创建成功:", mxcad);
+		console.log(new Date().getTime() - now, 22222);
+		this.mxcad = mxcad;
+		this.mxDraw = mxcad.mxdraw;
+		this.fileUrl = "./models/YTSF-001.mxweb"; // 记录当前文件URL
 
-      // 启用鼠标中键平移（我们会把 Ctrl + 左键模拟成中键事件）
-      try {
-        mxcad.mxdraw.setMouseMiddlePan(true);
-        console.log("已启用中键平移，Ctrl + 左键会模拟成中键事件");
-      } catch (e) {
-        console.warn("设置中键平移失败:", e);
-      }
-      
-      // 设置滚轮缩放速度（数值越小缩放越慢）
-      try {
-        mxcad.mxdraw.setZoomSpeed(1.8);
-        console.log("已设置滚轮缩放速度为 1.8");
-      } catch (e) {
-        console.warn("设置缩放速度失败:", e);
-      }
+		// 启用鼠标中键平移（我们会把 Ctrl + 左键模拟成中键事件）
+		try {
+		mxcad.mxdraw.setMouseMiddlePan(true);
+		console.log("已启用中键平移，Ctrl + 左键会模拟成中键事件");
+		} catch (e) {
+		console.warn("设置中键平移失败:", e);
+		}
 
-      // 二次注册命令（mxcad 实例创建后可能会重置 MxFun 状态）
-      console.log("二次注册命令...");
-      RegistMxCommands();
-      RxInitMxEntity();
+		// 设置滚轮缩放速度（数值越小缩放越慢）
+		try {
+		mxcad.mxdraw.setZoomSpeed(1.8);
+		console.log("已设置滚轮缩放速度为 1.8");
+		} catch (e) {
+		console.warn("设置缩放速度失败:", e);
+		}
 
-      this.loadingStep = "初始化完成";
-      this.loadingProgress = 90;
+		// 二次注册命令（mxcad 实例创建后可能会重置 MxFun 状态）
+		console.log("二次注册命令...");
+		RegistMxCommands();
+		RxInitMxEntity();
 
-      // 监听文件加载完成
-      mxcad.mxdraw.on("openFileComplete", () => {
-        console.log("文件加载完成");
-        this.onFileLoaded();
-      });
+		this.loadingStep = "初始化完成";
+		this.loadingProgress = 90;
 
-      // 监听图层数据更新
-      mxcad.mxdraw.on("uiSetLayerData", (listLayer: any[]) => {
-        console.log("图层数据更新:", listLayer);
-        this.layers = listLayer.map(v => ({
-          name: v.name,
-          id: v.id,
-          off: v.off,
-          colorValue: v.colorValue
-        }));
-        this.layerCount = this.layers.length;
-      });
-      console.log(this.layers, 1111)
+		// 监听文件加载完成
+		mxcad.mxdraw.on("openFileComplete", () => {
+		console.log("文件加载完成");
+		this.onFileLoaded();
+		});
 
-      // 监听命令行输入
-      MxFun.listenForCommandLineInput(({ msCmdTip, msCmdDisplay, msCmdText }: any) => {
-        console.log("命令行:", msCmdTip, msCmdDisplay, msCmdText);
-        // 如果有测量结果，更新显示
-        if (msCmdDisplay && msCmdDisplay.length > 0) {
-          this.measureResult = msCmdDisplay;
-        }
-      });
+		// 监听图层数据更新
+		mxcad.mxdraw.on("uiSetLayerData", (listLayer: any[]) => {
+		console.log("图层数据更新:", listLayer);
+		this.layers = listLayer.map((v) => ({
+			name: v.name,
+			id: v.id,
+			off: v.off,
+			colorValue: v.colorValue,
+		}));
+		this.layerCount = this.layers.length;
+		});
+		console.log(this.layers, 1111);
 
-      this.viewerReady = true;
-      // this.loading = false; // 移到 onFileLoaded 中，避免闪烁
-      this.loadingProgress = 100;
-      this.fileName = "HDMY-XJH.mxweb";
+		// 监听命令行输入
+		MxFun.listenForCommandLineInput(({ msCmdTip, msCmdDisplay, msCmdText }: any) => {
+		console.log("命令行:", msCmdTip, msCmdDisplay, msCmdText);
+		// 如果有测量结果，更新显示
+		if (msCmdDisplay && msCmdDisplay.length > 0) {
+			this.measureResult = msCmdDisplay;
+		}
+		});
 
-      // this.$Message.success("MxCAD 查看器初始化成功");
+		this.viewerReady = true;
+		// this.loading = false; // 移到 onFileLoaded 中，避免闪烁
+		this.loadingProgress = 100;
+		this.fileName = "HDMY-XJH.mxweb";
 
-    } catch (error) {
-      console.error("MxCAD 初始化失败:", error);
-      this.loading = false;
-      this.$Message.error("MxCAD 查看器初始化失败: " + (error as Error).message);
-    }
+		// this.$Message.success("MxCAD 查看器初始化成功");
+
+	} catch (error) {
+		console.error("MxCAD 初始化失败:", error);
+		this.loading = false;
+		this.$Message.error("MxCAD 查看器初始化失败: " + (error as Error).message);
+	}
   }
 
   /**
    * 文件加载完成回调
    */
-  onFileLoaded() {
-    console.log("文件加载完成");
-    
-    // 从 fileUrl 中提取文件名
-    const fileName = this.fileUrl ? this.fileUrl.split('/').pop() : "default";
-    console.log("当前文件名:", fileName);
-    
-    // 检查 localStorage 中有没有保存的视图参数
-    const savedView = localStorage.getItem("cad_view_" + fileName);
-    
-    if (savedView) {
-      // 有保存的视图参数，应用保存的视图
-      console.log("找到保存的视图参数，应用中...");
-      try {
-        const viewParams = JSON.parse(savedView);
-        console.log("视图参数:", viewParams);
-        
-        if (this.mxcad && this.mxcad.zoomCenter && this.mxcad.zoomScale && this.mxcad.getViewCADCoord) {
-          // 先获取当前视图宽度
-          const currentView = this.mxcad.getViewCADCoord();
-          if (currentView && currentView.pt1 && currentView.pt2) {
-            const curMinX = Math.min(currentView.pt1.x, currentView.pt2.x, currentView.pt3.x, currentView.pt4.x);
-            const curMaxX = Math.max(currentView.pt1.x, currentView.pt2.x, currentView.pt3.x, currentView.pt4.x);
-            const curWidth = curMaxX - curMinX;
-            const targetWidth = viewParams.width;
-            const scale = curWidth / targetWidth;
-            
-            console.log("当前宽度:", curWidth, "目标宽度:", targetWidth, "缩放比例:", scale);
-            
-            // 先设置中心点
-            this.mxcad.zoomCenter(viewParams.centerX, viewParams.centerY);
-            
-            // 再缩放
-            this.mxcad.zoomScale(scale);
-            
-            console.log("已应用保存的视图参数（zoomCenter + zoomScale 方式）");
-            
-            // 延迟隐藏加载遮罩
-            setTimeout(() => {
-              this.loading = false;
-            }, 300);
-          } else {
-            console.warn("无法获取当前视图宽度，直接显示初始视图");
-            this.loading = false;
-          }
-        } else {
-          console.warn("zoomCenter 或 zoomScale 不存在，直接显示初始视图");
-          this.loading = false;
-        }
-      } catch (e) {
-        console.error("应用保存的视图参数失败:", e);
-        this.loading = false;
-      }
-    } else {
-      // 没有保存的视图参数，直接显示初始视图
-      console.log("没有保存的视图参数，显示初始视图");
-      console.log("提示：您可以手动调整视图后，点击\"保存当前视图\"按钮，下次打开自动恢复");
-      this.loading = false;
-    }
-    
-    // 获取当前视图范围
-    try {
-      if (this.mxcad && this.mxcad.getViewCADCoord) {
-        const view = this.mxcad.getViewCADCoord();
-        console.log("当前视图范围:", view);
-        if (view && view.pt1 && view.pt2) {
-          const minX = Math.min(view.pt1.x, view.pt2.x, view.pt3.x, view.pt4.x);
-          const maxX = Math.max(view.pt1.x, view.pt2.x, view.pt3.x, view.pt4.x);
-          const minY = Math.min(view.pt1.y, view.pt2.y, view.pt3.y, view.pt4.y);
-          const maxY = Math.max(view.pt1.y, view.pt2.y, view.pt3.y, view.pt4.y);
-          console.log("当前视图范围（计算后）:", {
-            minX, minY, maxX, maxY,
-            width: maxX - minX,
-            height: maxY - minY
-          });
-        }
-      }
-    } catch (e) {
-      console.warn("获取视图范围失败:", e);
-    }
-    
-    // 主动获取图层数据（防止 uiSetLayerData 事件未触发）
-    try {
-      if (this.mxcad && this.mxcad.getDatabase) {
-        const layerTable = this.mxcad.getDatabase().getLayerTable();
-        const aryId = layerTable.getAllRecordId();
-        console.log("主动获取图层数量:", aryId.length);
-        
-        if (aryId.length > 0 && this.layers.length === 0) {
-          this.layers = aryId.map((id: any) => {
-            const record = id.getMcDbLayerTableRecord();
-            if (record) {
-              let colorValue = 0;
-              try {
-                if (record.color && record.color.getColorValue) {
-                  colorValue = record.color.getColorValue();
-                }
-              } catch (e) {}
-              
-              return {
-                name: record.name,
-                id: id,
-                off: record.isOff,
-                colorValue: colorValue
-              };
-            }
-            return {
-              name: "未知图层",
-              id: id,
-              off: false,
-              colorValue: 0
-            };
-          });
-          console.log(this.layers, 1111)
-          this.layerCount = this.layers.length;
-          console.log("主动获取图层数据成功，图层数量:", this.layerCount);
-          console.log("图层列表:", this.layers.map((l: any) => l.name));
-        }
-      }
-    } catch (e) {
-      console.warn("主动获取图层数据失败:", e);
-    }
+  public onFileLoaded() {
+	console.log("文件加载完成");
+
+	// 从 fileUrl 中提取文件名
+	const fileName = this.fileUrl ? this.fileUrl.split('/').pop() : "default";
+	console.log("当前文件名:", fileName);
+
+	// 检查 localStorage 中有没有保存的视图参数
+	const savedView = localStorage.getItem("cad_view_" + fileName);
+
+	if (savedView) {
+		// 有保存的视图参数，应用保存的视图
+		console.log("找到保存的视图参数，应用中...");
+		try {
+		const viewParams = JSON.parse(savedView);
+		console.log("视图参数:", viewParams);
+
+		if (this.mxcad && this.mxcad.zoomCenter && this.mxcad.zoomScale && this.mxcad.getViewCADCoord) {
+			// 先获取当前视图宽度
+			const currentView = this.mxcad.getViewCADCoord();
+			if (currentView && currentView.pt1 && currentView.pt2) {
+			const curMinX = Math.min(currentView.pt1.x, currentView.pt2.x, currentView.pt3.x, currentView.pt4.x);
+			const curMaxX = Math.max(currentView.pt1.x, currentView.pt2.x, currentView.pt3.x, currentView.pt4.x);
+			const curWidth = curMaxX - curMinX;
+			const targetWidth = viewParams.width;
+			const scale = curWidth / targetWidth;
+
+			console.log("当前宽度:", curWidth, "目标宽度:", targetWidth, "缩放比例:", scale);
+
+			// 先设置中心点
+			this.mxcad.zoomCenter(viewParams.centerX, viewParams.centerY);
+
+			// 再缩放
+			this.mxcad.zoomScale(scale);
+
+			console.log("已应用保存的视图参数（zoomCenter + zoomScale 方式）");
+
+			// 延迟隐藏加载遮罩
+			setTimeout(() => {
+				this.loading = false;
+			}, 300);
+			} else {
+			console.warn("无法获取当前视图宽度，直接显示初始视图");
+			this.loading = false;
+			}
+		} else {
+			console.warn("zoomCenter 或 zoomScale 不存在，直接显示初始视图");
+			this.loading = false;
+		}
+		} catch (e) {
+		console.error("应用保存的视图参数失败:", e);
+		this.loading = false;
+		}
+	} else {
+		// 没有保存的视图参数，直接显示初始视图
+		console.log("没有保存的视图参数，显示初始视图");
+		console.log("提示：您可以手动调整视图后，点击\"保存当前视图\"按钮，下次打开自动恢复");
+		this.loading = false;
+	}
+
+	// 获取当前视图范围
+	try {
+		if (this.mxcad && this.mxcad.getViewCADCoord) {
+		const view = this.mxcad.getViewCADCoord();
+		console.log("当前视图范围:", view);
+		if (view && view.pt1 && view.pt2) {
+			const minX = Math.min(view.pt1.x, view.pt2.x, view.pt3.x, view.pt4.x);
+			const maxX = Math.max(view.pt1.x, view.pt2.x, view.pt3.x, view.pt4.x);
+			const minY = Math.min(view.pt1.y, view.pt2.y, view.pt3.y, view.pt4.y);
+			const maxY = Math.max(view.pt1.y, view.pt2.y, view.pt3.y, view.pt4.y);
+			console.log("当前视图范围（计算后）:", {
+			minX, minY, maxX, maxY,
+			width: maxX - minX,
+			height: maxY - minY,
+			});
+		}
+		}
+	} catch (e) {
+		console.warn("获取视图范围失败:", e);
+	}
+
+	// 主动获取图层数据（防止 uiSetLayerData 事件未触发）
+	try {
+		if (this.mxcad && this.mxcad.getDatabase) {
+		const layerTable = this.mxcad.getDatabase().getLayerTable();
+		const aryId = layerTable.getAllRecordId();
+		console.log("主动获取图层数量:", aryId.length);
+
+		if (aryId.length > 0 && this.layers.length === 0) {
+			this.layers = aryId.map((id: any) => {
+			const record = id.getMcDbLayerTableRecord();
+			if (record) {
+				let colorValue = 0;
+				try {
+				if (record.color && record.color.getColorValue) {
+					colorValue = record.color.getColorValue();
+				}
+				} catch (e) {}
+
+				return {
+				name: record.name,
+				id,
+				off: record.isOff,
+				colorValue,
+				};
+			}
+			return {
+				name: "未知图层",
+				id,
+				off: false,
+				colorValue: 0,
+			};
+			});
+			console.log(this.layers, 1111);
+			this.layerCount = this.layers.length;
+			console.log("主动获取图层数据成功，图层数量:", this.layerCount);
+			console.log("图层列表:", this.layers.map((l: any) => l.name));
+		}
+		}
+	} catch (e) {
+		console.warn("主动获取图层数据失败:", e);
+	}
   }
 
   /**
    * 从 URL 加载
    */
-  loadFromUrl() {
-    if (!this.fileUrlInput) {
-      this.$Message.warning("请输入文件 URL");
-      return;
-    }
-    // 重新加载
-    this.destroyViewer();
-    this.$nextTick(() => {
-      this.initViewerWithFile(this.fileUrlInput);
-    });
+  public loadFromUrl() {
+	if (!this.fileUrlInput) {
+		this.$Message.warning("请输入文件 URL");
+		return;
+	}
+	// 重新加载
+	this.destroyViewer();
+	this.$nextTick(() => {
+		this.initViewerWithFile(this.fileUrlInput);
+	});
   }
 
   /**
    * 带文件初始化
    */
-  async initViewerWithFile(fileUrl: string) {
-    try {
-      this.loading = true;
-      this.loadingText = "正在加载图纸...";
-      this.loadingStep = "创建渲染实例";
-      this.loadingProgress = 50;
+  public async initViewerWithFile(fileUrl: string) {
+	try {
+		this.loading = true;
+		this.loadingText = "正在加载图纸...";
+		this.loadingStep = "创建渲染实例";
+		this.loadingProgress = 50;
 
-      const useST = !("SharedArrayBuffer" in window);
-      const wasmPath = useST ? "./wasm/2d-st/" : "./wasm/2d/";
+		const useST = !("SharedArrayBuffer" in window);
+		const wasmPath = useST ? "./wasm/2d-st/" : "./wasm/2d/";
 
-      const mxcad = await createMxCad({
-        canvas: "#mxcad",
-        locateFile: (fileName: string) => {
-          return new URL(wasmPath + fileName, window.location.origin + window.location.pathname).href;
-        },
-        fileUrl: fileUrl,
-        browse: true,
-        multipleSelect: false,
-        middlePan: 1,
-        authorized_service: "same_current_page_url",
-        onInit: () => {
-          try {
-            MxCpp.App.addNetworkLoadingFont([
-              "txt.shx", "simplex.shx", "gdt.shx", "aaa.shx",
-              "ltypeshp.shx", "complex.shx", "isocp.shx", "isoct.shx", "romans.shx"
-            ]);
-            MxCpp.App.addNetworkLoadingBigFont([
-              "hztxt.shx", "gbcbig.shx", "tssdchn.shx", "gbhzfs.shx"
-            ]);
-          } catch (e) {
-            console.warn("字体加载警告:", e);
-          }
-        }
-      });
+		const mxcad = await createMxCad({
+		canvas: "#mxcad",
+		locateFile: (fileName: string) => {
+			return new URL(wasmPath + fileName, window.location.origin + window.location.pathname).href;
+		},
+		fileUrl,
+		browse: true,
+		multipleSelect: false,
+		middlePan: 1,
+		authorized_service: "same_current_page_url",
+		onInit: () => {
+			try {
+			MxCpp.App.addNetworkLoadingFont([
+				"txt.shx", "simplex.shx", "gdt.shx", "aaa.shx",
+				"ltypeshp.shx", "complex.shx", "isocp.shx", "isoct.shx", "romans.shx",
+			]);
+			MxCpp.App.addNetworkLoadingBigFont([
+				"hztxt.shx", "gbcbig.shx", "tssdchn.shx", "gbhzfs.shx",
+			]);
+			} catch (e) {
+			console.warn("字体加载警告:", e);
+			}
+		},
+		});
 
-      this.mxcad = mxcad;
-      this.mxDraw = mxcad.mxdraw;
-      this.fileUrl = fileUrl; // 记录当前文件URL
-      this.fileName = fileUrl.split("/").pop() || "unknown";
+		this.mxcad = mxcad;
+		this.mxDraw = mxcad.mxdraw;
+		this.fileUrl = fileUrl; // 记录当前文件URL
+		this.fileName = fileUrl.split("/").pop() || "unknown";
 
-      // 启用鼠标中键平移（我们会把 Ctrl + 左键模拟成中键事件）
-      try {
-        mxcad.mxdraw.setMouseMiddlePan(true);
-        console.log("已启用中键平移，Ctrl + 左键会模拟成中键事件");
-      } catch (e) {
-        console.warn("设置中键平移失败:", e);
-      }
-      
-      // 设置滚轮缩放速度（数值越小缩放越慢）
-      try {
-        mxcad.mxdraw.setZoomSpeed(1.8);
-        console.log("已设置滚轮缩放速度为 1.8");
-      } catch (e) {
-        console.warn("设置缩放速度失败:", e);
-      }
+		// 启用鼠标中键平移（我们会把 Ctrl + 左键模拟成中键事件）
+		try {
+		mxcad.mxdraw.setMouseMiddlePan(true);
+		console.log("已启用中键平移，Ctrl + 左键会模拟成中键事件");
+		} catch (e) {
+		console.warn("设置中键平移失败:", e);
+		}
 
-      // 二次注册命令
-      RegistMxCommands();
-      RxInitMxEntity();
+		// 设置滚轮缩放速度（数值越小缩放越慢）
+		try {
+		mxcad.mxdraw.setZoomSpeed(1.8);
+		console.log("已设置滚轮缩放速度为 1.8");
+		} catch (e) {
+		console.warn("设置缩放速度失败:", e);
+		}
 
-      mxcad.mxdraw.on("openFileComplete", () => {
-        this.onFileLoaded();
-      });
+		// 二次注册命令
+		RegistMxCommands();
+		RxInitMxEntity();
 
-      mxcad.mxdraw.on("uiSetLayerData", (listLayer: any[]) => {
-        console.log("-------listLayer--------",listLayer)
-        this.layers = listLayer.map(v => ({
-          name: v.name,
-          id: v.id,
-          off: v.off,
-          colorValue: v.colorValue
-        }));
-        this.layerCount = this.layers.length;
-      });
+		mxcad.mxdraw.on("openFileComplete", () => {
+		this.onFileLoaded();
+		});
 
-      this.viewerReady = true;
-      this.loading = false;
-      this.loadingProgress = 100;
+		mxcad.mxdraw.on("uiSetLayerData", (listLayer: any[]) => {
+		console.log("-------listLayer--------", listLayer);
+		this.layers = listLayer.map((v) => ({
+			name: v.name,
+			id: v.id,
+			off: v.off,
+			colorValue: v.colorValue,
+		}));
+		this.layerCount = this.layers.length;
+		});
 
-    } catch (error) {
-      console.error("文件加载失败:", error);
-      this.loading = false;
-      this.$Message.error("文件加载失败: " + (error as Error).message);
-    }
+		this.viewerReady = true;
+		this.loading = false;
+		this.loadingProgress = 100;
+
+	} catch (error) {
+		console.error("文件加载失败:", error);
+		this.loading = false;
+		this.$Message.error("文件加载失败: " + (error as Error).message);
+	}
   }
 
   // ============== 视图控制 ==============
@@ -684,107 +684,107 @@ console.log(new Date().getTime() - now, 22222)
   /**
    * 保存当前视图参数
    */
-  saveCurrentView() {
-    try {
-      if (!this.mxcad || !this.mxcad.getViewCADCoord) {
-        this.$Message.warning("无法获取视图信息");
-        return;
-      }
-      
-      const view = this.mxcad.getViewCADCoord();
-      console.log("当前视图范围:", view);
-      
-      if (view && view.pt1 && view.pt2) {
-        const minX = Math.min(view.pt1.x, view.pt2.x, view.pt3.x, view.pt4.x);
-        const maxX = Math.max(view.pt1.x, view.pt2.x, view.pt3.x, view.pt4.x);
-        const minY = Math.min(view.pt1.y, view.pt2.y, view.pt3.y, view.pt4.y);
-        const maxY = Math.max(view.pt1.y, view.pt2.y, view.pt3.y, view.pt4.y);
-        
-        const viewParams = {
-          minX,
-          minY,
-          maxX,
-          maxY,
-          width: maxX - minX,
-          height: maxY - minY,
-          centerX: (minX + maxX) / 2,
-          centerY: (minY + maxY) / 2
-        };
-        
-        console.log("当前视图参数:", viewParams);
-        console.log("JSON 格式:", JSON.stringify(viewParams));
-        
-        // 从 fileUrl 中提取文件名
-        const fileName = this.fileUrl ? this.fileUrl.split('/').pop() : "default";
-        console.log("保存到文件:", fileName);
-        
-        // 保存到 localStorage
-        localStorage.setItem("cad_view_" + fileName, JSON.stringify(viewParams));
-        
-        this.$Message.success("视图参数已保存！下次打开自动恢复");
-      }
-    } catch (e) {
-      console.error("保存视图失败:", e);
-      this.$Message.error("保存视图失败");
-    }
+  public saveCurrentView() {
+	try {
+		if (!this.mxcad || !this.mxcad.getViewCADCoord) {
+		this.$Message.warning("无法获取视图信息");
+		return;
+		}
+
+		const view = this.mxcad.getViewCADCoord();
+		console.log("当前视图范围:", view);
+
+		if (view && view.pt1 && view.pt2) {
+		const minX = Math.min(view.pt1.x, view.pt2.x, view.pt3.x, view.pt4.x);
+		const maxX = Math.max(view.pt1.x, view.pt2.x, view.pt3.x, view.pt4.x);
+		const minY = Math.min(view.pt1.y, view.pt2.y, view.pt3.y, view.pt4.y);
+		const maxY = Math.max(view.pt1.y, view.pt2.y, view.pt3.y, view.pt4.y);
+
+		const viewParams = {
+			minX,
+			minY,
+			maxX,
+			maxY,
+			width: maxX - minX,
+			height: maxY - minY,
+			centerX: (minX + maxX) / 2,
+			centerY: (minY + maxY) / 2,
+		};
+
+		console.log("当前视图参数:", viewParams);
+		console.log("JSON 格式:", JSON.stringify(viewParams));
+
+		// 从 fileUrl 中提取文件名
+		const fileName = this.fileUrl ? this.fileUrl.split('/').pop() : "default";
+		console.log("保存到文件:", fileName);
+
+		// 保存到 localStorage
+		localStorage.setItem("cad_view_" + fileName, JSON.stringify(viewParams));
+
+		this.$Message.success("视图参数已保存！下次打开自动恢复");
+		}
+	} catch (e) {
+		console.error("保存视图失败:", e);
+		this.$Message.error("保存视图失败");
+	}
   }
-  
+
   /**
    * 缩放至全图
    */
-  zoomAll() {
-    try {
-      console.log("调用 mxcad.zoomAll()");
-      if (this.mxcad && this.mxcad.zoomAll) {
-        const result = this.mxcad.zoomAll();
-        console.log("mxcad.zoomAll() 调用成功，返回值:", result);
-      } else {
-        console.warn("mxcad.zoomAll 不存在，使用命令方式");
-        this.executeCommand("Mx_ZoomE");
-      }
-    } catch (e) {
-      console.error("缩放至全图失败:", e);
-    }
+  public zoomAll() {
+	try {
+		console.log("调用 mxcad.zoomAll()");
+		if (this.mxcad && this.mxcad.zoomAll) {
+		const result = this.mxcad.zoomAll();
+		console.log("mxcad.zoomAll() 调用成功，返回值:", result);
+		} else {
+		console.warn("mxcad.zoomAll 不存在，使用命令方式");
+		this.executeCommand("Mx_ZoomE");
+		}
+	} catch (e) {
+		console.error("缩放至全图失败:", e);
+	}
   }
 
   /**
    * 放大
    */
-  zoomIn() {
-    if (this.mxDraw) {
-      this.mxDraw.zoomScale(1.5);
-    }
+  public zoomIn() {
+	if (this.mxDraw) {
+		this.mxDraw.zoomScale(1.5);
+	}
   }
 
   /**
    * 缩小
    */
-  zoomOut() {
-    if (this.mxDraw) {
-      this.mxDraw.zoomScale(0.67);
-    }
+  public zoomOut() {
+	if (this.mxDraw) {
+		this.mxDraw.zoomScale(0.67);
+	}
   }
 
   /**
    * 重置视图
    */
-  resetView() {
-    this.zoomAll();
+  public resetView() {
+	this.zoomAll();
   }
 
   /**
    * 窗口缩放
    */
-  zoomWindow() {
-    this.executeCommand("BR_ZoomW", "窗口缩放");
+  public zoomWindow() {
+	this.executeCommand("BR_ZoomW", "窗口缩放");
   }
 
   /**
    * 重绘
    */
-  regen() {
-    this.executeCommand("BR_Regen");
-    this.$Message.info("正在重绘视图...");
+  public regen() {
+	this.executeCommand("BR_Regen");
+	this.$Message.info("正在重绘视图...");
   }
 
   // ============== 测量工具 ==============
@@ -792,33 +792,33 @@ console.log(new Date().getTime() - now, 22222)
   /**
    * 距离测量
    */
-  startMeasureDistance() {
-    this.measureResult = "";
-    this.executeCommand("BR_DimensionMeasurement", "距离测量");
+  public startMeasureDistance() {
+	this.measureResult = "";
+	this.executeCommand("BR_DimensionMeasurement", "距离测量");
   }
 
   /**
    * 面积测量
    */
-  startMeasureArea() {
-    this.measureResult = "";
-    this.executeCommand("BR_Area", "面积测量");
+  public startMeasureArea() {
+	this.measureResult = "";
+	this.executeCommand("BR_Area", "面积测量");
   }
 
   /**
    * 坐标测量
    */
-  startMeasureCoord() {
-    this.measureResult = "";
-    this.executeCommand("BR_Coord", "坐标测量");
+  public startMeasureCoord() {
+	this.measureResult = "";
+	this.executeCommand("BR_Coord", "坐标测量");
   }
 
   /**
    * 角度测量
    */
-  startMeasureAngle() {
-    this.measureResult = "";
-    this.executeCommand("BR_AngleSurveying", "角度测量");
+  public startMeasureAngle() {
+	this.measureResult = "";
+	this.executeCommand("BR_AngleSurveying", "角度测量");
   }
 
   // ============== 批注工具 ==============
@@ -826,280 +826,280 @@ console.log(new Date().getTime() - now, 22222)
   /**
    * 绘制直线
    */
-  drawLine() {
-    this.executeCommand("Mx_Line", "绘制直线");
+  public drawLine() {
+	this.executeCommand("Mx_Line", "绘制直线");
   }
 
   /**
    * 绘制圆 - 直接实现
    */
-  async drawCircle() {
-    if (!this.viewerReady || !MxFun) {
-      this.$Message.warning("查看器未就绪");
-      return;
-    }
+  public async drawCircle() {
+	if (!this.viewerReady || !MxFun) {
+		this.$Message.warning("查看器未就绪");
+		return;
+	}
 
-    try {
-      this.currentCommand = "绘制圆形";
-      const getPoint = new MrxDbgUiPrPoint();
-      const worldDraw = new McEdGetPointWorldDrawObject();
-      const mxObj = MxFun.getCurrentDraw();
-      const circle = new MxDbCircleShape();
+	try {
+		this.currentCommand = "绘制圆形";
+		const getPoint = new MrxDbgUiPrPoint();
+		const worldDraw = new McEdGetPointWorldDrawObject();
+		const mxObj = MxFun.getCurrentDraw();
+		const circle = new MxDbCircleShape();
 
-      circle.color = new THREE.Color("#ff0000");
-      circle.startAngle = 0;
-      circle.endAngle = Math.PI * 2;
+		circle.color = new THREE.Color("#ff0000");
+		circle.startAngle = 0;
+		circle.endAngle = Math.PI * 2;
 
-      getPoint.setUserDraw(worldDraw);
-      getPoint.setMessage("\n指定圆心:");
+		getPoint.setUserDraw(worldDraw);
+		getPoint.setMessage("\n指定圆心:");
 
-      // 第一步：指定圆心
-      const centerPt = await getPoint.go();
-      if (!centerPt) {
-        this.currentCommand = "";
-        return;
-      }
+		// 第一步：指定圆心
+		const centerPt = await getPoint.go();
+		if (!centerPt) {
+		this.currentCommand = "";
+		return;
+		}
 
-      circle.center = centerPt.clone();
+		circle.center = centerPt.clone();
 
-      // 第二步：指定半径
-      worldDraw.setDraw((v: THREE.Vector3) => {
-        const radius = centerPt.distanceTo(v);
-        circle.radius = radius;
-        worldDraw.drawCustomEntity(circle);
-      });
+		// 第二步：指定半径
+		worldDraw.setDraw((v: THREE.Vector3) => {
+		const radius = centerPt.distanceTo(v);
+		circle.radius = radius;
+		worldDraw.drawCustomEntity(circle);
+		});
 
-      getPoint.setBasePt(centerPt);
-      getPoint.setUseBasePt(true);
-      getPoint.setMessage("\n指定半径:");
+		getPoint.setBasePt(centerPt);
+		getPoint.setUseBasePt(true);
+		getPoint.setMessage("\n指定半径:");
 
-      const radiusPt = await getPoint.go();
-      if (!radiusPt) {
-        this.currentCommand = "";
-        return;
-      }
+		const radiusPt = await getPoint.go();
+		if (!radiusPt) {
+		this.currentCommand = "";
+		return;
+		}
 
-      const radius = centerPt.distanceTo(radiusPt);
-      circle.radius = radius;
-      circle.center = centerPt;
+		const radius = centerPt.distanceTo(radiusPt);
+		circle.radius = radius;
+		circle.center = centerPt;
 
-      mxObj.addMxEntity(circle);
-      this.$Message.success("圆形绘制成功");
-      this.currentCommand = "";
+		mxObj.addMxEntity(circle);
+		this.$Message.success("圆形绘制成功");
+		this.currentCommand = "";
 
-    } catch (e) {
-      console.error("绘制圆形失败:", e);
-      this.$Message.error("绘制圆形失败");
-      this.currentCommand = "";
-    }
+	} catch (e) {
+		console.error("绘制圆形失败:", e);
+		this.$Message.error("绘制圆形失败");
+		this.currentCommand = "";
+	}
   }
 
   /**
    * 绘制矩形 - 官方标准实现（MyRect 自定义实体做动态预览）
    */
-  async drawRect() {
-    if (!this.viewerReady || !MxFun) {
-      this.$Message.warning("查看器未就绪");
-      return;
-    }
+  public async drawRect() {
+	if (!this.viewerReady || !MxFun) {
+		this.$Message.warning("查看器未就绪");
+		return;
+	}
 
-    try {
-      this.currentCommand = "绘制矩形";
-      console.log("[矩形绘制] 开始绘制矩形（官方标准实现）");
-      
-      const getPoint = new MrxDbgUiPrPoint();
-      const mxObj = MxFun.getCurrentDraw();
+	try {
+		this.currentCommand = "绘制矩形";
+		console.log("[矩形绘制] 开始绘制矩形（官方标准实现）");
 
-      getPoint.setMessage("\n指定第一点:");
-      console.log("[矩形绘制] 等待第一点...");
+		const getPoint = new MrxDbgUiPrPoint();
+		const mxObj = MxFun.getCurrentDraw();
 
-      // 第一步：指定第一点
-      const pt1 = await getPoint.go();
-      if (!pt1) {
-        console.log("[矩形绘制] 取消第一点");
-        this.currentCommand = "";
-        return;
-      }
-      console.log("[矩形绘制] 第一点:", pt1.x, pt1.y);
+		getPoint.setMessage("\n指定第一点:");
+		console.log("[矩形绘制] 等待第一点...");
 
-      // 使用官方 MyRect 实体做动态预览（重写了 worldDraw，用四条线绘制）
-      const previewRect = new MyRect();
-      previewRect.pt1 = pt1;
-      previewRect.ang = 0;  // 正矩形，不旋转
-      previewRect.color = new THREE.Color("#ff6600");
-      previewRect.dLineWidth = MxFun.screenCoordLong2Doc(2);
-      previewRect.lineWidthByPixels = true;
+		// 第一步：指定第一点
+		const pt1 = await getPoint.go();
+		if (!pt1) {
+		console.log("[矩形绘制] 取消第一点");
+		this.currentCommand = "";
+		return;
+		}
+		console.log("[矩形绘制] 第一点:", pt1.x, pt1.y);
 
-      // 动态预览
-      const worldDrawComment = new McEdGetPointWorldDrawObject();
-      worldDrawComment.setDraw((currentPoint: THREE.Vector3) => {
-        previewRect.pt2 = currentPoint;
-        worldDrawComment.drawCustomEntity(previewRect);
-      });
+		// 使用官方 MyRect 实体做动态预览（重写了 worldDraw，用四条线绘制）
+		const previewRect = new MyRect();
+		previewRect.pt1 = pt1;
+		previewRect.ang = 0;  // 正矩形，不旋转
+		previewRect.color = new THREE.Color("#ff6600");
+		previewRect.dLineWidth = MxFun.screenCoordLong2Doc(2);
+		previewRect.lineWidthByPixels = true;
 
-      getPoint.setBasePt(pt1);
-      getPoint.setUseBasePt(true);
-      getPoint.setUserDraw(worldDrawComment);
-      getPoint.setMessage("\n指定第二点:");
-      console.log("[矩形绘制] 等待第二点...");
+		// 动态预览
+		const worldDrawComment = new McEdGetPointWorldDrawObject();
+		worldDrawComment.setDraw((currentPoint: THREE.Vector3) => {
+		previewRect.pt2 = currentPoint;
+		worldDrawComment.drawCustomEntity(previewRect);
+		});
 
-      // 第二步：指定第二点
-      const pt2 = await getPoint.go();
-      if (!pt2) {
-        console.log("[矩形绘制] 取消第二点");
-        this.currentCommand = "";
-        return;
-      }
-      console.log("[矩形绘制] 第二点:", pt2.x, pt2.y);
+		getPoint.setBasePt(pt1);
+		getPoint.setUseBasePt(true);
+		getPoint.setUserDraw(worldDrawComment);
+		getPoint.setMessage("\n指定第二点:");
+		console.log("[矩形绘制] 等待第二点...");
 
-      // 最终绘制：使用四条 MxDbLine 绘制矩形（保证渲染可靠）
-      console.log("[矩形绘制] 开始绘制四条线...");
+		// 第二步：指定第二点
+		const pt2 = await getPoint.go();
+		if (!pt2) {
+		console.log("[矩形绘制] 取消第二点");
+		this.currentCommand = "";
+		return;
+		}
+		console.log("[矩形绘制] 第二点:", pt2.x, pt2.y);
 
-      const lineTop = new MxDbLine();
-      lineTop.pt1 = new THREE.Vector3(pt1.x, pt1.y, 0);
-      lineTop.pt2 = new THREE.Vector3(pt2.x, pt1.y, 0);
-      lineTop.color = new THREE.Color("#ff6600");
-      lineTop.setLineWidth(2);
-      lineTop.setLineWidthByPixels(true);
-      mxObj.addMxEntity(lineTop);
-      console.log("[矩形绘制] 上边绘制完成");
+		// 最终绘制：使用四条 MxDbLine 绘制矩形（保证渲染可靠）
+		console.log("[矩形绘制] 开始绘制四条线...");
 
-      const lineRight = new MxDbLine();
-      lineRight.pt1 = new THREE.Vector3(pt2.x, pt1.y, 0);
-      lineRight.pt2 = new THREE.Vector3(pt2.x, pt2.y, 0);
-      lineRight.color = new THREE.Color("#ff6600");
-      lineRight.setLineWidth(2);
-      lineRight.setLineWidthByPixels(true);
-      mxObj.addMxEntity(lineRight);
-      console.log("[矩形绘制] 右边绘制完成");
+		const lineTop = new MxDbLine();
+		lineTop.pt1 = new THREE.Vector3(pt1.x, pt1.y, 0);
+		lineTop.pt2 = new THREE.Vector3(pt2.x, pt1.y, 0);
+		lineTop.color = new THREE.Color("#ff6600");
+		lineTop.setLineWidth(2);
+		lineTop.setLineWidthByPixels(true);
+		mxObj.addMxEntity(lineTop);
+		console.log("[矩形绘制] 上边绘制完成");
 
-      const lineBottom = new MxDbLine();
-      lineBottom.pt1 = new THREE.Vector3(pt2.x, pt2.y, 0);
-      lineBottom.pt2 = new THREE.Vector3(pt1.x, pt2.y, 0);
-      lineBottom.color = new THREE.Color("#ff6600");
-      lineBottom.setLineWidth(2);
-      lineBottom.setLineWidthByPixels(true);
-      mxObj.addMxEntity(lineBottom);
-      console.log("[矩形绘制] 下边绘制完成");
+		const lineRight = new MxDbLine();
+		lineRight.pt1 = new THREE.Vector3(pt2.x, pt1.y, 0);
+		lineRight.pt2 = new THREE.Vector3(pt2.x, pt2.y, 0);
+		lineRight.color = new THREE.Color("#ff6600");
+		lineRight.setLineWidth(2);
+		lineRight.setLineWidthByPixels(true);
+		mxObj.addMxEntity(lineRight);
+		console.log("[矩形绘制] 右边绘制完成");
 
-      const lineLeft = new MxDbLine();
-      lineLeft.pt1 = new THREE.Vector3(pt1.x, pt2.y, 0);
-      lineLeft.pt2 = new THREE.Vector3(pt1.x, pt1.y, 0);
-      lineLeft.color = new THREE.Color("#ff6600");
-      lineLeft.setLineWidth(2);
-      lineLeft.setLineWidthByPixels(true);
-      mxObj.addMxEntity(lineLeft);
-      console.log("[矩形绘制] 左边绘制完成");
+		const lineBottom = new MxDbLine();
+		lineBottom.pt1 = new THREE.Vector3(pt2.x, pt2.y, 0);
+		lineBottom.pt2 = new THREE.Vector3(pt1.x, pt2.y, 0);
+		lineBottom.color = new THREE.Color("#ff6600");
+		lineBottom.setLineWidth(2);
+		lineBottom.setLineWidthByPixels(true);
+		mxObj.addMxEntity(lineBottom);
+		console.log("[矩形绘制] 下边绘制完成");
 
-      this.$Message.success("矩形绘制成功");
-      this.currentCommand = "";
-      console.log("[矩形绘制] 绘制完成");
+		const lineLeft = new MxDbLine();
+		lineLeft.pt1 = new THREE.Vector3(pt1.x, pt2.y, 0);
+		lineLeft.pt2 = new THREE.Vector3(pt1.x, pt1.y, 0);
+		lineLeft.color = new THREE.Color("#ff6600");
+		lineLeft.setLineWidth(2);
+		lineLeft.setLineWidthByPixels(true);
+		mxObj.addMxEntity(lineLeft);
+		console.log("[矩形绘制] 左边绘制完成");
 
-    } catch (e) {
-      console.error("[矩形绘制] 绘制失败:", e);
-      this.$Message.error("绘制矩形失败: " + (e as Error).message);
-      this.currentCommand = "";
-    }
+		this.$Message.success("矩形绘制成功");
+		this.currentCommand = "";
+		console.log("[矩形绘制] 绘制完成");
+
+	} catch (e) {
+		console.error("[矩形绘制] 绘制失败:", e);
+		this.$Message.error("绘制矩形失败: " + (e as Error).message);
+		this.currentCommand = "";
+	}
   }
 
   /**
    * 绘制文字
    */
-  drawText() {
-    this.executeCommand("BR_Text", "绘制文字");
+  public drawText() {
+	this.executeCommand("BR_Text", "绘制文字");
   }
 
   /**
    * 绘制云线
    */
-  drawCloudLine() {
-    this.executeCommand("BR_CloudLine", "绘制云线");
+  public drawCloudLine() {
+	this.executeCommand("BR_CloudLine", "绘制云线");
   }
 
   /**
    * 绘制箭头
    */
-  drawArrow() {
-    this.executeCommand("BR_Arrow", "箭头批注");
+  public drawArrow() {
+	this.executeCommand("BR_Arrow", "箭头批注");
   }
 
   /**
    * 引线标注
    */
-  drawComment() {
-    this.executeCommand("BR_Comment", "引线标注");
+  public drawComment() {
+	this.executeCommand("BR_Comment", "引线标注");
   }
 
   /**
    * 删除批注
    */
-  deleteEntity() {
-    this.executeCommand("Mx_DeleteEntity", "删除批注");
+  public deleteEntity() {
+	this.executeCommand("Mx_DeleteEntity", "删除批注");
   }
 
   /**
    * 编辑文字
    */
-  editText() {
-    if (!this.viewerReady || !MxFun) {
-      this.$Message.warning("查看器未就绪");
-      return;
-    }
+  public editText() {
+	if (!this.viewerReady || !MxFun) {
+		this.$Message.warning("查看器未就绪");
+		return;
+	}
 
-    const mxObj = MxFun.getCurrentDraw();
-    const aryId = mxObj.getMxCurrentSelect();
+	const mxObj = MxFun.getCurrentDraw();
+	const aryId = mxObj.getMxCurrentSelect();
 
-    if (aryId.length === 0) {
-      this.$Message.warning("请先选中要编辑的文字或引线标注");
-      return;
-    }
+	if (aryId.length === 0) {
+		this.$Message.warning("请先选中要编辑的文字或引线标注");
+		return;
+	}
 
-    const ent = mxObj.getMxEntity(aryId[0]);
-    const typeName = ent.getTypeName();
+	const ent = mxObj.getMxEntity(aryId[0]);
+	const typeName = ent.getTypeName();
 
-    // 判断是否是文字或引线标注
-    if (typeName === "MxDbText" || typeName === "MyText") {
-      this.editTextType = "文字";
-      this.editTextValue = ent.text || "";
-      this.editTextEntity = ent;
-      this.showEditTextModal = true;
-    } else if (typeName === "MxDbLeadComment") {
-      this.editTextType = "引线标注";
-      this.editTextValue = ent.text || "";
-      this.editTextEntity = ent;
-      this.showEditTextModal = true;
-    } else {
-      this.$Message.warning("请选中文字或引线标注");
-    }
+	// 判断是否是文字或引线标注
+	if (typeName === "MxDbText" || typeName === "MyText") {
+		this.editTextType = "文字";
+		this.editTextValue = ent.text || "";
+		this.editTextEntity = ent;
+		this.showEditTextModal = true;
+	} else if (typeName === "MxDbLeadComment") {
+		this.editTextType = "引线标注";
+		this.editTextValue = ent.text || "";
+		this.editTextEntity = ent;
+		this.showEditTextModal = true;
+	} else {
+		this.$Message.warning("请选中文字或引线标注");
+	}
   }
 
   /**
    * 确认编辑文字
    */
-  confirmEditText() {
-    if (!this.editTextEntity) {
-      this.$Message.error("实体不存在");
-      return;
-    }
+  public confirmEditText() {
+	if (!this.editTextEntity) {
+		this.$Message.error("实体不存在");
+		return;
+	}
 
-    try {
-      this.editTextEntity.text = this.editTextValue;
-      this.editTextEntity.setNeedUpdateDisplay();
-      this.$Message.success("文字修改成功");
-      this.showEditTextModal = false;
-      this.editTextEntity = null;
-    } catch (e) {
-      console.error("修改文字失败:", e);
-      this.$Message.error("修改文字失败");
-    }
+	try {
+		this.editTextEntity.text = this.editTextValue;
+		this.editTextEntity.setNeedUpdateDisplay();
+		this.$Message.success("文字修改成功");
+		this.showEditTextModal = false;
+		this.editTextEntity = null;
+	} catch (e) {
+		console.error("修改文字失败:", e);
+		this.$Message.error("修改文字失败");
+	}
   }
 
   /**
    * 取消编辑文字
    */
-  cancelEditText() {
-    this.showEditTextModal = false;
-    this.editTextEntity = null;
+  public cancelEditText() {
+	this.showEditTextModal = false;
+	this.editTextEntity = null;
   }
 
   // ============== 导出工具 ==============
@@ -1107,28 +1107,28 @@ console.log(new Date().getTime() - now, 22222)
   /**
    * 截图
    */
-  takeScreenshot() {
-    try {
-      this.executeCommand("BR_WriteImage");
-      this.$Message.success("截图已生成，请右键保存");
-    } catch (e) {
-      this.$Message.error("截图失败");
-    }
+  public takeScreenshot() {
+	try {
+		this.executeCommand("BR_WriteImage");
+		this.$Message.success("截图已生成，请右键保存");
+	} catch (e) {
+		this.$Message.error("截图失败");
+	}
   }
 
   /**
    * 打印
    */
-  printView() {
-    this.executeCommand("BR_Print");
+  public printView() {
+	this.executeCommand("BR_Print");
   }
 
   /**
    * 保存批注
    */
-  saveAnnotations() {
-    this.executeCommand("Mx_SaveAllMxEntity");
-    this.$Message.success("批注数据已保存");
+  public saveAnnotations() {
+	this.executeCommand("Mx_SaveAllMxEntity");
+	this.$Message.success("批注数据已保存");
   }
 
   // ============== 图层管理 ==============
@@ -1136,53 +1136,53 @@ console.log(new Date().getTime() - now, 22222)
   /**
    * 切换图层显示/隐藏
    */
-  toggleLayer(layer: any, visible: boolean) {
-    try {
-      if (!this.mxcad || !layer || !layer.id) return;
-      console.log(layer, 11111)
-      // 获取图层记录对象
-      const record = layer.id.getMcDbLayerTableRecord();
-      if (record) {
-        // 设置图层是否关闭
-        record.isOff = !visible;
-        // 更新图层状态
-        layer.off = !visible;
-        console.log("切换图层:", layer.name, "显示:", visible);
-        
-        // 更新图层显示状态（关键！）
-        if (this.mxcad.updateLayerDisplayStatus) {
-          this.mxcad.updateLayerDisplayStatus();
-        }
-        
-        // 触发重绘
-        if (this.mxcad.updateDisplay) {
-          this.mxcad.updateDisplay();
-        } else if (MxFun && MxFun.updateDisplay) {
-          MxFun.updateDisplay();
-        }
-      }
-    } catch (e) {
-      console.error("切换图层失败:", e);
-    }
+  public toggleLayer(layer: any, visible: boolean) {
+	try {
+		if (!this.mxcad || !layer || !layer.id) { return; }
+		console.log(layer, 11111);
+		// 获取图层记录对象
+		const record = layer.id.getMcDbLayerTableRecord();
+		if (record) {
+		// 设置图层是否关闭
+		record.isOff = !visible;
+		// 更新图层状态
+		layer.off = !visible;
+		console.log("切换图层:", layer.name, "显示:", visible);
+
+		// 更新图层显示状态（关键！）
+		if (this.mxcad.updateLayerDisplayStatus) {
+			this.mxcad.updateLayerDisplayStatus();
+		}
+
+		// 触发重绘
+		if (this.mxcad.updateDisplay) {
+			this.mxcad.updateDisplay();
+		} else if (MxFun && MxFun.updateDisplay) {
+			MxFun.updateDisplay();
+		}
+		}
+	} catch (e) {
+		console.error("切换图层失败:", e);
+	}
   }
-  
+
   /**
    * 获取图层颜色
    */
-  getLayerColor(colorValue: any): string {
-    try {
-      if (typeof colorValue === 'number') {
-        return '#' + colorValue.toString(16).padStart(6, '0');
-      }
-      if (typeof colorValue === 'string') {
-        // 如果是字符串，尝试解析
-        if (colorValue.startsWith('#')) return colorValue;
-        return '#' + colorValue;
-      }
-      return '#808080';
-    } catch (e) {
-      return '#808080';
-    }
+  public getLayerColor(colorValue: any): string {
+	try {
+		if (typeof colorValue === 'number') {
+		return '#' + colorValue.toString(16).padStart(6, '0');
+		}
+		if (typeof colorValue === 'string') {
+		// 如果是字符串，尝试解析
+		if (colorValue.startsWith('#')) { return colorValue; }
+		return '#' + colorValue;
+		}
+		return '#808080';
+	} catch (e) {
+		return '#808080';
+	}
   }
 
   // ============== 通用方法 ==============
@@ -1190,183 +1190,183 @@ console.log(new Date().getTime() - now, 22222)
   /**
    * 执行命令
    */
-  executeCommand(cmd: string, commandName?: string) {
-    if (!this.viewerReady || !MxFun) {
-      this.$Message.warning("查看器未就绪");
-      return;
-    }
-    try {
-      MxFun.sendStringToExecute(cmd);
-      if (commandName) {
-        this.currentCommand = commandName;
-      }
-      console.log("执行命令:", cmd);
-    } catch (e) {
-      console.error("执行命令失败:", e);
-      this.$Message.error("命令执行失败");
-    }
+  public executeCommand(cmd: string, commandName?: string) {
+	if (!this.viewerReady || !MxFun) {
+		this.$Message.warning("查看器未就绪");
+		return;
+	}
+	try {
+		MxFun.sendStringToExecute(cmd);
+		if (commandName) {
+		this.currentCommand = commandName;
+		}
+		console.log("执行命令:", cmd);
+	} catch (e) {
+		console.error("执行命令失败:", e);
+		this.$Message.error("命令执行失败");
+	}
   }
 
   /**
    * 停止当前命令
    */
-  stopCommand() {
-    if (MxFun) {
-      MxFun.stopRunCommand();
-    }
-    this.currentCommand = "";
+  public stopCommand() {
+	if (MxFun) {
+		MxFun.stopRunCommand();
+	}
+	this.currentCommand = "";
   }
 
   /**
    * 切换面板收缩/展开
    */
-  togglePanel() {
-    this.panelCollapsed = !this.panelCollapsed;
+  public togglePanel() {
+	this.panelCollapsed = !this.panelCollapsed;
   }
 
   /**
    * 初始化 Ctrl + 左键平移（事件模拟方式）
    * 把 Ctrl + 左键模拟成中键事件，完全复用 mxdraw 内部的平移逻辑
    */
-  initCtrlPan() {
-    const canvas = document.getElementById("mxcad") as HTMLCanvasElement;
-    if (!canvas) {
-      console.warn("[Ctrl平移] 未找到 canvas 元素");
-      return;
-    }
+  public initCtrlPan() {
+	const canvas = document.getElementById("mxcad") as HTMLCanvasElement;
+	if (!canvas) {
+		console.warn("[Ctrl平移] 未找到 canvas 元素");
+		return;
+	}
 
-    console.log("[Ctrl平移] 初始化 Ctrl + 左键平移（事件模拟方式）");
+	console.log("[Ctrl平移] 初始化 Ctrl + 左键平移（事件模拟方式）");
 
-    // 使用捕获阶段监听，这样可以在 mxdraw 处理之前拦截事件
-    canvas.addEventListener("mousedown", this.handleCtrlPanMouseDown, true);
-    canvas.addEventListener("mousemove", this.handleCtrlPanMouseMove, true);
-    canvas.addEventListener("mouseup", this.handleCtrlPanMouseUp, true);
-    canvas.addEventListener("mouseleave", this.handleCtrlPanMouseUp, true);
+	// 使用捕获阶段监听，这样可以在 mxdraw 处理之前拦截事件
+	canvas.addEventListener("mousedown", this.handleCtrlPanMouseDown, true);
+	canvas.addEventListener("mousemove", this.handleCtrlPanMouseMove, true);
+	canvas.addEventListener("mouseup", this.handleCtrlPanMouseUp, true);
+	canvas.addEventListener("mouseleave", this.handleCtrlPanMouseUp, true);
   }
 
   /**
    * 模拟中键事件
    */
-  simulateMiddleButtonEvent(e: MouseEvent, type: string) {
-    // 创建一个新的鼠标事件，把 button 改成 1（中键）
-    const simulatedEvent = new MouseEvent(type, {
-      bubbles: true,
-      cancelable: true,
-      view: window,
-      detail: 1,
-      screenX: e.screenX,
-      screenY: e.screenY,
-      clientX: e.clientX,
-      clientY: e.clientY,
-      ctrlKey: false,  // 去掉 ctrlKey，避免 mxdraw 有特殊处理
-      altKey: false,
-      shiftKey: false,
-      metaKey: false,
-      button: 1,  // 中键
-      buttons: 4,  // 中键按下的状态
-      relatedTarget: e.relatedTarget as EventTarget
-    });
+  public simulateMiddleButtonEvent(e: MouseEvent, type: string) {
+	// 创建一个新的鼠标事件，把 button 改成 1（中键）
+	const simulatedEvent = new MouseEvent(type, {
+		bubbles: true,
+		cancelable: true,
+		view: window,
+		detail: 1,
+		screenX: e.screenX,
+		screenY: e.screenY,
+		clientX: e.clientX,
+		clientY: e.clientY,
+		ctrlKey: false,  // 去掉 ctrlKey，避免 mxdraw 有特殊处理
+		altKey: false,
+		shiftKey: false,
+		metaKey: false,
+		button: 1,  // 中键
+		buttons: 4,  // 中键按下的状态
+		relatedTarget: e.relatedTarget as EventTarget,
+	});
 
-    // 在 canvas 上派发模拟的事件
-    const canvas = document.getElementById("mxcad") as HTMLCanvasElement;
-    if (canvas) {
-      canvas.dispatchEvent(simulatedEvent);
-    }
+	// 在 canvas 上派发模拟的事件
+	const canvas = document.getElementById("mxcad") as HTMLCanvasElement;
+	if (canvas) {
+		canvas.dispatchEvent(simulatedEvent);
+	}
   }
 
   /**
    * Ctrl + 左键平移 - 鼠标按下
    */
-  handleCtrlPanMouseDown(e: MouseEvent) {
-    // 只处理 Ctrl + 左键
-    if (!e.ctrlKey || e.button !== 0) {
-      return;
-    }
+  public handleCtrlPanMouseDown(e: MouseEvent) {
+	// 只处理 Ctrl + 左键
+	if (!e.ctrlKey || e.button !== 0) {
+		return;
+	}
 
-    // 如果正在执行命令，不处理平移
-    if (this.currentCommand) {
-      return;
-    }
+	// 如果正在执行命令，不处理平移
+	if (this.currentCommand) {
+		return;
+	}
 
-    e.preventDefault();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
+	e.preventDefault();
+	e.stopPropagation();
+	e.stopImmediatePropagation();
 
-    console.log("[Ctrl平移] 模拟中键按下");
+	console.log("[Ctrl平移] 模拟中键按下");
 
-    // 模拟中键按下事件
-    this.simulateMiddleButtonEvent(e, "mousedown");
+	// 模拟中键按下事件
+	this.simulateMiddleButtonEvent(e, "mousedown");
 
-    // 改变光标样式
-    const canvas = document.getElementById("mxcad") as HTMLCanvasElement;
-    if (canvas) {
-      canvas.style.cursor = "grabbing";
-    }
+	// 改变光标样式
+	const canvas = document.getElementById("mxcad") as HTMLCanvasElement;
+	if (canvas) {
+		canvas.style.cursor = "grabbing";
+	}
   }
 
   /**
    * Ctrl + 左键平移 - 鼠标移动
    */
-  handleCtrlPanMouseMove(e: MouseEvent) {
-    // 只处理 Ctrl + 左键按下的情况
-    if (!e.ctrlKey || e.buttons !== 1) {
-      return;
-    }
+  public handleCtrlPanMouseMove(e: MouseEvent) {
+	// 只处理 Ctrl + 左键按下的情况
+	if (!e.ctrlKey || e.buttons !== 1) {
+		return;
+	}
 
-    // 如果正在执行命令，不处理平移
-    if (this.currentCommand) {
-      return;
-    }
+	// 如果正在执行命令，不处理平移
+	if (this.currentCommand) {
+		return;
+	}
 
-    e.preventDefault();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
+	e.preventDefault();
+	e.stopPropagation();
+	e.stopImmediatePropagation();
 
-    // 模拟中键移动事件
-    this.simulateMiddleButtonEvent(e, "mousemove");
+	// 模拟中键移动事件
+	this.simulateMiddleButtonEvent(e, "mousemove");
   }
 
   /**
    * Ctrl + 左键平移 - 鼠标释放
    */
-  handleCtrlPanMouseUp(e: MouseEvent) {
-    // 只处理 Ctrl + 左键释放的情况
-    if (!e.ctrlKey || e.button !== 0) {
-      return;
-    }
+  public handleCtrlPanMouseUp(e: MouseEvent) {
+	// 只处理 Ctrl + 左键释放的情况
+	if (!e.ctrlKey || e.button !== 0) {
+		return;
+	}
 
-    e.preventDefault();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
+	e.preventDefault();
+	e.stopPropagation();
+	e.stopImmediatePropagation();
 
-    console.log("[Ctrl平移] 模拟中键释放");
+	console.log("[Ctrl平移] 模拟中键释放");
 
-    // 模拟中键释放事件
-    this.simulateMiddleButtonEvent(e, "mouseup");
+	// 模拟中键释放事件
+	this.simulateMiddleButtonEvent(e, "mouseup");
 
-    // 恢复光标样式
-    const canvas = document.getElementById("mxcad") as HTMLCanvasElement;
-    if (canvas) {
-      canvas.style.cursor = "";
-    }
+	// 恢复光标样式
+	const canvas = document.getElementById("mxcad") as HTMLCanvasElement;
+	if (canvas) {
+		canvas.style.cursor = "";
+	}
   }
 
   /**
    * 销毁查看器
    */
-  destroyViewer() {
-    try {
-      if (this.mxcad && this.mxcad.destroy) {
-        this.mxcad.destroy();
-      }
-      this.mxcad = null;
-      this.mxDraw = null;
-      this.viewerReady = false;
-      this.currentCommand = "";
-      this.measureResult = "";
-    } catch (e) {
-      console.warn("销毁查看器时出错:", e);
-    }
+  public destroyViewer() {
+	try {
+		if (this.mxcad && this.mxcad.destroy) {
+		this.mxcad.destroy();
+		}
+		this.mxcad = null;
+		this.mxDraw = null;
+		this.viewerReady = false;
+		this.currentCommand = "";
+		this.measureResult = "";
+	} catch (e) {
+		console.warn("销毁查看器时出错:", e);
+	}
   }
 }
 </script>

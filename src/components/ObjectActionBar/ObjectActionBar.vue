@@ -33,27 +33,27 @@ import { Component, Vue, Prop } from "vue-property-decorator";
 })
 
 export default class ObjectActionBar extends Vue {
-    @Prop({
-        type: Boolean,
-        default: false
-    }) isShow!: boolean
+	@Prop({
+		type: Boolean,
+		default: false,
+	}) public isShow!: boolean;
 
-    isShowColors = false
-    colors = ['red', 'yellow', 'blue']
-    setColor(color:string) {
-        // 设置颜色
-        MxFun.sendStringToExecute("BR_SetEntityColor",color);
-    }
-    copyObj() {
-        // 复制对象
-        MxFun.sendStringToExecute("BR_CopyEntity");
-    }
-    deleteObj() {
-        // 删除对象
-        MxFun.sendStringToExecute("BR_DeleteEntity");
-       
-    }
-    
+	public isShowColors = false;
+	public colors = ['red', 'yellow', 'blue'];
+	public setColor(color: string) {
+		// 设置颜色
+		MxFun.sendStringToExecute("BR_SetEntityColor", color);
+	}
+	public copyObj() {
+		// 复制对象
+		MxFun.sendStringToExecute("BR_CopyEntity");
+	}
+	public deleteObj() {
+		// 删除对象
+		MxFun.sendStringToExecute("BR_DeleteEntity");
+
+	}
+
 }
 </script>
 

@@ -58,7 +58,7 @@
           <!-- 只有这个容器允许滚动，触底后按页加载下一批数据。 -->
           <div ref="warningList" class="risk-warning-list" @scroll.passive="handleScroll">
             <template v-if="warnings.length">
-              <article v-for="(item, index) in warnings" :key="warningKey(item, index)" class="risk-warning-item">
+              <article v-for="(item, index) in warnings" @click="toRiskDetail(item)" :key="warningKey(item, index)" class="risk-warning-item">
                 <i class="risk-warning-level-line" :style="{ backgroundColor: levelMeta(item).color }"></i>
                 <div class="risk-warning-item-title" :title="item.MODEL_NAM || '-'">{{ item.MODEL_NAM || '-' }}</div>
                 <div class="risk-warning-item-meta">
@@ -149,6 +149,11 @@ export default {
     })
   },
   methods: {
+    toRiskDetail(item) {
+      if (parent && parent.riskDetail) {
+        parent.riskDetail(item)
+      }
+    },
     // 统一封装 POST 请求，并自动附加组织参数。
     async postData(url, data) {
       const response = await fetch(url, {
@@ -610,6 +615,7 @@ export default {
   background: url('./images/risk-warning-item-bg.png') no-repeat center / 100% 100%;
   color: #999999;
   font-size: 14px;
+  cursor: pointer;
 }
 
 .risk-warning-item + .risk-warning-item {

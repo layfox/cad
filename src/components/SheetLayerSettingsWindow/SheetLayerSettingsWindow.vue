@@ -33,18 +33,18 @@
 
 <script lang="ts">
 import { Component, Vue, Prop } from "vue-property-decorator";
-export type LayerItemType = {
-  name: string,
-  id: number,
-  off?: number,
+export interface LayerItemType {
+  name: string;
+  id: number;
+  off?: number;
   color?: {
-    red?: number,
-    green?: number,
-    blue?: number
-  },
-  colorValue?: number,
-  zerolayer?: number,
-  isState?: boolean
+	red?: number,
+	green?: number,
+	blue?: number
+  };
+  colorValue?: number;
+  zerolayer?: number;
+  isState?: boolean;
 }
 
 
@@ -61,118 +61,117 @@ const win: any = window;
 })
 export default class SheetLayerSettingsWindow extends Vue {
   @Prop({
-    type: Boolean,
-    default: false
-  }) isShow!: boolean
+	type: Boolean,
+	default: false,
+  }) public isShow!: boolean;
   @Prop({
-    type: Array
+	type: Array,
   })
-  titles!: [];
+  public titles!: [];
   @Prop({
-    type: Array,
-    default: () => ([])
-  }) list!: LayerItemType[]
+	type: Array,
+	default: () => ([]),
+  }) public list!: LayerItemType[];
 
   @Prop({
-    type: String,
-    default: "图层"
-  }) title!: string
+	type: String,
+	default: "图层",
+  }) public title!: string;
 
-  onClickState(item: LayerItemType) {
+  public onClickState(item: LayerItemType) {
 
   }
-  onClickName(item: LayerItemType) {
-    this.$emit("onClickName", item)
+  public onClickName(item: LayerItemType) {
+	this.$emit("onClickName", item);
   }
-  onClickIsVisible(item: LayerItemType) {
-    this.$emit("onClickIsVisible", item)
+  public onClickIsVisible(item: LayerItemType) {
+	this.$emit("onClickIsVisible", item);
   }
-  closeBox() {
-    this.$emit("close")
+  public closeBox() {
+	this.$emit("close");
   }
-  onMousedown(e: any) {
-    // 获取该元素的transform的计算后的值
-    function getStyle(el: any, attr: any) {
-      if (typeof window.getComputedStyle !== 'undefined') {
-        return window.getComputedStyle(el, null)[attr]
-      } else if (typeof el.currentStyle !== 'undefined') {
-        return el.currentStyle[attr]
-      }
-      return ''
-    }
-    // 正则解析
-    const matrix3dReg = /^matrix3d\((?:[-\d.]+,\s*){12}([-\d.]+),\s*([-\d.]+)(?:,\s*[-\d.]+){2}\)/,
-      matrixReg = /^matrix\((?:[-\d.]+,\s*){4}([-\d.]+),\s*([-\d.]+)\)$/
-    /* 定义元素变量 */
-    const windowClass: string = "sheet_layer_settings_window"
+  public onMousedown(e: any) {
+	// 获取该元素的transform的计算后的值
+	function getStyle(el: any, attr: any) {
+		if (typeof window.getComputedStyle !== 'undefined') {
+		return window.getComputedStyle(el, null)[attr];
+		} else if (typeof el.currentStyle !== 'undefined') {
+		return el.currentStyle[attr];
+		}
+		return '';
+	}
+	// 正则解析
+	const matrix3dReg = /^matrix3d\((?:[-\d.]+,\s*){12}([-\d.]+),\s*([-\d.]+)(?:,\s*[-\d.]+){2}\)/,
+		matrixReg = /^matrix\((?:[-\d.]+,\s*){4}([-\d.]+),\s*([-\d.]+)\)$/;
+	/* 定义元素变量 */
+	const windowClass: string = "sheet_layer_settings_window";
 
-    const ELEMENT: any = document.getElementsByClassName(windowClass)[0]
+	const ELEMENT: any = document.getElementsByClassName(windowClass)[0];
 
-    // 设置class
-    if (ELEMENT.className.indexOf('drag_box_translate3d') === -1) {
-      ELEMENT.className += ' drag_box_translate3d'
-    }
+	// 设置class
+	if (ELEMENT.className.indexOf('drag_box_translate3d') === -1) {
+		ELEMENT.className += ' drag_box_translate3d';
+	}
 
-    /* 定义距离尺寸的存储池 */
-    const E_SIZER: any = {}
-    // 获取解析后的transform样式属性值(计算后的样式)
-    const matrix3dSourceValue: any = getStyle(ELEMENT, 'transform')
-    // 使用正则解析matrix
-    const matrix3dArrValue: any =
-      matrix3dSourceValue.match(matrix3dReg) ||
-      matrix3dSourceValue.match(matrixReg)
-    // 记录鼠标点击时的坐标
-    // console.log(ELEMENT.clientX);
-    E_SIZER['clientX'] = e.clientX
-    E_SIZER['clientY'] = e.clientY
+	/* 定义距离尺寸的存储池 */
+	const E_SIZER: any = {};
+	// 获取解析后的transform样式属性值(计算后的样式)
+	const matrix3dSourceValue: any = getStyle(ELEMENT, 'transform');
+	// 使用正则解析matrix
+	const matrix3dArrValue: any =
+		matrix3dSourceValue.match(matrix3dReg) ||
+		matrix3dSourceValue.match(matrixReg);
+	// 记录鼠标点击时的坐标
+	// console.log(ELEMENT.clientX);
+	E_SIZER.clientX = e.clientX;
+	E_SIZER.clientY = e.clientY;
 
-    // 记录matrix解析后的translateX & translateY的值
-    E_SIZER['targetX'] = matrix3dArrValue[1]
+	// 记录matrix解析后的translateX & translateY的值
+	E_SIZER.targetX = matrix3dArrValue[1];
 
-    E_SIZER['targetY'] = matrix3dArrValue[2]
-    // 计算坐标边界巨鹿
+	E_SIZER.targetY = matrix3dArrValue[2];
+	// 计算坐标边界巨鹿
 
-    E_SIZER['distX'] = E_SIZER['clientX'] - E_SIZER['targetX']
-    E_SIZER['distY'] = E_SIZER['clientY'] - E_SIZER['targetY']
-    const disx = e.pageX - ELEMENT.offsetLeft
-    const disy = e.pageY - ELEMENT.offsetTop
-    // 鼠标移动
-    const fun = function (e: any) {
-      // 阻止原生和冒泡
-      e.stopPropagation()
-      e.preventDefault()
+	E_SIZER.distX = E_SIZER.clientX - E_SIZER.targetX;
+	E_SIZER.distY = E_SIZER.clientY - E_SIZER.targetY;
+	const disx = e.pageX - ELEMENT.offsetLeft;
+	const disy = e.pageY - ELEMENT.offsetTop;
+	// 鼠标移动
+	const fun = function(e: any) {
+		// 阻止原生和冒泡
+		e.stopPropagation();
+		e.preventDefault();
 
-      // 计算元素到屏幕的距离
-      let moveX = e.clientX - E_SIZER['distX']
-      let moveY = e.clientY - E_SIZER['distY']
+		// 计算元素到屏幕的距离
+		const moveX = e.clientX - E_SIZER.distX;
+		const moveY = e.clientY - E_SIZER.distY;
 
 
-      // 限定拖拽范围
-      // if (Math.abs(moveY) >= Math.abs(E_SIZER['clientY'] - disy)) {
-      //   if (moveY > 0) {
-      //     moveY = E_SIZER['clientY'] - disy
-      //   } else {
-      //     moveY = -(E_SIZER['clientY'] - disy)
-      //   }
-      // }
-      // if (Math.abs(moveX) >= Math.abs(E_SIZER['clientX'] - disx)) {
-      //   if (moveX > 0) {
-      //     moveX = E_SIZER['clientX'] - disx
-      //   } else {
-      //     moveX = -(E_SIZER['clientX'] - disx)
-      //   }
-      // }
-      // 动画拖拽
-      ELEMENT.style.transform = ELEMENT.style.mozTransform = ELEMENT.style.webkitTransform = `translate3d(${moveX}px, ${moveY}px, 1px)`
-    }
-    // 取消事件
-    document.onmousemove = fun
-    document.onmouseup = function () {
-      document.onmousemove = document.onmouseup = null
-    }
+		// 限定拖拽范围
+		// if (Math.abs(moveY) >= Math.abs(E_SIZER['clientY'] - disy)) {
+		//   if (moveY > 0) {
+		//     moveY = E_SIZER['clientY'] - disy
+		//   } else {
+		//     moveY = -(E_SIZER['clientY'] - disy)
+		//   }
+		// }
+		// if (Math.abs(moveX) >= Math.abs(E_SIZER['clientX'] - disx)) {
+		//   if (moveX > 0) {
+		//     moveX = E_SIZER['clientX'] - disx
+		//   } else {
+		//     moveX = -(E_SIZER['clientX'] - disx)
+		//   }
+		// }
+		// 动画拖拽
+		ELEMENT.style.transform = ELEMENT.style.mozTransform = ELEMENT.style.webkitTransform = `translate3d(${moveX}px, ${moveY}px, 1px)`;
+	};
+	// 取消事件
+	document.onmousemove = fun;
+	document.onmouseup = function() {
+		document.onmousemove = document.onmouseup = null;
+	};
   }
 }
-
 </script>
 
 <style>
