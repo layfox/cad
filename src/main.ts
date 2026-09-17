@@ -15,8 +15,8 @@ Vue.use(iView);
 
 Vue.prototype.$Message.config({
   duration: 3, // 默认3秒自动关闭
-  top: 40      // 可选，距离顶部像素，默认24
-})
+  top: 40,      // 可选，距离顶部像素，默认24
+});
 
 Vue.config.productionTip = false;
 window.cadApp = new Vue({

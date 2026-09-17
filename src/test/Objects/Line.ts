@@ -5,11 +5,11 @@ import { Vector3} from "three";
 // 画连续线段
 export function BR_Lines() {
 	const getPoint = new MrxDbgUiPrPoint();
-	   getPoint.setMessage('\n指定第一点:');
-	   const objLines = new MxDbPolyline();
+	getPoint.setMessage('\n指定第一点:');
+	const objLines = new MxDbPolyline();
 	// 最开始的点
 	let startPt: Vector3;
-	   getPoint.go((status) => {
+	getPoint.go((status) => {
 		if (status != 0) {
 		   return;
 		}
@@ -81,8 +81,8 @@ export async function BR_Line() {
 
 	const getPoint = new MrxDbgUiPrPoint();
 	getPoint.setMessage("\n指定第一点:");
-	   const pt1: THREE.Vector3|null = await getPoint.go();
-	   if (pt1 == null) {
+	const pt1: THREE.Vector3|null = await getPoint.go();
+	if (pt1 == null) {
 		return;
 
 	}
@@ -90,7 +90,7 @@ export async function BR_Line() {
 	getPoint.setUseBasePt(true);
 	getPoint.setMessage("\n指定第二点:");
 	const pt2: THREE.Vector3|null = await getPoint.go();
-	   if (pt2 == null) {
+	if (pt2 == null) {
 		return;
 	}
 
@@ -98,9 +98,9 @@ export async function BR_Line() {
 	line.pt1 = pt1;
 	line.pt2 = pt2;
 
-	   line.setDashLineDisplay(true);
-	   line.setLineWidth(10);
-	   line.setLineWidthByPixels(true);
+	line.setDashLineDisplay(true);
+	line.setLineWidth(10);
+	line.setLineWidthByPixels(true);
 
 	MxFun.addToCurrentSpace(line);
   }

@@ -3,8 +3,8 @@ import { LineDashedMaterial } from "three";
 
 export default function() {
 	const point = new MrxDbgUiPrPoint();
-	   const mxDraw = MxFun.getCurrentDraw();
-	   const worldDrawComment = new McEdGetPointWorldDrawObject();
+	const mxDraw = MxFun.getCurrentDraw();
+	const worldDrawComment = new McEdGetPointWorldDrawObject();
 	const mxCheckDraw = new MxDbRectBoxLeadComment();
 
 	mxCheckDraw.radius = MxFun.screenCoordLong2Doc(8);

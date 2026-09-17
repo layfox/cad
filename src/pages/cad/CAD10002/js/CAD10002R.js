@@ -404,7 +404,6 @@ export default {
             const period = 1200;
             const rippleSpawnInterval = 500;
             let rippleSpawnTimer = 0;
-            const canvas = document.getElementById('mxcad');
             const loop = (timestamp) => {
                 if (this.activeWarningGroups.size === 0) {
                     this.globalAnimateRaf = null;
@@ -422,22 +421,10 @@ export default {
                 const needSpawnRipple = rippleSpawnTimer >= rippleSpawnInterval;
                 if (needSpawnRipple) rippleSpawnTimer %= rippleSpawnInterval;
                 let changed = false;
-                // 视口剔除：只在视口内的报警 group 才执行动画，减少无效 CPU 和渲染开销
-                // 每次循环重新获取 rect，避免窗口 resize 后剔除失效
-                const rect = canvas ? canvas.getBoundingClientRect() : null;
-                const rectWidth = rect ? rect.width : 0;
-                const rectHeight = rect ? rect.height : 0;
                 for (const group of this.activeWarningGroups) {
                     if (group.userData._destroyed) {
                         this.activeWarningGroups.delete(group);
                         continue;
-                    }
-                    // 视口剔除：计算 group 屏幕坐标，不在视口内则跳过
-                    if (rectWidth > 0 && rectHeight > 0) {
-                        const sp = MxFun.worldCoord2Screen(group.position.x, group.position.y, group.position.z || 0);
-                        if (!sp || sp.x < -50 || sp.x > rectWidth + 50 || sp.y < -50 || sp.y > rectHeight + 50) {
-                            continue;
-                        }
                     }
                     if (this.lastHoverGroup === group) continue;
                     const offset = group.userData.phaseOffset || 0;

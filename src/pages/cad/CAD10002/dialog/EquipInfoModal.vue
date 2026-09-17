@@ -15,10 +15,6 @@
           <span class="eim-info-value">{{ equip.company }}</span>
         </div>
         <div class="eim-info-item">
-          <span class="eim-info-label">流水号</span>
-          <span class="eim-info-value">{{ equip.serialNo }}</span>
-        </div>
-        <div class="eim-info-item">
           <span class="eim-info-label">装备名称</span>
           <span class="eim-info-value">{{ equip.equipName }}</span>
         </div>
