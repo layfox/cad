@@ -94,6 +94,10 @@ export default {
     data: {
       type: Object,
       default: () => { }
+    },
+    orgNo: {
+      type: String,
+      default: ''
     }
   },
   data() {
@@ -101,7 +105,6 @@ export default {
       activeTimeTab: 0,
       timeTabs: ['近24小时', '近7天'],
       chartInstance: null,
-      orgNo: '',
       sensor: {
         name: '',
         currentValue: '',
@@ -120,10 +123,6 @@ export default {
         currentData: [],
         highAlarm: '',
         lowAlarm: ''
-      },
-      orgNo: {
-        type: String,
-        default: ''
       }
     }
   },
@@ -133,6 +132,10 @@ export default {
         if (this.data) {
           this.getRealTime()
           this.getHistory()
+          this.sensor.highAlarm = this.data.UPPER_LEV1
+          this.sensor.lowAlarm = this.data.LOWER_LEV1
+          this.chartData.highAlarm = this.data.UPPER_LEV1
+          this.chartData.lowAlarm = this.data.LOWER_LEV1
         }
       }
     }
@@ -142,6 +145,10 @@ export default {
       if (this.data) {
           this.getRealTime()
           this.getHistory()
+          this.sensor.highAlarm = this.data.UPPER_LEV1
+          this.sensor.lowAlarm = this.data.LOWER_LEV1
+          this.chartData.highAlarm = this.data.UPPER_LEV1
+          this.chartData.lowAlarm = this.data.LOWER_LEV1
         }
     }
   },
@@ -171,9 +178,7 @@ export default {
         this.sensor = {
           name: data.LOT_NAM,
           currentValue: data.deviceValue,
-          currentColor: '#F53F3F',
-          highAlarm: data.gbValue,
-          lowAlarm: data.dbValue
+          currentColor: '#F53F3F'
         }
         this.sensorInfo = {
           sensorNo: data.GZBH_DSC,
@@ -181,8 +186,6 @@ export default {
           areaGroup: data.AREA_GROUP,
           type: data.LOT_TYPE_NAM
         }
-        this.chartData.highAlarm = data.gbValue,
-        this.chartData.lowAlarm = data.dbValue
       })
     },
     getDateYmd(date = new Date()) {

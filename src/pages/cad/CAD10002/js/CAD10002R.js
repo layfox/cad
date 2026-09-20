@@ -76,7 +76,7 @@ export default {
             lastHoverGroup: null,
             currentData: null,
             markerTextureCache: new Map(),
-            isDev: true,
+            isDev: false,
             activeWarningGroups: new Set(),
             globalAnimateRaf: null,
             globalAnimateLastTime: 0,
@@ -1304,7 +1304,7 @@ export default {
                                 point.LOT_NAM = point.PL_NAM
                                 point.x = point.X_VALUE
                                 point.y = point.Y_VALUE
-                                point.value = point.ORG_SHOT_NAM
+                                point.value = point.DEP_NAM
                                 point.isWarning = point.GJ_FLG === 'Y'
                                 point.type = '4'
                                 this.realData[point.id] = point
@@ -1436,20 +1436,11 @@ export default {
         onAlarmHandle(alarm) {
             if (alarm && Object.keys(alarm).length > 0) {
                 this.currentAlarm = alarm
+                this.showAlarmModal = true
             } else {
-                this.currentAlarm = {
-                    level: '一级告警',
-                    title: '瓦斯浓度超限',
-                    subtitle: '回风巷瓦斯监测点，当前 1.26%，阈值 1%',
-                    alarmNo: 'ALM-001',
-                    status: '告警发生',
-                    time: '2026-07-29 10:18',
-                    responsibleUnit: '通风队',
-                    deadline: '30 分钟',
-                    responseLevel: '一级告警'
-                }
+                this.currentAlarm = null
+                this.showAlarmModal = false
             }
-            this.showAlarmModal = true
         },
         onAlarmStepChange(step) {
         },

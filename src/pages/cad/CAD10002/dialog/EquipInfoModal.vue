@@ -191,7 +191,8 @@ export default {
     getRealTime() {
       this.postData('/api/scaqyzt/getHydrologyCh4Realtime', {
         TZPZ_NO: this.TZPZ_NO,
-        GZBH_DSC: this.data.GZBH_DSC
+        GZBH_DSC: this.data.GZBH_DSC,
+        PT_ID: this.data.PT_ID
       }).then(res => {
         const data = res.data;
         this.equip = {

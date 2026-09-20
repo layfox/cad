@@ -86,10 +86,6 @@ export default {
       type: Boolean,
       default: false
     },
-    company: {
-      type: String,
-      default: '小纪汗'
-    },
     orgNo: {
       type: String,
       default: ''
@@ -124,8 +120,9 @@ export default {
     }
   },
   watch: {
-    company(val) {
+    orgNo(val) {
       this.selectedCompany = val
+      this.orgNo1 = this.orgNo
     },
     visible(val) {
       if (val) {
@@ -145,18 +142,14 @@ export default {
     })
   },
   mounted() {
-    this.getCompany()
     this.$nextTick(() => {
       this.orgNo1 = this.orgNo
+      this.getCompany()
     })
   },
   methods: {
     async getCompany() {
-      const response = await fetch('/api/scaqyzt/getOrgs', {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await this.postData('/api/scaqyzt/getOrgs');
       const data = await response.json();
       this.companyOptions = data.data.filter(item => item.ORG_NO)
     },
