@@ -149,8 +149,12 @@ export default {
                     Y_VALUE: -30382998.077860042,
                     z: 0,
                     POINT_NAM: "通风测点‑01",
+                    "GJ_MSG": '超标11',
                     GJ_FLG: 'Y', // Y=告警
-                    value: "瓦斯浓度：1.4%【超限告警】"
+                    value: "11",
+                    UPPER_LEV1: 5,
+                    LOWER_LEV1: 1,
+                    PT_UNIT: '%'
                 },
                 {
                     PT_NO: "dev‑002",
@@ -159,7 +163,10 @@ export default {
                     z: 0,
                     POINT_NAM: "通风测点‑02",
                     GJ_FLG: 'N',
-                    value: "瓦斯浓度：0.3%正常"
+                    value: "10",
+                    UPPER_LEV1: 5,
+                    LOWER_LEV1: 1,
+                    PT_UNIT: '%'
                 }
             ];
 
@@ -237,6 +244,7 @@ export default {
                 pageSize: 10,
                 selectedPoints: [],
                 points: devSafePoints.map(item => {
+                    item.groupName = '模拟安全监测分组',
                     item.id = item.PT_NO;
                     item.x = item.X_VALUE;
                     item.y = item.Y_VALUE;
@@ -759,7 +767,7 @@ export default {
                         x: rawX,
                         y: rawY,
                         show: hoverItem.GJ_FLG === 'Y' ? true : false,
-                        text: hoverItem ? hoverItem.value : ''
+                        text: hoverItem ? `${hoverItem.groupName} ${hoverItem.value + (hoverItem.PT_UNIT || '')} ${(hoverItem.GJ_MSG || '') + (hoverItem.PT_UNIT || '')}` : ''
                     };
                 }
             }
@@ -1248,6 +1256,7 @@ export default {
                             "pageSize": 10,
                             "selectedPoints": [],
                             "points": (data1['安全监测'][key] || []).map(item => {
+                                item.groupName = key;
                                 item.id = item.PT_NO;
                                 item.x = item.X_VALUE;
                                 item.y = item.Y_VALUE;
@@ -1265,6 +1274,7 @@ export default {
                         "pageSize": 10,
                         "selectedPoints": [],
                         "points": (data1['水文监测'] || []).map(item => {
+                            item.groupName = '水位';
                             item.id = item.PT_NO;
                             item.x = item.X_VALUE;
                             item.y = item.Y_VALUE;
@@ -1282,6 +1292,7 @@ export default {
                         "pageSize": 10,
                         "selectedPoints": [],
                         "points": (data1['瓦斯抽采'] || []).map(item => {
+                            item.groupName = '瓦斯浓度';
                             item.id = item.PT_NO;
                             item.x = item.X_VALUE;
                             item.y = item.Y_VALUE;

@@ -69,8 +69,8 @@
                   <span class="risk-warning-time">{{ item.OCCUR_DTM || '-' }}</span>
                   <span class="risk-warning-status">{{ item.EVENT_STA_NAM || statusLabel(item.EVENT_STA) }}</span>
                 </div>
-                <div class="risk-warning-category" :title="item.RSKT_NAM || '-'">
-                  {{ item.RSKT_NAM || '-' }}
+                <div class="risk-warning-category" :title="getRaskInfo(item)">
+                  {{ getRaskInfo(item) }}
                 </div>
               </article>
               <div v-if="loading" class="risk-warning-list-tip">加载中...</div>
@@ -149,6 +149,13 @@ export default {
     })
   },
   methods: {
+    getRaskInfo(item) {
+      const data = [item.OCCUR_ORG_NAM, item.CST_NAM, item.RSKT_NAM].filter(item => item)
+      if (data.length === 0) {
+        return '-'
+      }
+      return data.join('/') + '下达'
+    },
     toRiskDetail(item) {
       if (parent && parent.riskDetail) {
         parent.riskDetail(item)

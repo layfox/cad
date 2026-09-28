@@ -31,7 +31,7 @@
     <div class="scm-info-section">
       <div class="scm-info-row">
         <div class="scm-info-card">
-          <div class="scm-info-value">{{ sensorInfo.sensorNo }}</div>
+          <div class="scm-info-value" :title="sensorInfo.sensorNo">{{ sensorInfo.sensorNo }}</div>
           <div class="scm-info-label">传感器编号</div>
         </div>
         <div class="scm-info-card">
@@ -41,7 +41,7 @@
       </div>
       <div class="scm-info-row">
         <div class="scm-info-card">
-          <div class="scm-info-value">{{ sensorInfo.areaGroup || '--' }}</div>
+          <div class="scm-info-value" :title="sensorInfo.areaGroup">{{ sensorInfo.areaGroup || '--' }}</div>
           <div class="scm-info-label">区域组</div>
         </div>
         <div class="scm-info-card">
@@ -422,8 +422,7 @@ export default {
 }
 
 .scm-info-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
   gap: 16px;
   margin-bottom: 16px;
 }
@@ -433,6 +432,7 @@ export default {
 }
 
 .scm-info-card {
+  width: calc(50% - 8px);
   height: 82px;
   border-radius: 4px;
   padding: 10px 14px;

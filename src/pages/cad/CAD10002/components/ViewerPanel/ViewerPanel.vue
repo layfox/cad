@@ -77,6 +77,11 @@ export default {
                 {
                     title: this.title === '人员定位站' ? '所属团队' : (this.title === '安全监测' ? '当前值' : '感知编号'),
                     key: 'value',
+                    render: (h, {row}) => {
+                    return h('span', {
+                        
+                    }, row.value + (row.PT_UNIT ?row.PT_UNIT : ''))
+                },
                     minWidth: 120,
                     align: 'center'
                 }
