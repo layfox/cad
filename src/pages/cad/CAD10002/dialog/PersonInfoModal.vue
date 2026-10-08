@@ -61,8 +61,8 @@
 
       <!-- 时间筛选按钮 -->
       <div class="pim-time-tabs">
-        <span v-for="(tab, idx) in timeTabs" :key="tab" class="pim-time-tab" :class="{ active: activeTimeTab === idx }"
-          @click="activeTimeTab = idx">{{ tab }}</span>
+        <span v-for="(tab, idx) in timeTabs" :key="tab" class="pim-time-tab" :class="{ active: activeTab === idx }"
+          @click="activeTab = idx">{{ tab }}</span>
         <span class="pim-entry-count">出入井次数 <strong>{{ trackRecords.length }}</strong> 次</span>
       </div>
 
@@ -71,15 +71,15 @@
         <div v-for="(record, idx) in trackRecords" :key="idx" class="pim-track-card">
           <div class="pim-track-card-row">
             <span class="pim-track-label">入井时间</span>
-            <span class="pim-track-value">{{ record.enterTime }}</span>
+            <span class="pim-track-value">{{ record.in_time }}</span>
           </div>
           <div class="pim-track-card-row">
             <span class="pim-track-label">出井时间</span>
-            <span class="pim-track-value">{{ record.exitTime }}</span>
+            <span class="pim-track-value">{{ record.out_time }}</span>
           </div>
           <div class="pim-track-card-row">
             <span class="pim-track-label">时长</span>
-            <span class="pim-track-value">{{ record.duration }}</span>
+            <span class="pim-track-value">{{ record.hours }}</span>
           </div>
           <div class="pim-track-detail">
             <span class="pim-track-link">轨迹详情 &gt;</span>
@@ -112,13 +112,17 @@ export default {
     orgNo: {
       type: String,
       default: ''
-    }
+    },
+    data: {
+      type: Object,
+      default: () => { }
+    },
   },
   data() {
     return {
       searchKeyword: '',
-      activeTimeTab: 0,
-      timeTabs: ['今天', '本周', '本月', '近7天', '近30天'],
+      activeTab: 0,
+      timeTabs: ['近一天', '近一周', '近一月', '近半年', '近一年'],
       person: {
         name: '',
         company: '',
@@ -133,14 +137,27 @@ export default {
       trackRecords: []
     }
   },
-  mounted() {
-  },
   watch: {
     visible(val) {
       if (val) {
-        this.getData()
+        if (this.data) {
+          this.person = {
+            name: this.data.PL_NAM,
+            company: this.data.ORG_SHOT_NAM,
+            position: this.data.PL_DUTY,
+            cardNo: this.data.CARD_CODE,
+            phone: this.data.PL_PHONE,
+            gender: this.data.GENDER_TYP,
+            location: this.data.ORG_SHOT_NAM,
+            department: this.data.DEP_NAM,
+            isUnderground: this.data.JX_FLG
+          }
+          this.getRydwPersonPath()
+        }
       }
     }
+  },
+  mounted() {
   },
   methods: {
     onClose() {
@@ -155,6 +172,40 @@ export default {
         body: JSON.stringify(data),
       });
       return response.json();
+    },
+    getDateYmd(date = new Date()) {
+      const d = new Date(date);
+      const year = d.getFullYear();
+      const month = d.getMonth() + 1;
+      const day = d.getDate();
+      const hours = d.getHours();
+      const m = month < 10 ? '0' + month : month;
+      const dd = day < 10 ? '0' + day : day;
+      const hh = hours < 10 ? '0' + hours : hours;
+      return `${year}${m}${dd}${hh}`;
+    },
+    getRydwPersonPath() {
+      const end = this.getDateYmd()
+      let start = ''
+      if (this.activeTab === 0) {
+        start = this.getDateYmd(new Date(new Date().getTime() - 24 * 60 * 60 * 1000))
+      } else if (this.activeTab === 1) {
+        start = this.getDateYmd(new Date(new Date().getTime() - 24 * 7 * 60 * 60 * 1000))
+      } else if (this.activeTab === 2) {
+        start = this.getDateYmd(new Date(new Date().getTime() - 24 * 30 * 60 * 60 * 1000))
+      } else if (this.activeTab === 3) {
+        start = this.getDateYmd(new Date(new Date().getTime() - 24 * 180 * 60 * 60 * 1000))
+      } else if (this.activeTab === 4) {
+        start = this.getDateYmd(new Date(new Date().getTime() - 24 * 365 * 60 * 60 * 1000))
+      }
+      this.postData('/api/scagyzt/getRydwPersonPath', {
+        LOT_DOMAIN: this.data.LOT_DOMAIN,
+        CARD_CODE: this.data.CARD_CODE,
+        start,
+        end
+      }).then(res => {
+        this.dattrackRecords = res.data.data || []
+      })
     },
     getData() {
       this.postData('/api/scaqyzt/getRydwRealtime', {

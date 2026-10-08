@@ -763,10 +763,11 @@ export default {
                         this.showPointInfoModal = false;
                     }, 3000);
                     this.clearAnnotationHighlight();
+                    this.destroyTempLine()
                     this.toggleAnnotationHighlightById(hitAnnotationId);
                 } else {
-                    this.clearAnnotationHighlight();
-                    this.destroyTempLine()
+                    // this.clearAnnotationHighlight();
+                    // this.destroyTempLine()
                 }
             } catch (err) {
                 console.error("点击marker异常", err);
@@ -1178,17 +1179,17 @@ export default {
                 this.refreshViewer1Data()
             })
         },
-        deleteIot(data, ptNos) {
+        deleteIot(data, ptNos, forced) {
             this.postData('/api/scaqyzt/deleteIot', data).then(() => {
                 if (ptNos && ptNos.length) {
                     this.clearBindMarkersByIds(ptNos);
                 }
-                this.refreshViewer1Data();
+                this.refreshViewer1Data(forced);
             })
         },
-        refreshViewer1Data() {
+        refreshViewer1Data(forced) {
             if (this.$refs.viewerPanel1) {
-                this.$refs.viewerPanel1.refreshData();
+                this.$refs.viewerPanel1.refreshData(forced);
             }
         },
         autoMatch(data) {
@@ -1609,7 +1610,7 @@ export default {
                 console.error('[zoomToPoint] 失败:', e);
             }
         },
-        onDeletePoints(points) {
+        onDeletePoints(points, forced) {
             if (!points || points.length === 0) {
                 this.$Message.warning('请先选择测点');
                 return;
@@ -1626,7 +1627,7 @@ export default {
                     this.deleteIot({
                         TZPZ_NO: this.entity.TZPZ_NO,
                         I2P_NOs: points.map(item => item.I2P_NO)
-                    }, ptNos);
+                    }, ptNos, forced);
                 }
             })
         },

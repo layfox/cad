@@ -59,11 +59,11 @@
           <div ref="warningList" class="risk-warning-list" @scroll.passive="handleScroll">
             <template v-if="warnings.length">
               <article v-for="(item, index) in warnings" @click="toRiskDetail(item)" :key="warningKey(item, index)" class="risk-warning-item">
-                <i class="risk-warning-level-line" :style="{ backgroundColor: levelMeta(item).color }"></i>
+                <i class="risk-warning-level-line" :style="{ backgroundColor: levelColor[item.RM_TYP] || '#3184E8' }"></i>
                 <div class="risk-warning-item-title" :title="item.MODEL_NAM || '-'">{{ item.MODEL_NAM || '-' }}</div>
                 <div class="risk-warning-item-meta">
-                  <span class="risk-warning-level" :style="{ backgroundColor: levelMeta(item).color }">
-                    {{ levelMeta(item).label }}
+                  <span class="risk-warning-level" :style="{ backgroundColor: levelColor[item.RM_TYP] || '#3184E8' }">
+                    {{ item.RM_TYP_NAM || '提醒' }}
                   </span>
                   <span class="risk-warning-owner" :title="item.USR_NAM || '-'">{{ item.USR_NAM || '-' }}</span>
                   <span class="risk-warning-time">{{ item.OCCUR_DTM || '-' }}</span>
@@ -128,7 +128,13 @@ export default {
       hasMore: true,
       loading: false,
       loadError: false,
-      requestId: 0
+      requestId: 0,
+      levelColor: {
+        '04': '#F04823',
+        '03': '#FF7317',
+        '02': '#F2C230',
+        '01': '#3184E8'
+      }
     }
   },
   props: {
@@ -397,7 +403,7 @@ export default {
     },
     // 兼容不同版本/接口字段名，并把风险等级映射为截图中的颜色。
     levelMeta(item) {
-      const source = item.RISK_LEVEL_NAM || item.RSK_LEVEL_NAM || item.RSKT_LEVEL_NAM || item.RISK_LEVEL || ''
+      const source = item.RM_TYP || item.RSK_LEVEL_NAM || item.RSKT_LEVEL_NAM || item.RISK_LEVEL || ''
       const levels = [
         { keywords: ['高', '重大', '一级'], label: '高级', color: '#F04823' },
         { keywords: ['中', '较大', '二级'], label: '中级', color: '#FF7317' },

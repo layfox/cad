@@ -136,7 +136,7 @@ export default {
             tolerance: 4,
             pointModalVisible: false,
             orgNo: '',
-            isDev: false ,
+            isDev: false,
             pointColumns: [
                 { type: 'selection', width: 60, align: 'center' },
                 { slot: 'seq', title: '序号', key: 'seq', width: 60, align: 'center', render: (h, { row, index }) => {
@@ -298,6 +298,7 @@ export default {
                 pageNum: String(this.currentPage)
             })
             if (res.success && res.data) {
+                this.selectedPoints = []
                 this.pageData = res.data.data || []
                 this.total = res.data.pageInfo ? res.data.pageInfo.totalCount : 0
             }
@@ -316,7 +317,10 @@ export default {
                 }
             })
         },
-        async refreshData() {
+        async refreshData(forced) {
+            if (forced) {
+                this.currentPage = 1;
+            }
             await this.fetchData()
             this.getIotStatistic()
         },
@@ -359,7 +363,7 @@ export default {
             // }
         },
         onDeletePoints(points) {
-            this.$emit('delete-points', points)
+            this.$emit('delete-points', points, this.pageData.length === this.selectedPoints.length)
         },
         onAutoMatch() {
             this.$emit('auto-match', this.selectedPoints, this.tolerance)

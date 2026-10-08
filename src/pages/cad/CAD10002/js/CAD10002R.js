@@ -767,7 +767,7 @@ export default {
                         x: rawX,
                         y: rawY,
                         show: hoverItem.GJ_FLG === 'Y' ? true : false,
-                        text: hoverItem ? `${hoverItem.groupName} ${hoverItem.value + (hoverItem.PT_UNIT || '')} ${(hoverItem.GJ_MSG || '') + (hoverItem.PT_UNIT || '')}` : ''
+                        text: hoverItem ? `${hoverItem.groupName || ''} ${hoverItem.value + (hoverItem.PT_UNIT || '')} ${(hoverItem.GJ_MSG || '') + (hoverItem.PT_UNIT || '')}` : ''
                     };
                 }
             }

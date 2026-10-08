@@ -26,6 +26,11 @@ const routes: RouteConfig[] = [
 	name: 'CAD10003S',
 	component: () => import('@/pages/cad/CAD10003/CAD10003S.vue'),
   },
+  {
+	path: '/CAD10004R',
+	name: 'CAD10004R',
+	component: () => import('@/pages/cad/CAD10004/CAD10004R.vue'),
+  },
 ];
 
 const router = new VueRouter({

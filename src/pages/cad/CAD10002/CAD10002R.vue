@@ -86,6 +86,7 @@
           :visible="showPersonModal"
           :TZPZ_NO="TZPZ_NO"
           :orgNo="orgNo"
+          :data="currentData"
           @update:visible="showPersonModal = $event"
           @close="showPersonModal = false"
         />

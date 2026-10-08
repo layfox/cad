@@ -1,0 +1,300 @@
+#CAD10004R,
+#CAD10004R .page-body {
+  height: 100%;
+}
+
+#CAD10004R {
+  overflow: hidden;
+  background: #f2f5fd;
+}
+
+#CAD10004R .viewer-header {
+  display: flex;
+  align-items: center;
+  height: 52px;
+  padding: 0 18px;
+  background: #fff;
+  border-bottom: 1px solid #e7edf7;
+}
+
+#CAD10004R .viewer-title {
+  color: #1c2b48;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+#CAD10004R .viewer-title::after {
+  display: block;
+  width: 28px;
+  height: 3px;
+  margin-top: 7px;
+  background: #2f75ee;
+  border-radius: 2px;
+  content: '';
+}
+
+#CAD10004R .viewer-file {
+  max-width: 320px;
+  margin-left: auto;
+  overflow: hidden;
+  color: #7f8ca4;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#CAD10004R .viewer-container {
+  position: relative;
+  height: calc(100% - 52px);
+}
+
+#CAD10004R .viewer-content,
+#CAD10004R .viewer-box {
+  width: 100%;
+  height: 100%;
+}
+
+#CAD10004R .viewer-box {
+  position: relative;
+  user-select: none;
+}
+
+#CAD10004R .viewer-box canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#CAD10004R .draw-config-panel {
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: 0;
+  z-index: 100;
+  width: 520px;
+  min-width: 360px;
+  border-radius: 0 10px 10px 0;
+  box-shadow: 4px 0 18px rgba(38, 70, 120, 0.12);
+  transform: translateX(0);
+  transition: transform 0.28s ease;
+}
+
+#CAD10004R .draw-config-panel.panel-collapsed {
+  transform: translateX(calc(-100% + 44px));
+}
+
+#CAD10004R .draw-config-panel-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 18px 22px 10px;
+  overflow: hidden;
+  background: #fff;
+  border-radius: inherit;
+}
+
+#CAD10004R .collapse-btn {
+  position: absolute;
+  top: 50%;
+  right: -34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 56px;
+  margin-top: -28px;
+  color: #326de2;
+  font-size: 17px;
+  background: #fff;
+  border: 1px solid #e7edf7;
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  box-shadow: 4px 0 12px rgba(38, 70, 120, 0.1);
+  cursor: pointer;
+}
+
+#CAD10004R .draw-config-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+
+#CAD10004R .draw-config-toolbar .ivu-btn {
+  height: 34px;
+  padding: 0 13px;
+  border-radius: 4px;
+}
+
+#CAD10004R .draw-config-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 40px;
+  margin-top: 18px;
+  overflow: hidden;
+  flex: none;
+  background: #edf1f7;
+  border-radius: 4px;
+}
+
+#CAD10004R .draw-config-tab {
+  color: #5d6a80;
+  font-size: 14px;
+  background: transparent;
+  border: none;
+  outline: none;
+  cursor: pointer;
+}
+
+#CAD10004R .draw-config-tab span {
+  color: inherit;
+}
+
+#CAD10004R .draw-config-tab.active {
+  color: #fff;
+  font-weight: 500;
+  background: #2f79ed;
+}
+
+#CAD10004R .draw-config-list {
+  min-height: 0;
+  margin-top: 18px;
+  overflow: auto;
+  flex: 1;
+}
+
+#CAD10004R .draw-config-list-head,
+#CAD10004R .draw-config-row {
+  display: grid;
+  grid-template-columns: 26px 30px 44px minmax(120px, 1fr) 82px;
+  align-items: center;
+  min-width: 390px;
+}
+
+#CAD10004R .draw-config-list-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 42px;
+  color: #5d6a80;
+  font-size: 13px;
+  background: #eef2f8;
+}
+
+#CAD10004R .draw-config-list-head > :first-child {
+  padding-left: 12px;
+}
+
+#CAD10004R .draw-config-row {
+  position: relative;
+  height: 48px;
+  color: #24324d;
+  font-size: 14px;
+  border-bottom: 1px solid #eef2f8;
+  transition: background 0.18s ease;
+}
+
+#CAD10004R .draw-config-row:nth-child(odd) {
+  background: #f5f8fd;
+}
+
+#CAD10004R .draw-config-row:hover,
+#CAD10004R .draw-config-row.selected {
+  background: #e8f2ff;
+}
+
+#CAD10004R .draw-config-row > :first-child {
+  padding-left: 12px;
+}
+
+#CAD10004R .row-zoom {
+  width: 24px;
+  height: 24px;
+  color: #346bdd;
+  font-size: 15px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+#CAD10004R .row-name {
+  min-width: 0;
+  overflow: hidden;
+  color: #2f73df;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+#CAD10004R .col-seq,
+#CAD10004R .col-code {
+  color: #55637b;
+  text-align: center;
+}
+
+#CAD10004R .viewer-content .loading-overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 14, 24, 0.44);
+}
+
+#CAD10004R .loading-content {
+  color: #fff;
+  text-align: center;
+}
+
+#CAD10004R .loading-spinner {
+  width: 46px;
+  height: 46px;
+  margin: 0 auto 16px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #2f79ed;
+  border-radius: 50%;
+  animation: cad10004-spin 1s linear infinite;
+}
+
+#CAD10004R .loading-text {
+  font-size: 16px;
+}
+
+@keyframes cad10004-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 760px) {
+  #CAD10004R .draw-config-panel {
+    width: calc(100vw - 22px);
+    min-width: 0;
+  }
+
+  #CAD10004R .draw-config-toolbar {
+    flex-wrap: wrap;
+  }
+
+  #CAD10004R .draw-config-panel-inner {
+    padding: 14px 14px 8px;
+  }
+
+  #CAD10004R .draw-config-toolbar .ivu-btn {
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  #CAD10004R .draw-config-list-head,
+  #CAD10004R .draw-config-row {
+    min-width: 350px;
+  }
+}

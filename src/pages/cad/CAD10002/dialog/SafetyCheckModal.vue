@@ -108,7 +108,7 @@ export default {
       sensor: {
         name: '',
         currentValue: '',
-        currentColor: '#F53F3F',
+        currentColor: '#4a8dff',
         highAlarm: '',
         lowAlarm: ''
       },
@@ -134,6 +134,7 @@ export default {
           this.getHistory()
           this.sensor.highAlarm = this.data.UPPER_LEV1
           this.sensor.lowAlarm = this.data.LOWER_LEV1
+          this.sensor.currentColor = this.data.GJ_FLG === 'Y' ? '#F53F3F' : '#4a8dff'
           this.chartData.highAlarm = this.data.UPPER_LEV1
           this.chartData.lowAlarm = this.data.LOWER_LEV1
         }
@@ -147,6 +148,7 @@ export default {
           this.getHistory()
           this.sensor.highAlarm = this.data.UPPER_LEV1
           this.sensor.lowAlarm = this.data.LOWER_LEV1
+          this.sensor.currentColor = this.data.GJ_FLG === 'Y' ? '#F53F3F' : '#4a8dff'
           this.chartData.highAlarm = this.data.UPPER_LEV1
           this.chartData.lowAlarm = this.data.LOWER_LEV1
         }
@@ -175,11 +177,8 @@ export default {
         AREA_GROUP: this.data.AREA_GROUP
       }).then(res => {
         const data = res.data;
-        this.sensor = {
-          name: data.LOT_NAM,
-          currentValue: data.deviceValue,
-          currentColor: '#F53F3F'
-        }
+        this.sensor.name = data.LOT_NAM
+        this.sensor.currentValue = data.deviceValue
         this.sensorInfo = {
           sensorNo: data.GZBH_DSC,
           dataTime: data.dataTime,
@@ -208,6 +207,7 @@ export default {
         start = this.getDateYmd(new Date(new Date().getTime() - 24 * 7 * 60 * 60 * 1000))
       }
       this.postData('/api/scaqyzt/getHistory', {
+        LOT_DOMAIN: this.data.LOT_DOMAIN,
         dimType: 'd',
         GZBH_DSC: this.data.GZBH_DSC,
         CDBM_DSC: this.data.CDBM_DSC,

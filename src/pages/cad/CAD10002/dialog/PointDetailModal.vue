@@ -135,7 +135,8 @@ export default {
         start,
         end,
         CD_ID: this.point.CD_ID,
-        GZBH_DSC: this.point.GZBH_DSC
+        GZBH_DSC: this.point.GZBH_DSC,
+        LOT_DOMAIN: this.point.LOT_DOMAIN
       }).then(res => {
         const data = res.data;
         this.chartXData = Object.keys(res.data)
