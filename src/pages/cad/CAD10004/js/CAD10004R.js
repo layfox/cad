@@ -20,9 +20,17 @@ const WORK_FACE_LAYER = 'MX_WORKFACE'
 const SECTION_LAYER = 'MX_SECTION'
 const WORK_FACE_COLOR = [13, 92, 224]
 const WORK_FACE_FILL_COLOR = [218, 241, 250]
-const WORK_FACE_LINE_RATIO = 0.008
 const SECTION_COLOR = [231, 69, 69]
 const SECTION_FILL_COLOR = [255, 231, 226]
+
+// —— 固定绘制参数：工作面/断面的线宽与文字大小固定，不随绘制区域大小变化 ——
+const FIXED_LINE_WIDTH = 2        // 工作面边界线 / 断面剖切线的线宽
+const FIXED_LIGHT_LINE_WIDTH = 1  // 辅助区域（选中框、预警区等）线宽
+const FIXED_TEXT_HEIGHT = 12      // 名称文字高度
+const FIXED_MARKER_RADIUS = 4     // 端点 / 中心标记圆半径
+const FIXED_ARROW_SIZE = 40       // 方向箭头长度
+const FIXED_LABEL_SIZE = 60       // 工作面名称标签（SVG）固定尺寸
+const LABEL_HIT_RADIUS = FIXED_LABEL_SIZE * 1.5  // 点击工作面标签/文字时的命中半径（doc 单位，可调）
 
 function point(x, y) {
   return {
@@ -176,55 +184,7 @@ export default {
     })
     if (this.isDev) {
         this.workFaces = [
-            {
-    "id": "workface-1790666321742",
-    "code": "12032",
-    "name": "12032工作面",
-    "range": {
-        "x": 23373310.120284803,
-        "y": -30388649.618931714
-    },
-    "headStart": {
-        "x": 23373257.737748835,
-        "y": -30388569.47066143
-    },
-    "headEnd": {
-        "x": 23373392.933098655,
-        "y": -30388564.32036239
-    },
-    "tailStart": {
-        "x": 23373227.30747095,
-        "y": -30388733.176554717
-    },
-    "tailEnd": {
-        "x": 23373392.933098655,
-        "y": -30388734.91750104
-    },
-    "bounds": {
-        "minX": 23373227.30747095,
-        "maxX": 23373392.933098655,
-        "minY": -30388734.91750104,
-        "maxY": -30388564.32036239
-    },
-    "polygon": [
-        {
-            "x": 23373257.737748835,
-            "y": -30388569.47066143
-        },
-        {
-            "x": 23373392.933098655,
-            "y": -30388564.32036239
-        },
-        {
-            "x": 23373392.933098655,
-            "y": -30388734.91750104
-        },
-        {
-            "x": 23373227.30747095,
-            "y": -30388733.176554717
-        }
-    ]
-}
+            {"id":"workface-1791450247304","code":"12032","name":"新工作面","range":{"x":23370717.694014765,"y":-30384470.680408843},"headStart":{"x":23370553.31276122,"y":-30385624.65022279},"headEnd":{"x":23370553.31276122,"y":-30385636.51320971},"tailStart":{"x":23370882.07526831,"y":-30385590.37244106},"tailEnd":{"x":23370882.07526831,"y":-30385623.640906647},"bounds":{"minX":23370553.31276122,"maxX":23370882.07526831,"minY":-30385641.68288729,"maxY":-30383299.677930392},"polygon":[{"x":23370553.31276122,"y":-30383299.677930392},{"x":23370882.07526831,"y":-30383299.677930392},{"x":23370882.07526831,"y":-30385641.68288729},{"x":23370553.31276122,"y":-30385641.68288729}],"kind":"workface","entityIds":[]}
         ]
         this.sections = [
             {
@@ -689,11 +649,8 @@ export default {
           point(face.tailStart.x, face.tailStart.y)
         ]
       const cadVertices = vertices.map(item => new McGePoint3d(item.x, item.y, 0))
-      const width = Math.max(distance(vertices[0], vertices[1]), 1)
-      const height = Math.max(distance(vertices[0], vertices[3]), 1)
-      const span = Math.max(width, height)
-      const textHeight = Math.max(span * 0.055, 8)
-      const markerRadius = Math.max(span * 0.018, 2)
+      const textHeight = FIXED_TEXT_HEIGHT
+      const markerRadius = FIXED_MARKER_RADIUS
 
       const hatch = new McDbHatch()
       hatch.appendLoop(new McGePoint3dArray(cadVertices))
@@ -708,7 +665,7 @@ export default {
 
       const boundary = new McDbPolyline()
       boundary.isClosed = true
-      boundary.constantWidth = Math.max(span * WORK_FACE_LINE_RATIO, 1)
+      boundary.constantWidth = FIXED_LINE_WIDTH
       cadVertices.forEach(vertex => boundary.addVertexAt(vertex))
       this.drawCadEntity(
         face,
@@ -718,19 +675,19 @@ export default {
         McDb.LineWeight.kLnWt070
       )
 
-      const headMidpoint = midpoint(face.headStart, face.headEnd)
-      const tailMidpoint = midpoint(face.tailStart, face.tailEnd)
-      const centerLine = new McDbLine(
-        new McGePoint3d(face.headStart.x, face.headStart.y, 0),
-        new McGePoint3d(face.tailStart.x, face.tailStart.y, 0)
-      )
-      this.drawCadEntity(
-        face,
-        centerLine,
-        WORK_FACE_LAYER,
-        [89, 166, 231],
-        McDb.LineWeight.kLnWt018
-      )
+    //   const headMidpoint = midpoint(face.headStart, face.headEnd)
+    //   const tailMidpoint = midpoint(face.tailStart, face.tailEnd)
+    //   const centerLine = new McDbLine(
+    //     new McGePoint3d(face.headStart.x, face.headStart.y, 0),
+    //     new McGePoint3d(face.tailStart.x, face.tailStart.y, 0)
+    //   )
+    //   this.drawCadEntity(
+    //     face,
+    //     centerLine,
+    //     WORK_FACE_LAYER,
+    //     [89, 166, 231],
+    //     McDb.LineWeight.kLnWt018
+    //   )
 
     //   const rangeCircle = new McDbCircle(
     //     face.range.x,
@@ -746,17 +703,17 @@ export default {
     //     McDb.LineWeight.kLnWt025
     //   )
 
-      const headDirection = normalizeVector(face.headStart, face.tailStart)
-      if (headDirection.length > 0) {
-        this.drawDirectionArrow(
-          face,
-          point(face.range.x, face.range.y + textHeight * 1.35),
-          headDirection,
-          Math.max(span * 0.18, textHeight * 2),
-          WORK_FACE_LAYER,
-          [255, 0, 0]
-        )
-      }
+    //   const headDirection = normalizeVector(face.headStart, face.tailStart)
+    //   if (headDirection.length > 0) {
+    //     this.drawDirectionArrow(
+    //       face,
+    //       point(face.range.x, face.range.y + textHeight * 1.35),
+    //       headDirection,
+    //       FIXED_ARROW_SIZE,
+    //       WORK_FACE_LAYER,
+    //       [255, 0, 0]
+    //     )
+    //   }
 
     },
 
@@ -781,11 +738,8 @@ export default {
           point(face.tailStart.x, face.tailStart.y)
         ]
       const cadVertices = vertices.map(item => new McGePoint3d(item.x, item.y, 0))
-      const width = Math.max(distance(vertices[0], vertices[1]), 1)
-      const height = Math.max(distance(vertices[0], vertices[3]), 1)
-      const span = Math.max(width, height)
-      const textHeight = Math.max(span * 0.055, 8)
-      const markerRadius = Math.max(span * 0.018, 2)
+      const textHeight = FIXED_TEXT_HEIGHT
+      const markerRadius = FIXED_MARKER_RADIUS
 
       const hatch = new McDbHatch()
       hatch.appendLoop(new McGePoint3dArray(cadVertices))
@@ -800,7 +754,7 @@ export default {
 
       const boundary = new McDbPolyline()
       boundary.isClosed = true
-      boundary.constantWidth = Math.max(span * WORK_FACE_LINE_RATIO, 1)
+      boundary.constantWidth = FIXED_LINE_WIDTH
       cadVertices.forEach(vertex => boundary.addVertexAt(vertex))
       this.drawCadEntity(
         face,
@@ -844,7 +798,7 @@ export default {
           face,
           point(face.range.x, face.range.y + textHeight * 1.35),
           headDirection,
-          Math.max(span * 0.18, textHeight * 2),
+          FIXED_ARROW_SIZE,
           WORK_FACE_LAYER,
           [12, 82, 214]
         )
@@ -900,12 +854,7 @@ export default {
 
       const vertices = face.polygon.map(item => point(item.x, item.y))
       const cadVertices = vertices.map(item => new McGePoint3d(item.x, item.y, 0))
-      const bounds = this.normalizePolygonBounds(vertices)
-      const span = Math.max(
-        bounds.maxX - bounds.minX,
-        bounds.maxY - bounds.minY
-      )
-      const markerRadius = Math.max(span * 0.014, 2)
+      const markerRadius = FIXED_MARKER_RADIUS
 
       const hatch = new McDbHatch()
       hatch.appendLoop(new McGePoint3dArray(cadVertices))
@@ -920,7 +869,7 @@ export default {
 
       const boundary = new McDbPolyline()
       boundary.isClosed = true
-      boundary.constantWidth = Math.max(span * WORK_FACE_LINE_RATIO, 2)
+      boundary.constantWidth = FIXED_LINE_WIDTH
       cadVertices.forEach(vertex => boundary.addVertexAt(vertex))
       const boundaryId = this.drawCadEntity(
         face,
@@ -951,12 +900,7 @@ export default {
 
       const vertices = section.polygon.map(item => point(item.x, item.y))
       const cadVertices = vertices.map(item => new McGePoint3d(item.x, item.y, 0))
-      const bounds = this.normalizePolygonBounds(vertices)
-      const span = Math.max(
-        bounds.maxX - bounds.minX,
-        bounds.maxY - bounds.minY
-      )
-      const markerRadius = Math.max(span * 0.014, 2)
+      const markerRadius = FIXED_MARKER_RADIUS
 
       const hatch = new McDbHatch()
       hatch.appendLoop(new McGePoint3dArray(cadVertices))
@@ -971,7 +915,7 @@ export default {
 
       const boundary = new McDbPolyline()
       boundary.isClosed = true
-      boundary.constantWidth = Math.max(span * 0.008, 2)
+      boundary.constantWidth = FIXED_LINE_WIDTH
       cadVertices.forEach(vertex => boundary.addVertexAt(vertex))
       const boundaryId = this.drawCadEntity(
         section,
@@ -1001,15 +945,7 @@ export default {
       const mxObj = MxFun.getCurrentDraw()
       if (!worldPoint || !mxObj || !mxObj.addMxEntity) return
 
-      const bounds = face.bounds || (
-        Array.isArray(face.polygon) && face.polygon.length >= 3
-          ? this.normalizePolygonBounds(face.polygon)
-          : null
-      )
-      const docSpan = bounds
-        ? Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY)
-        : 300
-      const labelSize = MxFun.docCoordLong2World(Math.max(docSpan * 0.28, 40))
+      const labelSize = MxFun.docCoordLong2World(FIXED_LABEL_SIZE)
       const textHeight = labelSize * 0.22
 
       const svg = new MxDbSVG()
@@ -1106,10 +1042,9 @@ export default {
       section.kind = 'section'
 
       const geometry = this.getSectionLine(section)
-      const span = geometry.span
-      const lineWidth = Math.max(span * 0.01, 2)
-      const markerRadius = Math.max(span * 0.025, 3)
-      const textHeight = Math.max(span * 0.055, 8)
+      const lineWidth = FIXED_LINE_WIDTH
+      const markerRadius = FIXED_MARKER_RADIUS
+      const textHeight = FIXED_TEXT_HEIGHT
 
       if ((Array.isArray(section.polygon) && section.polygon.length >= 3) || section.bounds) {
         const selectionPoints = Array.isArray(section.polygon) && section.polygon.length >= 3
@@ -1122,7 +1057,7 @@ export default {
           ]
         const selectionArea = new McDbPolyline()
         selectionArea.isClosed = true
-        selectionArea.constantWidth = Math.max(span * 0.006, 1)
+        selectionArea.constantWidth = FIXED_LIGHT_LINE_WIDTH
         selectionPoints.forEach(item => {
           selectionArea.addVertexAt(new McGePoint3d(item.x, item.y, 0))
         })
@@ -1170,10 +1105,9 @@ export default {
       section.kind = 'section'
 
       const geometry = this.getSectionLine(section)
-      const span = geometry.span
-      const lineWidth = Math.max(span * 0.006, 1)
-      const markerRadius = Math.max(span * 0.025, 3)
-      const textHeight = Math.max(span * 0.055, 8)
+      const lineWidth = FIXED_LINE_WIDTH
+      const markerRadius = FIXED_MARKER_RADIUS
+      const textHeight = FIXED_TEXT_HEIGHT
 
       if ((Array.isArray(section.polygon) && section.polygon.length >= 3) || section.bounds) {
         const selectionPoints = Array.isArray(section.polygon) && section.polygon.length >= 3
@@ -1186,7 +1120,7 @@ export default {
           ]
         const selectionArea = new McDbPolyline()
         selectionArea.isClosed = true
-        selectionArea.constantWidth = Math.max(span * 0.002, 0.5)
+        selectionArea.constantWidth = FIXED_LIGHT_LINE_WIDTH
         selectionPoints.forEach(item => {
           selectionArea.addVertexAt(new McGePoint3d(item.x, item.y, 0))
         })
@@ -1253,7 +1187,7 @@ export default {
           )
           const warningArea = new McDbPolyline()
           warningArea.isClosed = true
-          warningArea.constantWidth = Math.max(span * 0.0018, 0.5)
+          warningArea.constantWidth = FIXED_LIGHT_LINE_WIDTH
           ;[startPlus, endPlus, endMinus, startMinus].forEach(item => {
             warningArea.addVertexAt(new McGePoint3d(item.x, item.y, 0))
           })
@@ -1280,7 +1214,7 @@ export default {
             x: -markerDirection.y,
             y: markerDirection.x
           },
-          Math.max(span * 0.12, textHeight * 2),
+          FIXED_ARROW_SIZE,
           SECTION_LAYER,
           [222, 63, 64]
         )
@@ -1341,14 +1275,16 @@ export default {
       const label = kind === 'workface' ? '工作面' : '断面'
       this.currentCommand = 'AREA_SELECT'
       try {
-        this.$Message.info(`请依次选择${label}多边形顶点，输入 C 闭合或 F 完成`)
+        this.$Message.info(`请依次选择${label}多边形顶点，输入F或者右键完成`)
         this.startPolygonKeyboardCapture()
         const polygon = await this.pickPolygonArea(kind)
         if (!polygon) return
+        // 圈选完成后保留多边形连线，作为配置弹窗中坐标点选的参照；点击弹窗“确认”后才移除
+        this.polygonSelectionPreviewIds = this.drawPolygonReference(polygon, kind)
         const bounds = this.normalizePolygonBounds(polygon)
         if (kind === 'workface') {
           const draft = {
-            id: `workface-draft-${Date.now()}`,
+            id: `workface-${Date.now()}`,
             code: this.nextWorkFaceCode,
             name: '新工作面',
             range: {
@@ -1361,18 +1297,15 @@ export default {
             tailEnd: { x: '', y: '' },
             bounds,
             polygon,
-            status: 'draft',
             entityIds: []
           }
-          this.workFaces.push(draft)
+          // 圈选完成后直接弹出配置弹窗，确认后再加入列表并正式绘制（不出现临时工作面）
           this.activeConfigTab = 'workface'
-          this.$nextTick(() => {
-            this.renderDraftWorkFace(draft)
-          })
-          this.$Message.success('圈选完成，可拖动顶点调整，点击工作面名称进行配置')
+          this.openWorkFaceConfig(draft)
+          this.$Message.info('请完善工作面配置，确认后自动加入列表')
         } else {
           const draft = {
-            id: `section-draft-${Date.now()}`,
+            id: `section-${Date.now()}`,
             code: this.nextSectionCode,
             name: '新断面',
             range: {
@@ -1383,15 +1316,12 @@ export default {
             warningDistance: 50,
             bounds,
             polygon,
-            status: 'draft',
             entityIds: []
           }
-          this.sections.push(draft)
+          // 圈选完成后直接弹出配置弹窗，确认后再加入列表并正式绘制（不出现临时断面）
           this.activeConfigTab = 'section'
-          this.$nextTick(() => {
-            this.renderDraftSection(draft)
-          })
-          this.$Message.success('圈选完成，可拖动顶点调整，点击断面名称进行配置')
+          this.openSectionConfig(draft)
+          this.$Message.info('请完善断面配置，确认后自动加入列表')
         }
       } catch (error) {
         console.warn('圈选区域失败:', error)
@@ -1432,11 +1362,7 @@ export default {
         McDb.LineWeight.kLnWt070
       )
 
-      const bounds = this.normalizePolygonBounds(polygon)
-      const markerRadius = Math.max(
-        Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) * 0.012,
-        2
-      )
+      const markerRadius = FIXED_MARKER_RADIUS
       polygon.forEach(item => {
         this.drawCadEntity(
           draftItem,
@@ -1481,8 +1407,8 @@ export default {
           const lastPoint = polygon[polygon.length - 1]
           getPoint.setBasePt(new McGePoint3d(lastPoint.x, lastPoint.y, 0))
           getPoint.setUseBasePt(true)
-          getPoint.setKeyWords('[闭合(C)/完成(F)]')
-          getPoint.setMessage('\n指定下一个点或输入[闭合(C)/完成(F)]:')
+          getPoint.setKeyWords('[完成(F)]')
+          getPoint.setMessage('\n指定下一个点，按 F 或鼠标右键完成（多边形默认闭合）:')
           getPoint.setUserDraw((currentPoint, worldDraw) => {
             const previewPoints = polygon.concat([{
               x: Number(currentPoint.x),
@@ -1525,18 +1451,6 @@ export default {
           this.$Message.warning('至少选择 3 个点后才能完成')
           continue
         }
-        if (this.polygonCloseRequested) {
-          this.polygonFinishRequested = false
-          this.polygonCloseRequested = false
-          if (polygon.length >= 3) return polygon
-          this.$Message.warning('至少选择 3 个点后才能闭合')
-          continue
-        }
-        if (getPoint.isKeyWordPicked('C')) {
-          if (polygon.length >= 3) return polygon
-          this.$Message.warning('至少选择 3 个点后才能闭合')
-          continue
-        }
         if (getPoint.isKeyWordPicked('F')) {
           if (polygon.length >= 3) return polygon
           this.$Message.warning('至少选择 3 个点后才能完成')
@@ -1560,15 +1474,8 @@ export default {
       }
     },
 
-    getPolygonPreviewWidth(polygon) {
-      if (!polygon.length) return 0
-      const xs = polygon.map(item => Number(item.x))
-      const ys = polygon.map(item => Number(item.y))
-      const span = Math.max(
-        Math.max.apply(null, xs) - Math.min.apply(null, xs),
-        Math.max.apply(null, ys) - Math.min.apply(null, ys)
-      )
-      return span * WORK_FACE_LINE_RATIO
+    getPolygonPreviewWidth() {
+      return FIXED_LINE_WIDTH
     },
 
     startPolygonKeyboardCapture() {
@@ -1576,6 +1483,8 @@ export default {
       this.polygonFinishRequested = false
       this.polygonCloseRequested = false
       window.addEventListener('keydown', this.handlePolygonKeyDown, true)
+      window.addEventListener('mousedown', this.handlePolygonRightMouseDown, true)
+      window.addEventListener('contextmenu', this.handlePolygonContextMenu, true)
     },
 
     stopPolygonKeyboardCapture() {
@@ -1583,21 +1492,21 @@ export default {
       this.polygonFinishRequested = false
       this.polygonCloseRequested = false
       window.removeEventListener('keydown', this.handlePolygonKeyDown, true)
+      window.removeEventListener('mousedown', this.handlePolygonRightMouseDown, true)
+      window.removeEventListener('contextmenu', this.handlePolygonContextMenu, true)
       this.currentCommand = ''
     },
 
     handlePolygonKeyDown(event) {
       if (!this.isPolygonSelecting) return
       const key = String(event.key || '').toLowerCase()
-      if (key !== 'f' && key !== 'c' && key !== 'enter') return
+      if (key !== 'f' && key !== 'enter') return
       event.preventDefault()
       event.stopPropagation()
       event.stopImmediatePropagation()
       const keyCode = key === 'enter' ? 13 : key.toUpperCase().charCodeAt(0)
       if (key === 'f' || key === 'enter') {
         this.polygonFinishRequested = true
-      } else if (key === 'c') {
-        this.polygonCloseRequested = true
       }
       try {
         const uiData = MxFun.getUIData && MxFun.getUIData()
@@ -1610,6 +1519,35 @@ export default {
         console.warn('处理多边形快捷键失败:', error)
       }
       MxFun.sendStringToExecute(keyCode === 13 ? 'F' : key.toUpperCase())
+    },
+
+    handlePolygonRightMouseDown(event) {
+      if (!this.isPolygonSelecting) return
+      if (event.button !== 2) return
+      event.preventDefault()
+      event.stopPropagation()
+      event.stopImmediatePropagation()
+      // 鼠标右键等同于“完成(F)”，多边形默认即为闭合
+      this.polygonFinishRequested = true
+      try {
+        const uiData = MxFun.getUIData && MxFun.getUIData()
+        if (uiData && uiData.executeOperations) {
+          // 结束当前取点命令，由已记录顶点完成多边形。
+          uiData.executeOperations(2)
+          return
+        }
+      } catch (error) {
+        console.warn('处理多边形右键完成失败:', error)
+      }
+      MxFun.sendStringToExecute('F')
+    },
+
+    handlePolygonContextMenu(event) {
+      if (!this.isPolygonSelecting) return
+      // 圈选过程中屏蔽浏览器默认右键菜单，右键仅用于“完成”
+      event.preventDefault()
+      event.stopPropagation()
+      event.stopImmediatePropagation()
     },
 
     normalizePolygonBounds(polygon) {
@@ -1667,6 +1605,7 @@ export default {
       } else {
         this.workFaces.push(item)
       }
+      console.log(JSON.stringify(item), 11111)
       this.renderWorkFace(item)
       this.closeWorkFaceDialog()
       this.$Message.success('工作面已绘制')
@@ -1998,15 +1937,38 @@ export default {
         const mxObj = MxFun.getCurrentDraw()
         if (!mxObj || !mxObj.findMxEntityAtPoint) return
         const docPoint = mxObj.screenCoord2Doc(event.offsetX, event.offsetY, 0)
-        const entities = mxObj.findMxEntityAtPoint(docPoint)
+        if (!docPoint) return
+
+        // 1) 命中原生 SVG 标签实体（target 图标 + 名称文字所在实体）
+        const entities = mxObj.findMxEntityAtPoint(docPoint) || []
         const labelEntity = entities.find(entity => {
           return entity &&
             entity.userData &&
             entity.userData.workfaceLabel &&
             entity.userData.workfaceId
         })
-        if (!labelEntity) return
-        const face = this.workFaces.find(item => item.id === labelEntity.userData.workfaceId)
+        let face = labelEntity
+          ? this.workFaces.find(item => item.id === labelEntity.userData.workfaceId)
+          : null
+
+        // 2) 兜底：SVG 未命中时，按「点击点与工作面标签锚点的距离」命中文字/标签区域
+        if (!face) {
+          let nearest = null
+          let nearestDist = Infinity
+          for (const item of this.workFaces) {
+            const anchor = this.getWorkFaceLabelDocPoint(item)
+            if (!isPointValid(anchor)) continue
+            const dx = Number(docPoint.x) - Number(anchor.x)
+            const dy = Number(docPoint.y) - Number(anchor.y)
+            const dist = Math.hypot(dx, dy)
+            if (dist <= LABEL_HIT_RADIUS && dist < nearestDist) {
+              nearestDist = dist
+              nearest = item
+            }
+          }
+          face = nearest
+        }
+
         if (!face) return
         event.preventDefault()
         event.stopPropagation()
