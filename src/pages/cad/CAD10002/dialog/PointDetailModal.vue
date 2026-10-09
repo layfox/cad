@@ -139,8 +139,8 @@ export default {
         LOT_DOMAIN: this.point.LOT_DOMAIN
       }).then(res => {
         const data = res.data;
-        this.chartXData = Object.keys(res.data)
-        this.chartYData = Object.values(res.data)
+        this.chartXData = data.x || []
+        this.chartYData = data.y || []
         this.initChart()
       })
     },

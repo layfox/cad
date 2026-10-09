@@ -216,6 +216,7 @@ export default {
       this.currentPoint = {
         title: row.CD_NAM,
         TZPZ_NO: this.TZPZ_NO,
+        GZBH_DSC: this.data.GZBH_DSC,
         ...row,
       }
       this.showPointDetail = true

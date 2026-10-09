@@ -217,8 +217,8 @@ export default {
       }).then(res => {
         const data = res.data
         this.chartData = {
-          hours: Object.keys(data),
-          currentData: Object.values(data)
+          hours: data.x || [],
+          currentData: data.y || []
         }
         this.$nextTick(() => {
           this.initChart()

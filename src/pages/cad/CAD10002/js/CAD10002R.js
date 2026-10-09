@@ -1318,6 +1318,7 @@ export default {
                                 point.value = point.DEP_NAM
                                 point.isWarning = point.GJ_FLG === 'Y'
                                 point.type = '4'
+                                point.LOT_DOMAIN = item.LOT_DOMAIN
                                 this.realData[point.id] = point
                                 return point
                             })

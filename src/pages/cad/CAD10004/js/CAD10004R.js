@@ -32,6 +32,18 @@ const FIXED_ARROW_SIZE = 40       // 方向箭头长度
 const FIXED_LABEL_SIZE = 60       // 工作面名称标签（SVG）固定尺寸
 const LABEL_HIT_RADIUS = FIXED_LABEL_SIZE * 1.5  // 点击工作面标签/文字时的命中半径（doc 单位，可调）
 
+// —— 模拟每日回采区域（图片）数据与绘制参数（独立功能，可替换为真实接口数据） ——
+const MOCK_DAILY_DATES = [
+  '2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24',
+  '2026-09-25', '2026-09-26', '2026-09-27', '2026-09-28'
+]
+const DAILY_AREA_FILL_COLORS = [
+  [196, 225, 250], [186, 218, 246], [176, 211, 242], [166, 204, 238],
+  [156, 197, 234], [146, 190, 230], [136, 183, 226], [126, 176, 222]
+]
+const DAILY_AREA_BORDER = [43, 95, 170]  // 日期区域边框色
+const DAILY_AREA_TEXT = [25, 55, 110]    // 日期文字颜色
+
 function point(x, y) {
   return {
     x: Number(x),
@@ -627,6 +639,94 @@ export default {
       )
     },
 
+    // —— 独立功能：在工作面上按日期绘制区域块（起点为工作面 polygon 前两个点，沿机头→机尾向量每天前进10m） ——
+    renderWorkFaceDailyImages() {
+      if (!this.mxcad) return
+      this.workFaces.forEach(face => {
+        this.eraseDailyImages(face)
+        const pts = Array.isArray(face && face.polygon) && face.polygon.length >= 4
+          ? face.polygon
+          : null
+        if (!pts) return
+        const dates = MOCK_DAILY_DATES
+        if (!dates.length) return
+        // 起点：工作面 polygon 前两个点（机头线两端）
+        const hs = point(pts[0].x, pts[0].y)
+        const he = point(pts[1].x, pts[1].y)
+        // 机尾线：polygon 最后两点
+        const ts = point(pts[pts.length - 1].x, pts[pts.length - 1].y)
+        const te = point(pts[pts.length - 2].x, pts[pts.length - 2].y)
+        // 机头 → 机尾推进向量（推进方向），每天前进 step 米
+        const advanceDir = normalizeVector(midpoint(hs, he), midpoint(ts, te))
+        if (!advanceDir.length) return
+        const total = advanceDir.length
+        const ids = []
+        // 机头、机尾每天各自随机推进 10~20m（两者步长不同）
+        const randomStep = () => 10 + Math.floor(Math.random() * 11)
+        let hSum = 0
+        let tSum = 0
+        for (let i = 0; i < dates.length; i++) {
+          if (hSum > total && tSum > total) break
+          const date = dates[i]
+          const hStep = randomStep()
+          const tStep = randomStep()
+          // 机头端(hs 侧)按机头累计推进、机尾端(he 侧)按机尾累计推进，四点围成一个日期区域
+          const a = point(hs.x + advanceDir.x * hSum, hs.y + advanceDir.y * hSum)
+          const b = point(he.x + advanceDir.x * tSum, he.y + advanceDir.y * tSum)
+          hSum += hStep
+          tSum += tStep
+          const c = point(he.x + advanceDir.x * tSum, he.y + advanceDir.y * tSum)
+          const d = point(hs.x + advanceDir.x * hSum, hs.y + advanceDir.y * hSum)
+          const quad = [a, b, c, d].map(p => new McGePoint3d(p.x, p.y, 0))
+          const dailyItem = { id: `${face.id}-daily-${Date.now()}`, kind: 'workface-daily' }
+          const fillColor = DAILY_AREA_FILL_COLORS[i % DAILY_AREA_FILL_COLORS.length]
+
+          const hatch = new McDbHatch()
+          hatch.appendLoop(new McGePoint3dArray(quad))
+          hatch.clearPatternDefinition()
+          const hatchId = this.drawCadEntity(dailyItem, hatch, WORK_FACE_LAYER, fillColor, McDb.LineWeight.kLnWt000)
+          if (hatchId) ids.push(hatchId)
+
+          const boundary = new McDbPolyline()
+          boundary.isClosed = true
+          boundary.constantWidth = FIXED_LIGHT_LINE_WIDTH
+          quad.forEach(p => boundary.addVertexAt(p))
+          const bId = this.drawCadEntity(dailyItem, boundary, WORK_FACE_LAYER, DAILY_AREA_BORDER, McDb.LineWeight.kLnWt025)
+          if (bId) ids.push(bId)
+
+          const center = point((a.x + b.x + d.x + c.x) / 4, (a.y + b.y + d.y + c.y) / 4)
+          const dateTextHeight = FIXED_TEXT_HEIGHT * 0.7
+          // drawTextEntity 内部会将 position 上移 height*0.8，此处提前下移以抵消，使日期文字落在区块垂直中间
+          const tId = this.drawTextEntity(
+            dailyItem,
+            point(center.x, center.y - dateTextHeight * 0.8),
+            date,
+            dateTextHeight,
+            WORK_FACE_LAYER,
+            DAILY_AREA_TEXT
+          )
+          if (tId) ids.push(tId)
+        }
+        this.$set(face, 'dailyEntityIds', ids)
+      })
+      if (this.mxcad.updateDisplay) this.mxcad.updateDisplay(true)
+    },
+
+    eraseDailyImages(face) {
+      if (!face) return
+      const ids = face.dailyEntityIds || []
+      ids.forEach(objectId => {
+        try {
+          if (objectId && objectId.isValid && objectId.isValid()) {
+            objectId.erase()
+          }
+        } catch (error) {
+          console.warn('移除工作面日期区域失败:', error)
+        }
+      })
+      this.$set(face, 'dailyEntityIds', [])
+    },
+
     renderWorkFace(face) {
       if (!this.mxcad || !isWorkFaceGeometryValid(face)) return
       this.eraseConfigurationEntities(face)
@@ -975,6 +1075,55 @@ export default {
       this.$set(face, 'labelEntity', svg)
     },
 
+    getSectionLabelDocPoint(section) {
+      if (section && isPointValid(section.range)) {
+        return point(section.range.x, section.range.y)
+      }
+      if (section && section.bounds) {
+        return point(
+          (Number(section.bounds.minX) + Number(section.bounds.maxX)) / 2,
+          (Number(section.bounds.minY) + Number(section.bounds.maxY)) / 2
+        )
+      }
+      return null
+    },
+
+    createSectionLabelAnchor(section, docPoint) {
+      if (!section || !isPointValid(docPoint)) return
+      const worldPoint = MxFun.docCoord2World(docPoint.x, docPoint.y, 0)
+      const mxObj = MxFun.getCurrentDraw()
+      if (!worldPoint || !mxObj || !mxObj.addMxEntity) return
+
+      const labelSize = MxFun.docCoordLong2World(FIXED_LABEL_SIZE)
+      const textHeight = labelSize * 0.22
+
+      const svg = new MxDbSVG()
+      svg.setSvgPath('models/svg/target.svg')
+      svg.useSvgColor = true
+      svg.setColor(0xe74545)   // 断面红色图标
+      svg.setSvgPostion(worldPoint)
+      svg.setSvgSize(new THREE.Vector2(labelSize, 0))
+      svg.setSvgAlignmentRatio(new THREE.Vector2(0.5, 1))
+      svg.setRenderOrder(MxType.MxDefaultRenderOrder.kMxEntityRenderOrder + 2)
+      svg.userData = { sectionId: section.id, sectionLabel: true }
+
+      const text = new MxDbSVGText()
+      text.txt = section.name || section.code || '断面'
+      text.txtPos = new THREE.Vector3(
+        worldPoint.x,
+        worldPoint.y + labelSize * 0.34,
+        worldPoint.z || 0
+      )
+      text.txtHeight = textHeight
+      text.color = 0xffffff
+      text.fontStyle = 'bold'
+      svg.addText(text)
+
+      const entityId = mxObj.addMxEntity(svg)
+      this.$set(section, 'labelEntityId', entityId)
+      this.$set(section, 'labelEntity', svg)
+    },
+
     refreshWorkFaceLabelEntity(face) {
       if (!face) return
       const docPoint = this.getWorkFaceLabelDocPoint(face)
@@ -1040,6 +1189,7 @@ export default {
       if (!this.mxcad || !isPointValid(section.range)) return
       this.eraseConfigurationEntities(section)
       section.kind = 'section'
+      this.createSectionLabelAnchor(section, section.range)
 
       const geometry = this.getSectionLine(section)
       const lineWidth = FIXED_LINE_WIDTH
@@ -1089,20 +1239,13 @@ export default {
       
       const markerCenter = interpolate(geometry.start, geometry.end, 0.5)
 
-      this.drawTextEntity(
-        section,
-        point(markerCenter.x, markerCenter.y + textHeight * 1.3),
-        section.name,
-        textHeight,
-        SECTION_LAYER,
-        [213, 55, 55]
-      )
     },
 
     renderSection1(section) {
       if (!this.mxcad || !isPointValid(section.range)) return
       this.eraseConfigurationEntities(section)
       section.kind = 'section'
+      this.createSectionLabelAnchor(section, section.range)
 
       const geometry = this.getSectionLine(section)
       const lineWidth = FIXED_LINE_WIDTH
@@ -1220,14 +1363,6 @@ export default {
         )
       }
 
-      this.drawTextEntity(
-        section,
-        point(markerCenter.x, markerCenter.y + textHeight * 1.3),
-        section.name,
-        textHeight,
-        SECTION_LAYER,
-        [213, 55, 55]
-      )
     },
 
     renderAllConfigurations() {
@@ -1248,6 +1383,8 @@ export default {
           this.renderSection(section)
         }
       })
+      // 独立功能：在工作面上按日期绘制区域块（使用模拟数据）
+      this.renderWorkFaceDailyImages()
       try {
         this.mxcad.updateDisplay(true)
       } catch (error) {
@@ -1607,6 +1744,7 @@ export default {
       }
       console.log(JSON.stringify(item), 11111)
       this.renderWorkFace(item)
+      this.renderWorkFaceDailyImages()
       this.closeWorkFaceDialog()
       this.$Message.success('工作面已绘制')
     },
@@ -1930,7 +2068,7 @@ export default {
       if (canvas) canvas.style.cursor = ''
     },
 
-    handleWorkFaceLabelClick(event) {
+    handleConfigLabelClick(event) {
       if (event.button !== 0 || event.ctrlKey || event.metaKey) return
       if (this.isPolygonSelecting || this.isCoordinatePicking || this.activeVertexDrag) return
       try {
@@ -1939,44 +2077,77 @@ export default {
         const docPoint = mxObj.screenCoord2Doc(event.offsetX, event.offsetY, 0)
         if (!docPoint) return
 
-        // 1) 命中原生 SVG 标签实体（target 图标 + 名称文字所在实体）
+        // 1) 命中原生 SVG 标签实体（target 图标 + 名称文字所在实体），区分工作面/断面
         const entities = mxObj.findMxEntityAtPoint(docPoint) || []
         const labelEntity = entities.find(entity => {
-          return entity &&
-            entity.userData &&
-            entity.userData.workfaceLabel &&
-            entity.userData.workfaceId
+          return entity && entity.userData &&
+            (entity.userData.workfaceLabel || entity.userData.sectionLabel)
         })
-        let face = labelEntity
-          ? this.workFaces.find(item => item.id === labelEntity.userData.workfaceId)
-          : null
-
-        // 2) 兜底：SVG 未命中时，按「点击点与工作面标签锚点的距离」命中文字/标签区域
-        if (!face) {
-          let nearest = null
-          let nearestDist = Infinity
-          for (const item of this.workFaces) {
-            const anchor = this.getWorkFaceLabelDocPoint(item)
-            if (!isPointValid(anchor)) continue
-            const dx = Number(docPoint.x) - Number(anchor.x)
-            const dy = Number(docPoint.y) - Number(anchor.y)
-            const dist = Math.hypot(dx, dy)
-            if (dist <= LABEL_HIT_RADIUS && dist < nearestDist) {
-              nearestDist = dist
-              nearest = item
+        if (labelEntity) {
+          if (labelEntity.userData.workfaceId) {
+            const face = this.workFaces.find(item => item.id === labelEntity.userData.workfaceId)
+            if (face) {
+              event.preventDefault()
+              event.stopPropagation()
+              event.stopImmediatePropagation()
+              this.openWorkFaceConfig(face)
+              return
             }
           }
-          face = nearest
+          if (labelEntity.userData.sectionId) {
+            const section = this.sections.find(item => item.id === labelEntity.userData.sectionId)
+            if (section) {
+              event.preventDefault()
+              event.stopPropagation()
+              event.stopImmediatePropagation()
+              this.openSectionConfig(section)
+              return
+            }
+          }
         }
 
-        if (!face) return
+        // 2) 兜底：SVG 未命中时，按「点击点与标签锚点的距离」命中最近的工作面/断面
+        const nearest = this.findNearestLabel(docPoint)
+        if (!nearest) return
         event.preventDefault()
         event.stopPropagation()
         event.stopImmediatePropagation()
-        this.openWorkFaceConfig(face)
+        if (nearest.kind === 'workface') {
+          this.openWorkFaceConfig(nearest.item)
+        } else {
+          this.openSectionConfig(nearest.item)
+        }
       } catch (error) {
-        console.warn('打开工作面配置失败:', error)
+        console.warn('打开配置弹窗失败:', error)
       }
+    },
+
+    findNearestLabel(docPoint) {
+      let best = null
+      let bestDist = Infinity
+      this.workFaces.forEach(item => {
+        const anchor = this.getWorkFaceLabelDocPoint(item)
+        if (!isPointValid(anchor)) return
+        const dx = Number(docPoint.x) - Number(anchor.x)
+        const dy = Number(docPoint.y) - Number(anchor.y)
+        const dist = Math.hypot(dx, dy)
+        if (dist <= LABEL_HIT_RADIUS && dist < bestDist) {
+          bestDist = dist
+          best = { kind: 'workface', item }
+        }
+      })
+      this.sections.forEach(item => {
+        const anchor = this.getSectionLabelDocPoint(item)
+        if (!isPointValid(anchor)) return
+        const dx = Number(docPoint.x) - Number(anchor.x)
+        const dy = Number(docPoint.y) - Number(anchor.y)
+        const dist = Math.hypot(dx, dy)
+        if (dist <= LABEL_HIT_RADIUS && dist < bestDist) {
+          bestDist = dist
+          best = { kind: 'section', item }
+        }
+      })
+      return best
     },
 
     updateDraftVertex(face, vertexIndex, x, y) {
@@ -2027,7 +2198,7 @@ export default {
       canvas.addEventListener('mousedown', this.handleWorkFaceVertexMouseDown, true)
       canvas.addEventListener('mousemove', this.handleWorkFaceVertexMouseMove, true)
       canvas.addEventListener('mouseup', this.handleWorkFaceVertexMouseUp, true)
-      canvas.addEventListener('mousedown', this.handleWorkFaceLabelClick, true)
+      canvas.addEventListener('mousedown', this.handleConfigLabelClick, true)
       canvas.addEventListener('mousedown', this.handleCtrlPanMouseDown, true)
       canvas.addEventListener('mousemove', this.handleCtrlPanMouseMove, true)
       canvas.addEventListener('mouseup', this.handleCtrlPanMouseUp, true)
@@ -2040,7 +2211,7 @@ export default {
       canvas.removeEventListener('mousedown', this.handleWorkFaceVertexMouseDown, true)
       canvas.removeEventListener('mousemove', this.handleWorkFaceVertexMouseMove, true)
       canvas.removeEventListener('mouseup', this.handleWorkFaceVertexMouseUp, true)
-      canvas.removeEventListener('mousedown', this.handleWorkFaceLabelClick, true)
+      canvas.removeEventListener('mousedown', this.handleConfigLabelClick, true)
       canvas.removeEventListener('mousedown', this.handleCtrlPanMouseDown, true)
       canvas.removeEventListener('mousemove', this.handleCtrlPanMouseMove, true)
       canvas.removeEventListener('mouseup', this.handleCtrlPanMouseUp, true)
