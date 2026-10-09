@@ -82,7 +82,7 @@
                   <button
                     type="button"
                     class="col-name row-name"
-                    @click="zoomToConfiguration(item, 'workface')"
+                    @click="openWorkFaceConfig(item)"
                   >
                     {{ item.name }}
                   </button>

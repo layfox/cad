@@ -10,7 +10,8 @@ import {
   McGePoint3d,
   McGePoint3dArray,
   MxCpp,
-  MxCADUiPrPoint
+  MxCADUiPrPoint,
+  MxCADUtility
 } from 'mxcad'
 import { MxDbSVG, MxDbSVGText, MxFun, MxType } from 'mxdraw'
 import { RegistMxCommands, RxInitMxEntity } from '@/test/command'
@@ -548,32 +549,47 @@ export default {
     },
 
     eraseConfigurationEntities(item) {
-      if (!item) return
-      if (!Array.isArray(item.entityIds)) {
-        this.$set(item, 'entityIds', [])
+  if (!item) return
+  if (!Array.isArray(item.entityIds)) {
+    this.$set(item, 'entityIds', [])
+  }
+  // 清理svg标签实体
+  if (item.labelEntityId) {
+    try {
+      const mxObj = MxFun.getCurrentDraw()
+      if (mxObj && mxObj.eraseMxEntity) {
+        mxObj.eraseMxEntity(item.labelEntityId)
       }
-      if (item.labelEntityId) {
-        try {
-          const mxObj = MxFun.getCurrentDraw()
-          if (mxObj && mxObj.eraseMxEntity) {
-            mxObj.eraseMxEntity(item.labelEntityId)
-          }
-        } catch (error) {
-          console.warn('移除工作面名称标签失败:', error)
+    } catch (error) {
+      console.warn('移除工作面名称标签失败:', error)
+    }
+    this.$set(item, 'labelEntityId', null)
+  }
+  // 【新增】清理CAD热区矩形实体
+  if (Array.isArray(item.labelEntityIds)) {
+    item.labelEntityIds.forEach(objectId => {
+      try {
+        if (objectId && objectId.isValid && objectId.isValid()) {
+          objectId.erase()
         }
-        this.$set(item, 'labelEntityId', null)
+      } catch (error) {
+        console.warn('移除标签热区实体失败:', error)
       }
-      item.entityIds.forEach(objectId => {
-        try {
-          if (objectId && objectId.isValid && objectId.isValid()) {
-            objectId.erase()
-          }
-        } catch (error) {
-          console.warn('删除 CAD 实体失败:', error)
-        }
-      })
-      this.$set(item, 'entityIds', [])
-    },
+    })
+  }
+  this.$set(item, 'labelEntityIds', [])
+
+  item.entityIds.forEach(objectId => {
+    try {
+      if (objectId && objectId.isValid && objectId.isValid()) {
+        objectId.erase()
+      }
+    } catch (error) {
+      console.warn('删除 CAD 实体失败:', error)
+    }
+  })
+  this.$set(item, 'entityIds', [])
+},
 
     drawTextEntity(item, position, text, height, layerName, rgb) {
       if (!text) return
@@ -997,6 +1013,7 @@ export default {
       if (!this.mxcad || !Array.isArray(section.polygon) || section.polygon.length < 3) return
       this.eraseConfigurationEntities(section)
       section.kind = 'section'
+      this.createSectionLabelAnchor(section, this.getSectionLabelDocPoint(section))
 
       const vertices = section.polygon.map(item => point(item.x, item.y))
       const cadVertices = vertices.map(item => new McGePoint3d(item.x, item.y, 0))
@@ -1040,89 +1057,148 @@ export default {
     },
 
     createWorkFaceLabelAnchor(face, docPoint) {
-      if (!face || !isPointValid(docPoint)) return
-      const worldPoint = MxFun.docCoord2World(docPoint.x, docPoint.y, 0)
-      const mxObj = MxFun.getCurrentDraw()
-      if (!worldPoint || !mxObj || !mxObj.addMxEntity) return
+  if (!face || !isPointValid(docPoint)) return
+  const worldPoint = MxFun.docCoord2World(docPoint.x, docPoint.y, 0)
+  const mxObj = MxFun.getCurrentDraw()
+  if (!worldPoint || !mxObj || !mxObj.addMxEntity) return
 
-      const labelSize = MxFun.docCoordLong2World(FIXED_LABEL_SIZE)
-      const textHeight = labelSize * 0.22
+  const iconRealSize = MxFun.docCoordLong2World(FIXED_LABEL_SIZE)
+  // svg显示包围盒（仅视觉渲染，不再作为拾取主体）
+  const svg = new MxDbSVG()
+  svg.setSvgPath('models/svg/target.svg')
+  svg.useSvgColor = true
+  svg.setColor(0x164bd8)
+  svg.setSvgPostion(worldPoint)
+  svg.setSvgSize(new THREE.Vector2(iconRealSize, 0))
+  svg.setSvgAlignmentRatio(new THREE.Vector2(0.5, 1))
+  svg.setRenderOrder(MxType.MxDefaultRenderOrder.kMxEntityRenderOrder + 2)
+  // svg仅用于显示，不再依靠它做拾取，userData可以移除
+  const textHeight = iconRealSize * 0.22
+  const text = new MxDbSVGText()
+  text.txt = face.name || face.code || '工作面'
+  text.txtPos = new THREE.Vector3(
+    worldPoint.x,
+    worldPoint.y + iconRealSize * 0.34,
+    worldPoint.z || 0
+  )
+  text.txtHeight = textHeight
+  text.color = 0xffffff
+  text.fontStyle = 'bold'
+  svg.addText(text)
 
-      const svg = new MxDbSVG()
-      svg.setSvgPath('models/svg/target.svg')
-      svg.useSvgColor = true
-      svg.setColor(0x164bd8)
-      svg.setSvgPostion(worldPoint)
-      svg.setSvgSize(new THREE.Vector2(labelSize, 0))
-      svg.setSvgAlignmentRatio(new THREE.Vector2(0.5, 1))
-      svg.setRenderOrder(MxType.MxDefaultRenderOrder.kMxEntityRenderOrder + 2)
-      svg.userData = { workfaceId: face.id, workfaceLabel: true }
+  const entityId = mxObj.addMxEntity(svg)
+  this.$set(face, 'labelEntityId', entityId)
 
-      const text = new MxDbSVGText()
-      text.txt = face.name || face.code || '工作面'
-      text.txtPos = new THREE.Vector3(
-        worldPoint.x,
-        worldPoint.y + labelSize * 0.34,
-        worldPoint.z || 0
-      )
-      text.txtHeight = textHeight
-      text.color = 0xffffff
-      text.fontStyle = 'bold'
-      svg.addText(text)
+  // =========【方案B核心】生成CAD透明拾取热区矩形（doc世界坐标，跟随缩放平移）=========
+  // 热区包围盒大小：适配图标+文字，doc文档坐标
+  const hotW = FIXED_LABEL_SIZE * 2.8
+  const hotH = FIXED_LABEL_SIZE * 1.6
+  const hotRect = new McDbPolyline()
+  hotRect.isClosed = true
+  hotRect.addVertexAt(new McGePoint3d(docPoint.x - hotW / 2, docPoint.y, 0))
+  hotRect.addVertexAt(new McGePoint3d(docPoint.x + hotW / 2, docPoint.y, 0))
+  hotRect.addVertexAt(new McGePoint3d(docPoint.x + hotW / 2, docPoint.y + hotH, 0))
+  hotRect.addVertexAt(new McGePoint3d(docPoint.x - hotW / 2, docPoint.y + hotH, 0))
 
-      const entityId = mxObj.addMxEntity(svg)
-      this.$set(face, 'labelEntityId', entityId)
-      this.$set(face, 'labelEntity', svg)
-    },
+  const hotItem = { id: `${face.id}-hot`, kind: 'label-hot', entityIds: [] }
+  const hotId = this.drawCadEntity(
+    hotItem,
+    hotRect,
+    WORK_FACE_LAYER,
+    [0, 0, 0],
+    McDb.LineWeight.kLnWt005
+  )
+  if (hotId) {
+    const obj = hotId.getMcDbObject()
+    if (obj && obj.setxDataString) {
+      // 存入自定义数据，拾取时解析
+      obj.setxDataString('MX_LABEL', `workface:${face.id}`)
+    }
+  }
+  // 保存热区实体id，后续统一擦除
+  this.$set(face, 'labelEntityIds', hotItem.entityIds || [])
+},
+
 
     getSectionLabelDocPoint(section) {
-      if (section && isPointValid(section.range)) {
-        return point(section.range.x, section.range.y)
-      }
-      if (section && section.bounds) {
-        return point(
-          (Number(section.bounds.minX) + Number(section.bounds.maxX)) / 2,
-          (Number(section.bounds.minY) + Number(section.bounds.maxY)) / 2
-        )
-      }
-      return null
-    },
+  if (Array.isArray(section.polygon) && section.polygon.length >= 3) {
+    const validPoints = section.polygon.filter(isPointValid)
+    if (validPoints.length) {
+      return point(
+        validPoints.reduce((sum, item) => sum + Number(item.x), 0) / validPoints.length,
+        validPoints.reduce((sum, item) => sum + Number(item.y), 0) / validPoints.length
+      )
+    }
+  }
+  if (isPointValid(section.range)) return point(section.range.x, section.range.y)
+  if (section.bounds) {
+    return point(
+      (Number(section.bounds.minX) + Number(section.bounds.maxX)) / 2,
+      (Number(section.bounds.minY) + Number(section.bounds.maxY)) / 2
+    )
+  }
+  return null
+},
 
     createSectionLabelAnchor(section, docPoint) {
-      if (!section || !isPointValid(docPoint)) return
-      const worldPoint = MxFun.docCoord2World(docPoint.x, docPoint.y, 0)
-      const mxObj = MxFun.getCurrentDraw()
-      if (!worldPoint || !mxObj || !mxObj.addMxEntity) return
+  if (!section || !isPointValid(docPoint)) return
+  const worldPoint = MxFun.docCoord2World(docPoint.x, docPoint.y, 0)
+  const mxObj = MxFun.getCurrentDraw()
+  if (!worldPoint || !mxObj || !mxObj.addMxEntity) return
 
-      const labelSize = MxFun.docCoordLong2World(FIXED_LABEL_SIZE)
-      const textHeight = labelSize * 0.22
+  const iconRealSize = MxFun.docCoordLong2World(FIXED_LABEL_SIZE)
+  const svg = new MxDbSVG()
+  svg.setSvgPath('models/svg/target.svg')
+  svg.useSvgColor = true
+  svg.setColor(0xe74545)
+  svg.setSvgPostion(worldPoint)
+  svg.setSvgSize(new THREE.Vector2(iconRealSize, 0))
+  svg.setSvgAlignmentRatio(new THREE.Vector2(0.5, 1))
+  svg.setRenderOrder(MxType.MxDefaultRenderOrder.kMxEntityRenderOrder + 2)
 
-      const svg = new MxDbSVG()
-      svg.setSvgPath('models/svg/target.svg')
-      svg.useSvgColor = true
-      svg.setColor(0xe74545)   // 断面红色图标
-      svg.setSvgPostion(worldPoint)
-      svg.setSvgSize(new THREE.Vector2(labelSize, 0))
-      svg.setSvgAlignmentRatio(new THREE.Vector2(0.5, 1))
-      svg.setRenderOrder(MxType.MxDefaultRenderOrder.kMxEntityRenderOrder + 2)
-      svg.userData = { sectionId: section.id, sectionLabel: true }
+  const textHeight = iconRealSize * 0.22
+  const text = new MxDbSVGText()
+  text.txt = section.name || section.code || '断面'
+  text.txtPos = new THREE.Vector3(
+    worldPoint.x,
+    worldPoint.y + iconRealSize * 0.34,
+    worldPoint.z || 0
+  )
+  text.txtHeight = textHeight
+  text.color = 0xffffff
+  text.fontStyle = 'bold'
+  svg.addText(text)
 
-      const text = new MxDbSVGText()
-      text.txt = section.name || section.code || '断面'
-      text.txtPos = new THREE.Vector3(
-        worldPoint.x,
-        worldPoint.y + labelSize * 0.34,
-        worldPoint.z || 0
-      )
-      text.txtHeight = textHeight
-      text.color = 0xffffff
-      text.fontStyle = 'bold'
-      svg.addText(text)
+  const entityId = mxObj.addMxEntity(svg)
+  this.$set(section, 'labelEntityId', entityId)
 
-      const entityId = mxObj.addMxEntity(svg)
-      this.$set(section, 'labelEntityId', entityId)
-      this.$set(section, 'labelEntity', svg)
-    },
+  // CAD透明拾取热区矩形
+  const hotW = FIXED_LABEL_SIZE * 2.8
+  const hotH = FIXED_LABEL_SIZE * 1.6
+  const hotRect = new McDbPolyline()
+  hotRect.isClosed = true
+  hotRect.addVertexAt(new McGePoint3d(docPoint.x - hotW / 2, docPoint.y, 0))
+  hotRect.addVertexAt(new McGePoint3d(docPoint.x + hotW / 2, docPoint.y, 0))
+  hotRect.addVertexAt(new McGePoint3d(docPoint.x + hotW / 2, docPoint.y + hotH, 0))
+  hotRect.addVertexAt(new McGePoint3d(docPoint.x - hotW / 2, docPoint.y + hotH, 0))
+
+  const hotItem = { id: `${section.id}-hot`, kind: 'label-hot', entityIds: [] }
+  const hotId = this.drawCadEntity(
+    hotItem,
+    hotRect,
+    SECTION_LAYER,
+    [0, 0, 0],
+    McDb.LineWeight.kLnWt005
+  )
+  if (hotId) {
+    const obj = hotId.getMcDbObject()
+    if (obj && obj.setxDataString) {
+      obj.setxDataString('MX_LABEL', `section:${section.id}`)
+    }
+  }
+  this.$set(section, 'labelEntityIds', hotItem.entityIds || [])
+},
+
 
     refreshWorkFaceLabelEntity(face) {
       if (!face) return
@@ -1189,7 +1265,7 @@ export default {
       if (!this.mxcad || !isPointValid(section.range)) return
       this.eraseConfigurationEntities(section)
       section.kind = 'section'
-      this.createSectionLabelAnchor(section, section.range)
+      this.createSectionLabelAnchor(section, this.getSectionLabelDocPoint(section))
 
       const geometry = this.getSectionLine(section)
       const lineWidth = FIXED_LINE_WIDTH
@@ -1957,6 +2033,16 @@ export default {
       const canvas = document.getElementById('mxcad')
       if (!canvas) return null
       const rect = canvas.getBoundingClientRect()
+      const viewBounds = this.getViewDocBounds()
+      if (viewBounds) {
+        const x = viewBounds.minX +
+          ((event.clientX - rect.left) / rect.width) *
+          (viewBounds.maxX - viewBounds.minX)
+        const y = viewBounds.maxY -
+          ((event.clientY - rect.top) / rect.height) *
+          (viewBounds.maxY - viewBounds.minY)
+        return point(x, y)
+      }
       const mxObj = MxFun.getCurrentDraw()
       const camera = mxObj && mxObj.getCamera ? mxObj.getCamera() : null
       if (!mxObj || !camera || !mxObj.worldCoord2Doc) return null
@@ -1971,15 +2057,46 @@ export default {
       return docPoint ? point(docPoint.x, docPoint.y) : null
     },
 
+    getViewDocBounds() {
+      if (!this.mxcad || !this.mxcad.getViewCADCoord) return null
+      try {
+        const view = this.mxcad.getViewCADCoord()
+        const points = view
+          ? [view.pt1, view.pt2, view.pt3, view.pt4].filter(isPointValid)
+          : []
+        if (points.length < 2) return null
+        const xs = points.map(item => Number(item.x))
+        const ys = points.map(item => Number(item.y))
+        const minX = Math.min.apply(null, xs)
+        const maxX = Math.max.apply(null, xs)
+        const minY = Math.min.apply(null, ys)
+        const maxY = Math.max.apply(null, ys)
+        if (maxX <= minX || maxY <= minY) return null
+        return { minX, maxX, minY, maxY }
+      } catch (error) {
+        return null
+      }
+    },
+
     projectDocPointToCanvas(docPoint) {
       if (!isPointValid(docPoint)) return null
       const canvas = document.getElementById('mxcad')
+      if (!canvas) return null
+      const rect = canvas.getBoundingClientRect()
+      const viewBounds = this.getViewDocBounds()
+      if (viewBounds) {
+        return {
+          x: ((Number(docPoint.x) - viewBounds.minX) /
+            (viewBounds.maxX - viewBounds.minX)) * rect.width,
+          y: ((viewBounds.maxY - Number(docPoint.y)) /
+            (viewBounds.maxY - viewBounds.minY)) * rect.height
+        }
+      }
       const camera = this.mxDraw && this.mxDraw.getCamera
         ? this.mxDraw.getCamera()
         : null
-      if (!canvas || !camera) return null
+      if (!camera) return null
       try {
-        const rect = canvas.getBoundingClientRect()
         const worldPoint = MxFun.docCoord2World(
           Number(docPoint.x),
           Number(docPoint.y),
@@ -2069,58 +2186,69 @@ export default {
     },
 
     handleConfigLabelClick(event) {
+      const canvas = document.getElementById('mxcad')
+      if (!canvas) return
       if (event.button !== 0 || event.ctrlKey || event.metaKey) return
       if (this.isPolygonSelecting || this.isCoordinatePicking || this.activeVertexDrag) return
+
       try {
-        const mxObj = MxFun.getCurrentDraw()
-        if (!mxObj || !mxObj.findMxEntityAtPoint) return
-        const docPoint = mxObj.screenCoord2Doc(event.offsetX, event.offsetY, 0)
-        if (!docPoint) return
-
-        // 1) 命中原生 SVG 标签实体（target 图标 + 名称文字所在实体），区分工作面/断面
-        const entities = mxObj.findMxEntityAtPoint(docPoint) || []
-        const labelEntity = entities.find(entity => {
-          return entity && entity.userData &&
-            (entity.userData.workfaceLabel || entity.userData.sectionLabel)
-        })
-        if (labelEntity) {
-          if (labelEntity.userData.workfaceId) {
-            const face = this.workFaces.find(item => item.id === labelEntity.userData.workfaceId)
-            if (face) {
-              event.preventDefault()
-              event.stopPropagation()
-              event.stopImmediatePropagation()
-              this.openWorkFaceConfig(face)
-              return
-            }
-          }
-          if (labelEntity.userData.sectionId) {
-            const section = this.sections.find(item => item.id === labelEntity.userData.sectionId)
-            if (section) {
-              event.preventDefault()
-              event.stopPropagation()
-              event.stopImmediatePropagation()
-              this.openSectionConfig(section)
-              return
-            }
-          }
+        const rect = canvas.getBoundingClientRect()
+        const mousePoint = {
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top
         }
+        const candidates = []
 
-        // 2) 兜底：SVG 未命中时，按「点击点与标签锚点的距离」命中最近的工作面/断面
-        const nearest = this.findNearestLabel(docPoint)
-        if (!nearest) return
+        this.workFaces.forEach(item => {
+          const anchor = this.getWorkFaceLabelDocPoint(item)
+          const screenPoint = this.projectDocPointToCanvas(anchor)
+          if (screenPoint) {
+            candidates.push({
+              item,
+              kind: 'workface',
+              distance: Math.hypot(
+                screenPoint.x - mousePoint.x,
+                screenPoint.y - mousePoint.y
+              )
+            })
+          }
+        })
+
+        this.sections.forEach(item => {
+          const anchor = this.getSectionLabelDocPoint(item)
+          const screenPoint = this.projectDocPointToCanvas(anchor)
+          if (screenPoint) {
+            candidates.push({
+              item,
+              kind: 'section',
+              distance: Math.hypot(
+                screenPoint.x - mousePoint.x,
+                screenPoint.y - mousePoint.y
+              )
+            })
+          }
+        })
+
+        const target = candidates
+          .filter(candidate => candidate.distance <= 24)
+          .sort((a, b) => a.distance - b.distance)[0]
+        if (!target) return
+
         event.preventDefault()
         event.stopPropagation()
         event.stopImmediatePropagation()
-        if (nearest.kind === 'workface') {
-          this.openWorkFaceConfig(nearest.item)
+        if (target.kind === 'workface') {
+          this.openWorkFaceConfig(target.item)
         } else {
-          this.openSectionConfig(nearest.item)
+          this.openSectionConfig(target.item)
         }
       } catch (error) {
-        console.warn('打开配置弹窗失败:', error)
+        console.warn('标签点击处理异常:', error)
       }
     },
+
+
+
 
     findNearestLabel(docPoint) {
       let best = null
@@ -2193,30 +2321,35 @@ export default {
     },
 
     initCtrlPan() {
-      const canvas = document.getElementById('mxcad')
-      if (!canvas) return
-      canvas.addEventListener('mousedown', this.handleWorkFaceVertexMouseDown, true)
-      canvas.addEventListener('mousemove', this.handleWorkFaceVertexMouseMove, true)
-      canvas.addEventListener('mouseup', this.handleWorkFaceVertexMouseUp, true)
-      canvas.addEventListener('mousedown', this.handleConfigLabelClick, true)
-      canvas.addEventListener('mousedown', this.handleCtrlPanMouseDown, true)
-      canvas.addEventListener('mousemove', this.handleCtrlPanMouseMove, true)
-      canvas.addEventListener('mouseup', this.handleCtrlPanMouseUp, true)
-      canvas.addEventListener('mouseleave', this.handleCtrlPanMouseUp, true)
-    },
+  const canvas = document.getElementById('mxcad')
+  if (!canvas) return
+  // 标签点击处理器放在第一位，优先执行
+  canvas.addEventListener('mousedown', this.handleConfigLabelClick, true)
+
+  canvas.addEventListener('mousedown', this.handleWorkFaceVertexMouseDown, true)
+  canvas.addEventListener('mousemove', this.handleWorkFaceVertexMouseMove, true)
+  canvas.addEventListener('mouseup', this.handleWorkFaceVertexMouseUp, true)
+
+  canvas.addEventListener('mousedown', this.handleCtrlPanMouseDown, true)
+  canvas.addEventListener('mousemove', this.handleCtrlPanMouseMove, true)
+  canvas.addEventListener('mouseup', this.handleCtrlPanMouseUp, true)
+  canvas.addEventListener('mouseleave', this.handleCtrlPanMouseUp, true)
+},
 
     destroyCtrlPan() {
-      const canvas = document.getElementById('mxcad')
-      if (!canvas) return
-      canvas.removeEventListener('mousedown', this.handleWorkFaceVertexMouseDown, true)
-      canvas.removeEventListener('mousemove', this.handleWorkFaceVertexMouseMove, true)
-      canvas.removeEventListener('mouseup', this.handleWorkFaceVertexMouseUp, true)
-      canvas.removeEventListener('mousedown', this.handleConfigLabelClick, true)
-      canvas.removeEventListener('mousedown', this.handleCtrlPanMouseDown, true)
-      canvas.removeEventListener('mousemove', this.handleCtrlPanMouseMove, true)
-      canvas.removeEventListener('mouseup', this.handleCtrlPanMouseUp, true)
-      canvas.removeEventListener('mouseleave', this.handleCtrlPanMouseUp, true)
-    },
+  const canvas = document.getElementById('mxcad')
+  if (!canvas) return
+  canvas.removeEventListener('mousedown', this.handleConfigLabelClick, true)
+
+  canvas.removeEventListener('mousedown', this.handleWorkFaceVertexMouseDown, true)
+  canvas.removeEventListener('mousemove', this.handleWorkFaceVertexMouseMove, true)
+  canvas.removeEventListener('mouseup', this.handleWorkFaceVertexMouseUp, true)
+
+  canvas.removeEventListener('mousedown', this.handleCtrlPanMouseDown, true)
+  canvas.removeEventListener('mousemove', this.handleCtrlPanMouseMove, true)
+  canvas.removeEventListener('mouseup', this.handleCtrlPanMouseUp, true)
+  canvas.removeEventListener('mouseleave', this.handleCtrlPanMouseUp, true)
+},
 
     simulateMouseButtonEvent(event, type, button = 1) {
       const buttons = type === 'mouseup'
