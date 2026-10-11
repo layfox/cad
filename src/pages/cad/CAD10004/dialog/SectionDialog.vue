@@ -280,6 +280,11 @@ export default {
       this.form.bounds = cloneBounds(payload.bounds)
       this.form.range = clonePoint(payload.range || emptyPoint())
     },
+    // 绘制会话期间父组件取当前填写的编码/名称：草稿对象的名称标签直接用它们，
+    // 否则草稿 name 是空串、标签文字按 code 回退，绘制过程中看到的是编码
+    getIdentity() {
+      return { code: this.form.code, name: this.form.name }
+    },
     onConfirm() {
       if (!this.form.code) {
         this.$Message.warning('请输入断层编码')

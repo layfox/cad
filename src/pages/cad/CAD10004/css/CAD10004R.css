@@ -225,7 +225,7 @@
   align-items: center;
   justify-content: flex-end;
   margin-top: auto;
-  padding: 16px 0 0;
+  padding: 8px 16px;
   font-size: 14px;
   flex: none;
 }

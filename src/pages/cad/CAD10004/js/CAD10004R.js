@@ -48,8 +48,18 @@ const FIXED_TEXT_HEIGHT = 12      // 名称文字高度
 const FIXED_MARKER_RADIUS = 4     // 端点 / 中心标记圆半径
 const ENDPOINT_LABEL_OFFSET = FIXED_MARKER_RADIUS + 6  // 端点名称文字相对圆心的 X/Y 偏移（doc 单位）
 const FIXED_ARROW_SIZE = 40       // 方向箭头长度
-const FIXED_LABEL_SIZE = 60       // 工作面名称标签（SVG）固定尺寸
-const LABEL_HIT_RADIUS = FIXED_LABEL_SIZE * 1.5  // 点击工作面标签/文字时的命中半径（doc 单位，可调）
+const FIXED_LABEL_SIZE = 60       // 工作面/断层名称标签（图标+文字）的基准尺寸
+// 名称标签图标：工作面/断层各一张 PNG（public/image 下，原图都是 28x39）。
+// 图标按基准尺寸定宽，高按原图宽高比换算，避免被拉成正方形
+const LABEL_ICON_ASPECT = 28 / 39
+const WORK_FACE_LABEL_ICON = 'image/workface.png'
+const SECTION_LABEL_ICON = 'image/duanceng.png'
+// 名称标签的命中半宽/半高（doc 单位）。图标自锚点向上/下都有尺寸、文字又叠在一侧，
+// 所以按锚点取对称方形，保证点在图标的任意位置都能命中
+const LABEL_HIT_HALF_SIZE = FIXED_LABEL_SIZE * 1.4
+// 名称标签的默认文字色。必须是 0xRRGGBB 数字，原因见 hexToColorNumber
+const DEFAULT_WORK_FACE_LABEL_TEXT_COLOR = hexToColorNumber(DEFAULT_WORK_FACE_LINE_COLOR)
+const DEFAULT_SECTION_LABEL_TEXT_COLOR = hexToColorNumber(DEFAULT_SECTION_LINE_COLOR)
 
 // 顶点把手：默认是白色小圆，被选中时放大变红——不然 Del 要删的是哪一个完全看不出来
 const VERTEX_HANDLE_COLOR = [255, 255, 255]
@@ -159,6 +169,15 @@ function hexToRgb(hex) {
     parseInt(value.slice(2, 4), 16),
     parseInt(value.slice(4, 6), 16)
   ]
+}
+
+// '#RRGGBB' → 0xRRGGBB 数字，非法色值返回 fallback。
+// MxDbSVGText.color 在 worldDraw 里会经过 t.setColor()，内部走 MxFun.getNumberColor，
+// 而它对字符串只做 parseInt —— '#0D5CE0' 得到 NaN，文字最终渲染成黑色，所以这里必须转成数字
+function hexToColorNumber(hex, fallback) {
+  const rgb = hexToRgb(hex)
+  if (!rgb) return fallback
+  return (rgb[0] << 16) | (rgb[1] << 8) | rgb[2]
 }
 
 // 机头线段与机尾线段是工作面的两条对边，四个端点按「机头起→机头止→机尾止→机尾起」
@@ -1232,6 +1251,7 @@ export default {
       const text = exist.getText && exist.getText(0)
       if (text) {
         text.txt = face.name || face.code || '工作面'
+        text.color = hexToColorNumber(face.lineColor, DEFAULT_WORK_FACE_LABEL_TEXT_COLOR)
         text.txtPos = new THREE.Vector3(
           worldPoint.x,
           worldPoint.y + iconRealSize * 0.34,
@@ -1243,13 +1263,11 @@ export default {
     }
   }
 
-  // svg显示包围盒（仅视觉渲染，不再作为拾取主体）
+  // 标签图标走 PNG：工作面/断层各一张，保留各自的配色，不再用 setColor 给图形染色
   const svg = new MxDbSVG()
-  svg.setSvgPath('models/svg/target.svg')
-  svg.useSvgColor = true
-  svg.setColor(0x164bd8)
+  svg.setImagePath(WORK_FACE_LABEL_ICON)
   svg.setSvgPostion(worldPoint)
-  svg.setSvgSize(new THREE.Vector2(iconRealSize, 0))
+  svg.setSvgSize(new THREE.Vector2(iconRealSize, iconRealSize / LABEL_ICON_ASPECT))
   svg.setSvgAlignmentRatio(new THREE.Vector2(0.5, 1))
   svg.setRenderOrder(MxType.MxDefaultRenderOrder.kMxEntityRenderOrder + 2)
   // svg仅用于显示，不再依靠它做拾取，userData可以移除
@@ -1262,7 +1280,8 @@ export default {
     worldPoint.z || 0
   )
   text.txtHeight = textHeight
-  text.color = 0xffffff
+  // 文字颜色跟随配置的线段颜色，和图纸上的边界保持一致
+  text.color = hexToColorNumber(face.lineColor, DEFAULT_WORK_FACE_LABEL_TEXT_COLOR)
   text.fontStyle = 'bold'
   svg.addText(text)
 
@@ -1293,15 +1312,28 @@ export default {
   this.$set(face, 'labelEntityIds', hotItem.entityIds || [])
 },
 
-  // 名称标签拾取热区的四个角点（doc 文档坐标），大小适配图标+文字
+  // 名称标签的命中矩形（doc 文档坐标）：以标签锚点为中心的对称方形，覆盖图标与文字。
+  // 判定必须走 doc 坐标——缩放时命中范围会跟着一起放大缩小；原先用固定的 24px 屏幕距离，
+  // 放大后图标和文字变大、离锚点越来越远，点在图标上反而落空
+  labelHitRect(anchor) {
+    const x = Number(anchor.x)
+    const y = Number(anchor.y)
+    return {
+      minX: x - LABEL_HIT_HALF_SIZE,
+      maxX: x + LABEL_HIT_HALF_SIZE,
+      minY: y - LABEL_HIT_HALF_SIZE,
+      maxY: y + LABEL_HIT_HALF_SIZE
+    }
+  },
+
+  // 名称标签拾取热区的四个角点（doc 文档坐标），与 labelHitRect 保持同一范围
   labelHotRectCorners(docPoint) {
-    const hotW = FIXED_LABEL_SIZE * 2.8
-    const hotH = FIXED_LABEL_SIZE * 1.6
+    const rect = this.labelHitRect(docPoint)
     return [
-      new McGePoint3d(docPoint.x - hotW / 2, docPoint.y, 0),
-      new McGePoint3d(docPoint.x + hotW / 2, docPoint.y, 0),
-      new McGePoint3d(docPoint.x + hotW / 2, docPoint.y + hotH, 0),
-      new McGePoint3d(docPoint.x - hotW / 2, docPoint.y + hotH, 0)
+      new McGePoint3d(rect.minX, rect.minY, 0),
+      new McGePoint3d(rect.maxX, rect.minY, 0),
+      new McGePoint3d(rect.maxX, rect.maxY, 0),
+      new McGePoint3d(rect.minX, rect.maxY, 0)
     ]
   },
 
@@ -1359,6 +1391,7 @@ export default {
       const text = exist.getText && exist.getText(0)
       if (text) {
         text.txt = section.name || section.code || '断层'
+        text.color = hexToColorNumber(section.lineColor, DEFAULT_SECTION_LABEL_TEXT_COLOR)
         text.txtPos = new THREE.Vector3(
           worldPoint.x,
           worldPoint.y + iconRealSize * 0.34,
@@ -1370,12 +1403,11 @@ export default {
     }
   }
 
+  // 标签图标走 PNG：断层用 duanceng.png，保留原图配色，不再用 setColor 给图形染色
   const svg = new MxDbSVG()
-  svg.setSvgPath('models/svg/target.svg')
-  svg.useSvgColor = true
-  svg.setColor(0xe74545)
+  svg.setImagePath(SECTION_LABEL_ICON)
   svg.setSvgPostion(worldPoint)
-  svg.setSvgSize(new THREE.Vector2(iconRealSize, 0))
+  svg.setSvgSize(new THREE.Vector2(iconRealSize, iconRealSize / LABEL_ICON_ASPECT))
   svg.setSvgAlignmentRatio(new THREE.Vector2(0.5, 1))
   svg.setRenderOrder(MxType.MxDefaultRenderOrder.kMxEntityRenderOrder + 2)
 
@@ -1388,7 +1420,8 @@ export default {
     worldPoint.z || 0
   )
   text.txtHeight = textHeight
-  text.color = 0xffffff
+  // 文字颜色跟随配置的线段颜色，和图纸上的多边形保持一致
+  text.color = hexToColorNumber(section.lineColor, DEFAULT_SECTION_LABEL_TEXT_COLOR)
   text.fontStyle = 'bold'
   svg.addText(text)
 
@@ -1970,6 +2003,13 @@ export default {
         return
       }
       if (this.sectionDrawSession) return
+      // 弹窗里的 form 是副本、不回写 item，而草稿的名称标签文字取的是 item.name。
+      // 不先同步一下的话，草稿 name 是空串、标签按 code 回退，绘制全程看到的都是编码
+      if (this.$refs.sectionDialog && this.$refs.sectionDialog.getIdentity) {
+        const identity = this.$refs.sectionDialog.getIdentity()
+        this.$set(item, 'code', identity.code)
+        this.$set(item, 'name', identity.name)
+      }
       this._sectionSessionAborted = false
       this.sectionDialogVisible = false
       await this.$nextTick()
@@ -2045,8 +2085,7 @@ export default {
       if (resolve) resolve(polygon || null)
     },
 
-    // 会话中途被打断（切换配置项 / 关弹窗 / 删除行）时收尾，
-    // 否则 Promise 永不 resolve，弹窗会一直藏在画布后面
+    // 会话中途被打断（关弹窗）时收尾，否则 Promise 永不 resolve，弹窗会一直藏在画布后面
     abortSectionDrawSession() {
       // 首次绘制还在连续取点：先结束 prompt，pickPolygonArea 才会返回、外层 await 才能收尾
       if (this.isPolygonSelecting) {
@@ -2060,7 +2099,31 @@ export default {
       }
       if (!this.sectionDrawSession) return
       this._sectionSessionAborted = true
+      this.discardSectionDrawSession()
+    },
+
+    // 丢弃本次会话的全部改动并收尾（ESC 与弹窗「取消」共用）：拖拽、加点、删点都是直接改
+    // item.polygon 的，不还原、不重画的话，取消之后图纸上会留着改了一半的轮廓和点位
+    discardSectionDrawSession() {
+      const item = this.restoreSectionSessionPolygon()
       this.endSectionEditSession(null)
+      if (!item) return
+      this.renderSection(item)
+      if (this.mxcad && this.mxcad.updateDisplay) this.mxcad.updateDisplay(true)
+    },
+
+    // polygon 还原成进入会话前的快照并同步 bounds / range，返回被还原的对象。
+    // 只还原数据、不在这里重画：调用方要等 exitVertexEdit 摘掉旧把手后再整条重画
+    restoreSectionSessionPolygon() {
+      const item = this.resolveVertexEditTarget()
+      const snapshot = this._sectionSessionSnapshot
+      if (!item || !Array.isArray(snapshot)) return null
+      this.$set(item, 'polygon', snapshot.map(vertex => ({
+        x: Number(vertex.x),
+        y: Number(vertex.y)
+      })))
+      this.applySectionPolygon(item, item.polygon)
+      return item
     },
 
     // 增删顶点会让 McDbPolyline 内部下标移位，而 draftVertexIds 与 setPointAt 都是按下标对位的，
@@ -2193,16 +2256,23 @@ export default {
 
     onSaveSection(value) {
       this.removePolygonReference()
+      const index = this.sections.findIndex(section => section.id === value.id)
       const item = {
         ...value,
         kind: 'section',
         entityIds: []
       }
-      const index = this.sections.findIndex(section => section.id === item.id)
       if (index > -1) {
+        // 编辑已有断层：擦掉旧实体再换成新的，标签文字才会跟着改成新名称
         this.eraseConfigurationEntities(this.sections[index])
         this.$set(this.sections, index, item)
       } else {
+        // 新建时 this.editingSection 是还没进列表的草稿，它的名称标签/拾取热区/轮廓
+        // 已经由绘制会话画在图纸上了。换成新对象后草稿那套实体没人认领、会一直留着，
+        // 而草稿 name 是空串、标签文字按 code 回退，于是图纸上叠着编码和名称两个标签
+        if (this.editingSection && this.editingSection !== item) {
+          this.eraseConfigurationEntities(this.editingSection)
+        }
         this.sections.push(item)
       }
       this.renderSection(item)
@@ -2669,18 +2739,8 @@ export default {
           this.exitVertexEdit()
           return
         }
-        // ESC 丢弃本次会话的全部改动，polygon 还原成进入会话前的样子
-        const item = this.resolveVertexEditTarget()
-        if (item && this._sectionSessionSnapshot) {
-          this.$set(item, 'polygon', this._sectionSessionSnapshot.map(vertex => ({
-            x: vertex.x,
-            y: vertex.y
-          })))
-          this.applySectionPolygon(item, item.polygon)
-          this.renderSection(item)
-        }
-        this.endSectionEditSession(null)
-        if (this.mxcad && this.mxcad.updateDisplay) this.mxcad.updateDisplay(true)
+        // ESC 丢弃本次会话的全部改动：polygon 还原成进入会话前的样子，弹窗照常重开
+        this.discardSectionDrawSession()
         return
       }
       // Del / Backspace 删除选中的顶点：Mac 上标着 Delete 的键发的就是 Backspace，两个都收
@@ -2707,94 +2767,47 @@ export default {
     },
 
     handleConfigLabelClick(event) {
-      const canvas = document.getElementById('mxcad')
-      if (!canvas) return
       if (event.button !== 0 || event.ctrlKey || event.metaKey) return
       if (this.isPolygonSelecting || this.isCoordinatePicking || this.activeVertexDrag || this.activeVertexEditId) return
 
-      try {
-        const rect = canvas.getBoundingClientRect()
-        const mousePoint = {
-          x: event.clientX - rect.left,
-          y: event.clientY - rect.top
-        }
-        const candidates = []
+      const docPoint = this.getCanvasDocPoint(event)
+      const target = this.findNearestLabel(docPoint)
+      if (!target) return
 
-        this.workFaces.forEach(item => {
-          const anchor = this.getWorkFaceLabelDocPoint(item)
-          const screenPoint = this.projectDocPointToCanvas(anchor)
-          if (screenPoint) {
-            candidates.push({
-              item,
-              kind: 'workface',
-              distance: Math.hypot(
-                screenPoint.x - mousePoint.x,
-                screenPoint.y - mousePoint.y
-              )
-            })
-          }
-        })
-
-        this.sections.forEach(item => {
-          const anchor = this.getSectionLabelDocPoint(item)
-          const screenPoint = this.projectDocPointToCanvas(anchor)
-          if (screenPoint) {
-            candidates.push({
-              item,
-              kind: 'section',
-              distance: Math.hypot(
-                screenPoint.x - mousePoint.x,
-                screenPoint.y - mousePoint.y
-              )
-            })
-          }
-        })
-
-        const target = candidates
-          .filter(candidate => candidate.distance <= 24)
-          .sort((a, b) => a.distance - b.distance)[0]
-        if (!target) return
-
-        event.preventDefault()
-        event.stopPropagation()
-        event.stopImmediatePropagation()
-        if (target.kind === 'workface') {
-          this.openWorkFaceConfig(target.item)
-        } else {
-          this.openSectionConfig(target.item)
-        }
-      } catch (error) {
-        console.warn('标签点击处理异常:', error)
+      event.preventDefault()
+      event.stopPropagation()
+      event.stopImmediatePropagation()
+      if (target.kind === 'workface') {
+        this.openWorkFaceConfig(target.item)
+      } else {
+        this.openSectionConfig(target.item)
       }
     },
 
 
 
 
+    // 名称标签的命中测试走 doc 坐标：鼠标位置换算成 doc 点，再和标签锚点的命中矩形比较。
+    // 多张标签的范围重叠时取离锚点最近的那个
     findNearestLabel(docPoint) {
+      if (!isPointValid(docPoint)) return null
       let best = null
       let bestDist = Infinity
-      this.workFaces.forEach(item => {
-        const anchor = this.getWorkFaceLabelDocPoint(item)
+      const consider = (item, kind, anchor) => {
         if (!isPointValid(anchor)) return
-        const dx = Number(docPoint.x) - Number(anchor.x)
-        const dy = Number(docPoint.y) - Number(anchor.y)
-        const dist = Math.hypot(dx, dy)
-        if (dist <= LABEL_HIT_RADIUS && dist < bestDist) {
-          bestDist = dist
-          best = { kind: 'workface', item }
-        }
+        const rect = this.labelHitRect(anchor)
+        if (docPoint.x < rect.minX || docPoint.x > rect.maxX ||
+          docPoint.y < rect.minY || docPoint.y > rect.maxY) return
+        const dist = Math.hypot(docPoint.x - anchor.x, docPoint.y - anchor.y)
+        if (dist >= bestDist) return
+        bestDist = dist
+        best = { kind, item }
+      }
+      this.workFaces.forEach(item => {
+        consider(item, 'workface', this.getWorkFaceLabelDocPoint(item))
       })
       this.sections.forEach(item => {
-        const anchor = this.getSectionLabelDocPoint(item)
-        if (!isPointValid(anchor)) return
-        const dx = Number(docPoint.x) - Number(anchor.x)
-        const dy = Number(docPoint.y) - Number(anchor.y)
-        const dist = Math.hypot(dx, dy)
-        if (dist <= LABEL_HIT_RADIUS && dist < bestDist) {
-          bestDist = dist
-          best = { kind: 'section', item }
-        }
+        consider(item, 'section', this.getSectionLabelDocPoint(item))
       })
       return best
     },
