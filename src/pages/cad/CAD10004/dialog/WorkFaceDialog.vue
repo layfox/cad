@@ -28,15 +28,15 @@
 
       <FormItem label="机头开始坐标" required>
         <div class="coord-row">
-          <Input v-model="form.headStart.x" placeholder="X" />
-          <Input v-model="form.headStart.y" placeholder="Y" />
+          <Input readonly v-model="form.headStart.x" placeholder="X" />
+          <Input readonly v-model="form.headStart.y" placeholder="Y" />
           <Button type="primary" plain @click="requestPick('headStart')">选择坐标</Button>
         </div>
       </FormItem>
       <FormItem label="机头结束坐标" required>
         <div class="coord-row">
-          <Input v-model="form.headEnd.x" placeholder="X" />
-          <Input v-model="form.headEnd.y" placeholder="Y" />
+          <Input readonly v-model="form.headEnd.x" placeholder="X" />
+          <Input readonly v-model="form.headEnd.y" placeholder="Y" />
           <Button type="primary" plain @click="requestPick('headEnd')">选择坐标</Button>
         </div>
       </FormItem>
@@ -49,15 +49,15 @@
 
       <FormItem label="机尾开始坐标" required>
         <div class="coord-row">
-          <Input v-model="form.tailStart.x" placeholder="X" />
-          <Input v-model="form.tailStart.y" placeholder="Y" />
+          <Input readonly v-model="form.tailStart.x" placeholder="X" />
+          <Input readonly v-model="form.tailStart.y" placeholder="Y" />
           <Button type="primary" plain @click="requestPick('tailStart')">选择坐标</Button>
         </div>
       </FormItem>
       <FormItem label="机尾结束坐标" required>
         <div class="coord-row">
-          <Input v-model="form.tailEnd.x" placeholder="X" />
-          <Input v-model="form.tailEnd.y" placeholder="Y" />
+          <Input readonly v-model="form.tailEnd.x" placeholder="X" />
+          <Input readonly v-model="form.tailEnd.y" placeholder="Y" />
           <Button type="primary" plain @click="requestPick('tailEnd')">选择坐标</Button>
         </div>
       </FormItem>
@@ -72,7 +72,6 @@
     <div class="draw-config-footer">
       <Button type="primary" @click="onConfirm">确定</Button>
       <Button @click="onCancel">取消</Button>
-      <Button v-if="canDelete" type="error" ghost @click="onDelete">删除</Button>
     </div>
   </div>
 </template>

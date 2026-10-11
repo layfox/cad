@@ -78,11 +78,6 @@
         <div v-if="!workFaces.length" class="work-face-empty">暂无工作面，请先添加工作面</div>
       </FormItem>
     </Form>
-
-    <div class="draw-config-tip">
-      根据提醒距离、设计范围和断层坐标，提前计算影响范围。
-    </div>
-
     <div class="draw-config-footer">
       <Button type="primary" @click="onConfirm">确定</Button>
       <Button @click="onCancel">取消</Button>

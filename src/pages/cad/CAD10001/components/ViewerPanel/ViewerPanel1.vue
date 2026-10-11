@@ -136,7 +136,7 @@ export default {
             tolerance: 4,
             pointModalVisible: false,
             orgNo: '',
-            isDev: false,
+            isDev: true,
             pointColumns: [
                 { type: 'selection', width: 60, align: 'center' },
                 { slot: 'seq', title: '序号', key: 'seq', width: 60, align: 'center', render: (h, { row, index }) => {

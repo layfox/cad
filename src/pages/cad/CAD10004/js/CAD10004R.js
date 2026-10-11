@@ -54,9 +54,11 @@ const FIXED_LABEL_SIZE = 60       // 工作面/断层名称标签（图标+文�
 const LABEL_ICON_ASPECT = 28 / 39
 const WORK_FACE_LABEL_ICON = 'image/workface.png'
 const SECTION_LABEL_ICON = 'image/duanceng.png'
-// 名称标签的命中半宽/半高（doc 单位）。图标自锚点向上/下都有尺寸、文字又叠在一侧，
-// 所以按锚点取对称方形，保证点在图标的任意位置都能命中
-const LABEL_HIT_HALF_SIZE = FIXED_LABEL_SIZE * 1.4
+const LABEL_FONT_STYLE = 'bold'
+// 名称标签文字的字高 / 相对锚点的位置（都以图标宽度为基准）。绘制和命中判定共用这几个比例，
+// 否则点得到的范围和看到的文字会对不上
+const LABEL_TEXT_HEIGHT_RATIO = 0.22
+const LABEL_TEXT_OFFSET_RATIO = 0.34
 // 名称标签的默认文字色。必须是 0xRRGGBB 数字，原因见 hexToColorNumber
 const DEFAULT_WORK_FACE_LABEL_TEXT_COLOR = hexToColorNumber(DEFAULT_WORK_FACE_LINE_COLOR)
 const DEFAULT_SECTION_LABEL_TEXT_COLOR = hexToColorNumber(DEFAULT_SECTION_LINE_COLOR)
@@ -178,6 +180,16 @@ function hexToColorNumber(hex, fallback) {
   const rgb = hexToRgb(hex)
   if (!rgb) return fallback
   return (rgb[0] << 16) | (rgb[1] << 8) | rgb[2]
+}
+
+// 文字在图纸上占的宽度。MxDbSVG 画文字时是把 measureText(文字) 按 256 归一后再乘字高，
+// 这里用同样的字体量一遍，命中区域才能正好贴合文字本身
+const labelMeasureCtx = document.createElement('canvas').getContext('2d')
+
+function measureLabelTextWidth(text, textHeight) {
+  if (!text) return 0
+  labelMeasureCtx.font = `${LABEL_FONT_STYLE} 256px Arial`
+  return labelMeasureCtx.measureText(String(text)).width * textHeight / 256
 }
 
 // 机头线段与机尾线段是工作面的两条对边，四个端点按「机头起→机头止→机尾止→机尾起」
@@ -670,19 +682,6 @@ export default {
     }
     this.$set(item, 'labelEntityId', null)
   }
-  // 【新增】清理CAD热区矩形实体
-  if (Array.isArray(item.labelEntityIds)) {
-    item.labelEntityIds.forEach(objectId => {
-      try {
-        if (objectId && objectId.isValid && objectId.isValid()) {
-          objectId.erase()
-        }
-      } catch (error) {
-        console.warn('移除标签热区实体失败:', error)
-      }
-    })
-  }
-  this.$set(item, 'labelEntityIds', [])
 
   item.entityIds.forEach(objectId => {
     try {
@@ -1250,15 +1249,14 @@ export default {
       exist.setSvgPostion(worldPoint)
       const text = exist.getText && exist.getText(0)
       if (text) {
-        text.txt = face.name || face.code || '工作面'
+        text.txt = this.labelDisplayText(face, '工作面')
         text.color = hexToColorNumber(face.lineColor, DEFAULT_WORK_FACE_LABEL_TEXT_COLOR)
         text.txtPos = new THREE.Vector3(
           worldPoint.x,
-          worldPoint.y + iconRealSize * 0.34,
+          worldPoint.y + iconRealSize * LABEL_TEXT_OFFSET_RATIO,
           worldPoint.z || 0
         )
       }
-      this.moveLabelHotRect(face, docPoint)
       return
     }
   }
@@ -1270,87 +1268,51 @@ export default {
   svg.setSvgSize(new THREE.Vector2(iconRealSize, iconRealSize / LABEL_ICON_ASPECT))
   svg.setSvgAlignmentRatio(new THREE.Vector2(0.5, 1))
   svg.setRenderOrder(MxType.MxDefaultRenderOrder.kMxEntityRenderOrder + 2)
-  // svg仅用于显示，不再依靠它做拾取，userData可以移除
-  const textHeight = iconRealSize * 0.22
+
   const text = new MxDbSVGText()
-  text.txt = face.name || face.code || '工作面'
+  text.txt = this.labelDisplayText(face, '工作面')
   text.txtPos = new THREE.Vector3(
     worldPoint.x,
-    worldPoint.y + iconRealSize * 0.34,
+    worldPoint.y + iconRealSize * LABEL_TEXT_OFFSET_RATIO,
     worldPoint.z || 0
   )
-  text.txtHeight = textHeight
+  text.txtHeight = iconRealSize * LABEL_TEXT_HEIGHT_RATIO
   // 文字颜色跟随配置的线段颜色，和图纸上的边界保持一致
   text.color = hexToColorNumber(face.lineColor, DEFAULT_WORK_FACE_LABEL_TEXT_COLOR)
-  text.fontStyle = 'bold'
+  text.fontStyle = LABEL_FONT_STYLE
   svg.addText(text)
 
   const entityId = mxObj.addMxEntity(svg)
   this.$set(face, 'labelEntityId', entityId)
-
-  // =========【方案B核心】生成CAD透明拾取热区矩形（doc世界坐标，跟随缩放平移）=========
-  const hotRect = new McDbPolyline()
-  hotRect.isClosed = true
-  this.labelHotRectCorners(docPoint).forEach(item => hotRect.addVertexAt(item))
-
-  const hotItem = { id: `${face.id}-hot`, kind: 'label-hot', entityIds: [] }
-  const hotId = this.drawCadEntity(
-    hotItem,
-    hotRect,
-    WORK_FACE_LAYER,
-    [0, 0, 0],
-    McDb.LineWeight.kLnWt005
-  )
-  if (hotId) {
-    const obj = hotId.getMcDbObject()
-    if (obj && obj.setxDataString) {
-      // 存入自定义数据，拾取时解析
-      obj.setxDataString('MX_LABEL', `workface:${face.id}`)
-    }
-  }
-  // 保存热区实体id，后续统一擦除
-  this.$set(face, 'labelEntityIds', hotItem.entityIds || [])
 },
 
-  // 名称标签的命中矩形（doc 文档坐标）：以标签锚点为中心的对称方形，覆盖图标与文字。
-  // 判定必须走 doc 坐标——缩放时命中范围会跟着一起放大缩小；原先用固定的 24px 屏幕距离，
-  // 放大后图标和文字变大、离锚点越来越远，点在图标上反而落空
-  labelHitRect(anchor) {
-    const x = Number(anchor.x)
-    const y = Number(anchor.y)
+  // 名称标签显示的文字：名称优先，没填退回编码。绘制与命中判定必须用同一个结果
+  labelDisplayText(item, fallback) {
+    return item.name || item.code || fallback
+  },
+
+  // 名称标签的命中区域（doc 文档坐标）= 图标矩形 ∪ 文字矩形，尺寸和位置与绘制用的是同一套常数。
+  // 先在 world 里算出角点再转回 doc，这样视图矩阵怎么翻转、旋转都对得上；判定必须走 doc 坐标——
+  // 缩放时命中范围会跟着一起缩放，原先用固定的 24 屏幕像素，放大后图标和文字会跑到判定圈外
+  labelHitRect(anchor, txt) {
+    const world = MxFun.docCoord2World(Number(anchor.x), Number(anchor.y), 0)
+    const iconWidth = MxFun.docCoordLong2World(FIXED_LABEL_SIZE)
+    const iconHeight = iconWidth / LABEL_ICON_ASPECT
+    const textHeight = iconWidth * LABEL_TEXT_HEIGHT_RATIO
+    const textWidth = Math.max(iconWidth, measureLabelTextWidth(txt, textHeight))
+    const textCenterY = world.y + iconWidth * LABEL_TEXT_OFFSET_RATIO
+    // 图标自锚点向一侧铺满整个高度（MxDbSVG 的 alignmentRatio.y = 1），文字落在另一侧
+    const corners = [
+      [world.x - iconWidth / 2, world.y - iconHeight],
+      [world.x + iconWidth / 2, world.y],
+      [world.x - textWidth / 2, textCenterY - textHeight / 2],
+      [world.x + textWidth / 2, textCenterY + textHeight / 2]
+    ].map(([x, y]) => MxFun.worldCoord2Doc(x, y, 0))
     return {
-      minX: x - LABEL_HIT_HALF_SIZE,
-      maxX: x + LABEL_HIT_HALF_SIZE,
-      minY: y - LABEL_HIT_HALF_SIZE,
-      maxY: y + LABEL_HIT_HALF_SIZE
-    }
-  },
-
-  // 名称标签拾取热区的四个角点（doc 文档坐标），与 labelHitRect 保持同一范围
-  labelHotRectCorners(docPoint) {
-    const rect = this.labelHitRect(docPoint)
-    return [
-      new McGePoint3d(rect.minX, rect.minY, 0),
-      new McGePoint3d(rect.maxX, rect.minY, 0),
-      new McGePoint3d(rect.maxX, rect.maxY, 0),
-      new McGePoint3d(rect.minX, rect.maxY, 0)
-    ]
-  },
-
-  // 跟随名称标签移动拾取热区（复用同一实体，不重建）
-  moveLabelHotRect(item, docPoint) {
-    if (!item || !isPointValid(docPoint)) return
-    const ids = Array.isArray(item.labelEntityIds) ? item.labelEntityIds : []
-    if (!ids.length) return
-    try {
-      const poly = ids[0] && ids[0].getMcDbEntity ? ids[0].getMcDbEntity() : null
-      if (poly && poly.setPointAt) {
-        this.labelHotRectCorners(docPoint).forEach((corner, index) => {
-          poly.setPointAt(index, corner)
-        })
-      }
-    } catch (error) {
-      console.warn('更新标签热区失败:', error)
+      minX: Math.min(...corners.map(corner => corner.x)),
+      maxX: Math.max(...corners.map(corner => corner.x)),
+      minY: Math.min(...corners.map(corner => corner.y)),
+      maxY: Math.max(...corners.map(corner => corner.y))
     }
   },
 
@@ -1390,15 +1352,14 @@ export default {
       exist.setSvgPostion(worldPoint)
       const text = exist.getText && exist.getText(0)
       if (text) {
-        text.txt = section.name || section.code || '断层'
+        text.txt = this.labelDisplayText(section, '断层')
         text.color = hexToColorNumber(section.lineColor, DEFAULT_SECTION_LABEL_TEXT_COLOR)
         text.txtPos = new THREE.Vector3(
           worldPoint.x,
-          worldPoint.y + iconRealSize * 0.34,
+          worldPoint.y + iconRealSize * LABEL_TEXT_OFFSET_RATIO,
           worldPoint.z || 0
         )
       }
-      this.moveLabelHotRect(section, docPoint)
       return
     }
   }
@@ -1411,43 +1372,21 @@ export default {
   svg.setSvgAlignmentRatio(new THREE.Vector2(0.5, 1))
   svg.setRenderOrder(MxType.MxDefaultRenderOrder.kMxEntityRenderOrder + 2)
 
-  const textHeight = iconRealSize * 0.22
   const text = new MxDbSVGText()
-  text.txt = section.name || section.code || '断层'
+  text.txt = this.labelDisplayText(section, '断层')
   text.txtPos = new THREE.Vector3(
     worldPoint.x,
-    worldPoint.y + iconRealSize * 0.34,
+    worldPoint.y + iconRealSize * LABEL_TEXT_OFFSET_RATIO,
     worldPoint.z || 0
   )
-  text.txtHeight = textHeight
+  text.txtHeight = iconRealSize * LABEL_TEXT_HEIGHT_RATIO
   // 文字颜色跟随配置的线段颜色，和图纸上的多边形保持一致
   text.color = hexToColorNumber(section.lineColor, DEFAULT_SECTION_LABEL_TEXT_COLOR)
-  text.fontStyle = 'bold'
+  text.fontStyle = LABEL_FONT_STYLE
   svg.addText(text)
 
   const entityId = mxObj.addMxEntity(svg)
   this.$set(section, 'labelEntityId', entityId)
-
-  // CAD透明拾取热区矩形
-  const hotRect = new McDbPolyline()
-  hotRect.isClosed = true
-  this.labelHotRectCorners(docPoint).forEach(item => hotRect.addVertexAt(item))
-
-  const hotItem = { id: `${section.id}-hot`, kind: 'label-hot', entityIds: [] }
-  const hotId = this.drawCadEntity(
-    hotItem,
-    hotRect,
-    SECTION_LAYER,
-    [0, 0, 0],
-    McDb.LineWeight.kLnWt005
-  )
-  if (hotId) {
-    const obj = hotId.getMcDbObject()
-    if (obj && obj.setxDataString) {
-      obj.setxDataString('MX_LABEL', `section:${section.id}`)
-    }
-  }
-  this.$set(section, 'labelEntityIds', hotItem.entityIds || [])
 },
 
 
@@ -1672,7 +1611,7 @@ export default {
     },
 
 
-    // 断层还没有任何点位时的首次绘制：复用连续取点，F / 右键 / 点回首点附近完成
+    // 断层还没有任何点位时的首次绘制：复用连续取点，F / Enter / 点回首点附近完成
     async pickSectionPolygonFresh() {
       if (!this.mxcad) {
         this.$Message.warning('图纸尚未加载完成')
@@ -1681,7 +1620,7 @@ export default {
       this.exitVertexEdit()
       this.currentCommand = 'AREA_SELECT'
       try {
-        this.$Message.info('请依次选择断层多边形顶点，输入F或者右键完成')
+        this.$Message.info('请依次选择断层多边形顶点，按 F 或 Enter 完成')
         this.startPolygonKeyboardCapture()
         const polygon = await this.pickPolygonArea('section')
         if (!polygon || polygon.length < 3) return null
@@ -1773,7 +1712,7 @@ export default {
           getPoint.setBasePt(new McGePoint3d(lastPoint.x, lastPoint.y, 0))
           getPoint.setUseBasePt(true)
           getPoint.setKeyWords('[完成(F)]')
-          getPoint.setMessage('\n指定下一个点，按 F 或鼠标右键完成（多边形默认闭合）:')
+          getPoint.setMessage('\n指定下一个点，按 F 或 Enter 完成（多边形默认闭合）:')
           getPoint.setUserDraw((currentPoint, worldDraw) => {
             const previewPoints = polygon.concat([{
               x: Number(currentPoint.x),
@@ -1848,7 +1787,7 @@ export default {
       this.polygonFinishRequested = false
       this.polygonCloseRequested = false
       window.addEventListener('keydown', this.handlePolygonKeyDown, true)
-      window.addEventListener('mousedown', this.handlePolygonRightMouseDown, true)
+      window.addEventListener('mousedown', this.handlePolygonRightMouseBlock, true)
       window.addEventListener('contextmenu', this.handlePolygonContextMenu, true)
     },
 
@@ -1857,7 +1796,7 @@ export default {
       this.polygonFinishRequested = false
       this.polygonCloseRequested = false
       window.removeEventListener('keydown', this.handlePolygonKeyDown, true)
-      window.removeEventListener('mousedown', this.handlePolygonRightMouseDown, true)
+      window.removeEventListener('mousedown', this.handlePolygonRightMouseBlock, true)
       window.removeEventListener('contextmenu', this.handlePolygonContextMenu, true)
       this.currentCommand = ''
     },
@@ -1870,9 +1809,7 @@ export default {
       event.stopPropagation()
       event.stopImmediatePropagation()
       const keyCode = key === 'enter' ? 13 : key.toUpperCase().charCodeAt(0)
-      if (key === 'f' || key === 'enter') {
-        this.polygonFinishRequested = true
-      }
+      this.polygonFinishRequested = true
       try {
         const uiData = MxFun.getUIData && MxFun.getUIData()
         if (uiData && uiData.executeOperations) {
@@ -1886,30 +1823,19 @@ export default {
       MxFun.sendStringToExecute(keyCode === 13 ? 'F' : key.toUpperCase())
     },
 
-    handlePolygonRightMouseDown(event) {
+    // 取点过程中右键不参与完成，只把事件吞掉：mxcad 的取点命令默认认右键为「确认」，
+    // 不拦住的话右键照样会结束多边形，就绕过了「只能用 F / Enter 完成」的约定
+    handlePolygonRightMouseBlock(event) {
       if (!this.isPolygonSelecting) return
       if (event.button !== 2) return
       event.preventDefault()
       event.stopPropagation()
       event.stopImmediatePropagation()
-      // 鼠标右键等同于“完成(F)”，多边形默认即为闭合
-      this.polygonFinishRequested = true
-      try {
-        const uiData = MxFun.getUIData && MxFun.getUIData()
-        if (uiData && uiData.executeOperations) {
-          // 结束当前取点命令，由已记录顶点完成多边形。
-          uiData.executeOperations(2)
-          return
-        }
-      } catch (error) {
-        console.warn('处理多边形右键完成失败:', error)
-      }
-      MxFun.sendStringToExecute('F')
     },
 
     handlePolygonContextMenu(event) {
       if (!this.isPolygonSelecting) return
-      // 圈选过程中屏蔽浏览器默认右键菜单，右键仅用于“完成”
+      // 圈选过程中屏蔽浏览器默认右键菜单
       event.preventDefault()
       event.stopPropagation()
       event.stopImmediatePropagation()
@@ -2064,20 +1990,19 @@ export default {
         this.renderSection(item)
         this.enterVertexEdit(item, 'section')
         this.startSectionEditSession()
-        this.$Message.info('拖拽顶点可移动，点击空白处新增顶点，点中顶点后按 Del 或右键删除，按 F 或回车完成')
+        this.$Message.info('拖拽顶点可移动，点击空白处新增顶点，点中顶点后按 Del 删除，按 F 或 Enter 完成')
       })
     },
 
     startSectionEditSession() {
       this.sectionDrawSession = true
-      this._suppressContextMenuOnce = false
-      window.addEventListener('mousedown', this.handleSessionRightMouseDown, true)
+      window.addEventListener('mousedown', this.handleSessionRightMouseBlock, true)
     },
 
     endSectionEditSession(polygon) {
       if (!this.sectionDrawSession) return
       this.sectionDrawSession = false
-      window.removeEventListener('mousedown', this.handleSessionRightMouseDown, true)
+      window.removeEventListener('mousedown', this.handleSessionRightMouseBlock, true)
       this.exitVertexEdit()
       const resolve = this._sectionSessionResolve
       this._sectionSessionResolve = null
@@ -2158,7 +2083,7 @@ export default {
       if (this.mxcad && this.mxcad.updateDisplay) this.mxcad.updateDisplay(true)
     },
 
-    // Del / Backspace：删掉当前选中的顶点（与右键点顶点的删除走同一条路径）
+    // Del / Backspace：删掉当前选中的顶点，这是删点的唯一入口
     deleteActiveVertex() {
       const index = this.activeVertexIndex
       if (index === null || index === undefined) {
@@ -2175,29 +2100,18 @@ export default {
       this.deleteSectionVertex(index)
     },
 
-    // 会话内的右键：命中顶点删除该顶点，未命中则结束会话
-    handleSessionRightMouseDown(event) {
+    // 会话内右键不参与完成，只把事件吞掉：mxcad 和浏览器都不该对它有反应。
+    // 结束绘制只认 F / Enter，丢弃改动只认 ESC
+    handleSessionRightMouseBlock(event) {
       if (!this.sectionDrawSession || event.button !== 2) return
       event.preventDefault()
       event.stopPropagation()
       event.stopImmediatePropagation()
-      const hit = this.findEditableVertex(event)
-      if (hit) {
-        this.deleteSectionVertex(hit.vertexIndex)
-        return
-      }
-      const item = this.resolveVertexEditTarget()
-      // 会话结束时监听已摘掉，紧接着的 contextmenu 拦不住，用一次性标记补上，
-      // 否则右键完成会顺带弹出浏览器右键菜单
-      this._suppressContextMenuOnce = true
-      this.endSectionEditSession(item && item.polygon ? item.polygon : null)
     },
 
-    // 常驻监听：会话期间（含右键结束的那一次）屏蔽画布右键菜单
+    // 常驻监听：会话期间屏蔽画布右键菜单
     handleSessionContextMenu(event) {
-      const suppressOnce = this._suppressContextMenuOnce
-      if (suppressOnce) this._suppressContextMenuOnce = false
-      if (!this.sectionDrawSession && !suppressOnce) return
+      if (!this.sectionDrawSession) return
       event.preventDefault()
       event.stopPropagation()
       event.stopImmediatePropagation()
@@ -2793,9 +2707,9 @@ export default {
       if (!isPointValid(docPoint)) return null
       let best = null
       let bestDist = Infinity
-      const consider = (item, kind, anchor) => {
+      const consider = (item, kind, anchor, txt) => {
         if (!isPointValid(anchor)) return
-        const rect = this.labelHitRect(anchor)
+        const rect = this.labelHitRect(anchor, txt)
         if (docPoint.x < rect.minX || docPoint.x > rect.maxX ||
           docPoint.y < rect.minY || docPoint.y > rect.maxY) return
         const dist = Math.hypot(docPoint.x - anchor.x, docPoint.y - anchor.y)
@@ -2804,10 +2718,10 @@ export default {
         best = { kind, item }
       }
       this.workFaces.forEach(item => {
-        consider(item, 'workface', this.getWorkFaceLabelDocPoint(item))
+        consider(item, 'workface', this.getWorkFaceLabelDocPoint(item), this.labelDisplayText(item, '工作面'))
       })
       this.sections.forEach(item => {
-        consider(item, 'section', this.getSectionLabelDocPoint(item))
+        consider(item, 'section', this.getSectionLabelDocPoint(item), this.labelDisplayText(item, '断层'))
       })
       return best
     },
