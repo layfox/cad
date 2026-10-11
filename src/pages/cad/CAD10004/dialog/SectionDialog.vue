@@ -11,7 +11,7 @@
       <FormItem label="名称" required>
         <Input v-model.trim="form.name" :maxlength="50" placeholder="请输入断面名称" />
       </FormItem>
-      <FormItem v-if="!form.bounds" label="范围坐标" required>
+      <!-- <FormItem v-if="!form.bounds" label="范围坐标" required>
         <div class="coord-row">
           <Input v-model="form.range.x" placeholder="X" />
           <Input v-model="form.range.y" placeholder="Y" />
@@ -22,21 +22,50 @@
         <div class="selection-summary">
           已记录 {{ selectionPointCount }} 个多边形顶点
         </div>
-      </FormItem>
+      </FormItem> -->
       <FormItem label="影响工作面" required>
-        <Select v-model="form.workFaceId" clearable placeholder="请选择">
-          <Option v-for="face in workFaces" :key="face.id" :value="face.id" :label="face.name" />
-        </Select>
-      </FormItem>
-      <FormItem label="提醒距离" required>
-        <InputNumber
-          v-model="form.warningDistance"
-          :min="0"
-          :precision="2"
-          :step="1"
-          style="width: 180px"
-        />
-        <span class="unit-text">米</span>
+        <div
+          v-for="(link, index) in form.workFaceLinks"
+          :key="link._key"
+          class="work-face-row"
+        >
+          <Select
+            v-model="link.workFaceId"
+            class="work-face-select"
+            placeholder="请选择"
+            :disabled="!workFaces.length"
+          >
+            <Option
+              v-for="face in workFaces"
+              :key="face.id"
+              :value="face.id"
+              :label="face.name"
+              :disabled="isWorkFaceTaken(face.id, index)"
+            />
+          </Select>
+          <InputNumber
+            v-model="link.warningDistance"
+            class="work-face-distance"
+            :min="1"
+            :precision="0"
+            :step="1"
+          />
+          <span class="unit-text">米</span>
+          <Button
+            class="work-face-row-btn"
+            @click="addWorkFaceLink"
+          >
+            添加行
+          </Button>
+          <Button
+            v-if="form.workFaceLinks.length > 1"
+            class="work-face-row-btn"
+            @click="removeWorkFaceLink(index)"
+          >
+            删除
+          </Button>
+        </div>
+        <div v-if="!workFaces.length" class="work-face-empty">暂无工作面，请先添加工作面</div>
       </FormItem>
     </Form>
 
@@ -84,6 +113,14 @@ function clonePolygon(polygon) {
   return polygon.map(item => clonePoint(item))
 }
 
+function normalizeWarningDistance(value) {
+  const distance = Math.round(Number(value))
+  return Number.isFinite(distance) && distance >= 1 ? distance : 50
+}
+
+// 行 key 只需在组件内唯一，用模块级自增值即可，避免与表单数据混在一起
+let linkKeySeed = 0
+
 export default {
   name: 'SectionDialog',
   props: {
@@ -129,8 +166,7 @@ export default {
             code: val.code || '',
             name: val.name || '',
             range: clonePoint(val.range || emptyPoint()),
-            workFaceId: val.workFaceId || '',
-            warningDistance: Number(val.warningDistance) || 0,
+            workFaceLinks: this.createWorkFaceLinks(val),
             bounds: cloneBounds(val.bounds),
             polygon: clonePolygon(val.polygon)
           }
@@ -147,11 +183,65 @@ export default {
         code: this.nextCode || '',
         name: '',
         range: emptyPoint(),
-        workFaceId: this.workFaces.length ? this.workFaces[0].id : '',
-        warningDistance: 50,
+        workFaceLinks: [
+          this.createWorkFaceLink(this.workFaces.length ? this.workFaces[0].id : '')
+        ],
         bounds: null,
         polygon: []
       }
+    },
+    createWorkFaceLink(workFaceId = '', warningDistance = 50) {
+      linkKeySeed += 1
+      return {
+        _key: linkKeySeed,
+        workFaceId: workFaceId || '',
+        warningDistance: normalizeWarningDistance(warningDistance)
+      }
+    },
+    createWorkFaceLinks(value) {
+      const source = Array.isArray(value.workFaceLinks) ? value.workFaceLinks : []
+      const links = source
+        .filter(item => item && item.workFaceId)
+        .map(item => this.createWorkFaceLink(item.workFaceId, item.warningDistance))
+      return links.length ? links : [this.createWorkFaceLink()]
+    },
+    addWorkFaceLink() {
+      this.form.workFaceLinks.push(this.createWorkFaceLink())
+    },
+    removeWorkFaceLink(index) {
+      // 首行常驻不可删除，保证至少保留一项
+      if (index <= 0) return
+      this.form.workFaceLinks.splice(index, 1)
+    },
+    isWorkFaceTaken(workFaceId, currentIndex) {
+      return this.form.workFaceLinks.some(
+        (link, index) => index !== currentIndex && link.workFaceId === workFaceId
+      )
+    },
+    validateWorkFaceLinks() {
+      const links = this.form.workFaceLinks
+      if (!links.length) {
+        this.$Message.warning('请至少配置一项影响工作面')
+        return false
+      }
+      const used = new Set()
+      for (const link of links) {
+        if (!link.workFaceId) {
+          this.$Message.warning('请选择完整的影响工作面')
+          return false
+        }
+        if (used.has(link.workFaceId)) {
+          this.$Message.warning('影响工作面不可重复选择')
+          return false
+        }
+        used.add(link.workFaceId)
+        const distance = Number(link.warningDistance)
+        if (!Number.isInteger(distance) || distance < 1) {
+          this.$Message.warning('提醒距离请输入正整数')
+          return false
+        }
+      }
+      return true
     },
     fillCoordinate(field, x, y) {
       if (!this.form[field]) return
@@ -179,10 +269,7 @@ export default {
           return
         }
       }
-      if (!this.form.workFaceId) {
-        this.$Message.warning('请选择影响工作面')
-        return
-      }
+      if (!this.validateWorkFaceLinks()) return
 
       this.$emit('confirm', {
         id: this.form.id || `section-${Date.now()}`,
@@ -194,8 +281,10 @@ export default {
             y: (Number(this.form.bounds.minY) + Number(this.form.bounds.maxY)) / 2
           }
           : clonePoint(this.form.range),
-        workFaceId: this.form.workFaceId,
-        warningDistance: Number(this.form.warningDistance) || 0,
+        workFaceLinks: this.form.workFaceLinks.map(link => ({
+          workFaceId: link.workFaceId,
+          warningDistance: Number(link.warningDistance)
+        })),
         bounds: cloneBounds(this.form.bounds),
         polygon: clonePolygon(this.form.polygon)
       })
@@ -276,5 +365,42 @@ export default {
 .unit-text {
   margin-left: 8px;
   color: #666;
+}
+
+.work-face-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.work-face-row:last-child {
+  margin-bottom: 0;
+}
+
+.work-face-row .unit-text {
+  margin-left: 0;
+}
+
+.work-face-select {
+  min-width: 0;
+  flex: 1;
+}
+
+.work-face-distance {
+  width: 110px;
+  flex: none;
+}
+
+.work-face-row-btn {
+  width: 76px;
+  padding: 0;
+  flex: none;
+}
+
+.work-face-empty {
+  margin-top: 6px;
+  color: #d64b4b;
+  font-size: 12px;
 }
 </style>

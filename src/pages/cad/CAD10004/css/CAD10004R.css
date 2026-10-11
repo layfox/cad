@@ -66,174 +66,168 @@
   height: 100%;
 }
 
+/* 面板外观对齐 CAD10001R 的 viewer-panel：样式尺寸取自 CAD10001R.css 的 #CAD10001R .viewer-panel */
 #CAD10004R .draw-config-panel {
   position: absolute;
-  top: 14px;
-  bottom: 14px;
+  top: 16px;
   left: 0;
   z-index: 100;
-  width: 520px;
-  min-width: 360px;
-  border-radius: 0 10px 10px 0;
-  box-shadow: 4px 0 18px rgba(38, 70, 120, 0.12);
+  width: 600px;
+  height: 94%;
+  padding: 24px 56px 24px 32px;
+  background: url('./images/panel-bg1.png') no-repeat right center;
+  background-size: 100% 100%;
   transform: translateX(0);
-  transition: transform 0.28s ease;
+  transition: all 0.3s;
 }
 
 #CAD10004R .draw-config-panel.panel-collapsed {
-  transform: translateX(calc(-100% + 44px));
+  transform: translateX(-565px);
 }
 
+/* 背景图自带圆角与投影，内层不再画白底 */
 #CAD10004R .draw-config-panel-inner {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 18px 22px 10px;
   overflow: hidden;
-  background: #fff;
-  border-radius: inherit;
 }
 
 #CAD10004R .collapse-btn {
   position: absolute;
-  top: 50%;
-  right: -34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  top: 52%;
+  right: 8px;
   width: 34px;
-  height: 56px;
-  margin-top: -28px;
-  color: #326de2;
-  font-size: 17px;
-  background: #fff;
-  border: 1px solid #e7edf7;
-  border-left: none;
-  border-radius: 0 8px 8px 0;
-  box-shadow: 4px 0 12px rgba(38, 70, 120, 0.1);
+  height: 100px;
+  margin-top: -49px;
+  padding: 0;
+  background: url('./images/collapse-icon.png') no-repeat 6px center;
+  background-size: 14px 12px;
+  border: none;
   cursor: pointer;
 }
 
-#CAD10004R .draw-config-toolbar {
+#CAD10004R .draw-config-panel.panel-collapsed .collapse-btn {
+  right: 14px;
+  transform: rotate(180deg);
+}
+
+#CAD10004R .draw-config-tabbar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  margin-bottom: 24px;
   flex: none;
 }
 
-#CAD10004R .draw-config-toolbar .ivu-btn {
-  height: 34px;
-  padding: 0 13px;
+#CAD10004R .draw-config-add.ivu-btn {
+  height: 32px;
+  padding: 0 14px;
+  font-size: 13px;
   border-radius: 4px;
+  flex: none;
 }
 
+/* 标签栏尺寸与配色取自 ViewerPanel 的 .vp-header / .vp-tab-item */
 #CAD10004R .draw-config-tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  height: 40px;
-  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 2px;
   overflow: hidden;
-  flex: none;
-  background: #edf1f7;
+  flex: 1;
+  background: #edf0f6;
   border-radius: 4px;
 }
 
 #CAD10004R .draw-config-tab {
-  color: #5d6a80;
+  height: 28px;
+  color: #666;
   font-size: 14px;
+  line-height: 28px;
+  text-align: center;
   background: transparent;
   border: none;
+  border-radius: 4px;
   outline: none;
   cursor: pointer;
+  flex: 1;
+}
+
+#CAD10004R .draw-config-tab:hover {
+  color: #1764e8;
+  background: rgba(23, 100, 232, 0.08);
 }
 
 #CAD10004R .draw-config-tab span {
   color: inherit;
+  font-size: 12px;
+  opacity: 0.8;
 }
 
 #CAD10004R .draw-config-tab.active {
-  color: #fff;
-  font-weight: 500;
-  background: #2f79ed;
+  color: #1764e8;
+  background: #fff;
 }
 
 #CAD10004R .draw-config-list {
+  display: flex;
+  flex-direction: column;
   min-height: 0;
-  margin-top: 18px;
   overflow: auto;
   flex: 1;
 }
 
-#CAD10004R .draw-config-list-head,
-#CAD10004R .draw-config-row {
-  display: grid;
-  grid-template-columns: 26px 30px 44px minmax(120px, 1fr) 82px;
+#CAD10004R .draw-config-table {
+  flex: none;
+}
+
+#CAD10004R .row-actions {
+  display: flex;
   align-items: center;
-  min-width: 390px;
+  justify-content: center;
+  gap: 2px;
 }
 
-#CAD10004R .draw-config-list-head {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  height: 42px;
-  color: #5d6a80;
-  font-size: 13px;
-  background: #eef2f8;
-}
-
-#CAD10004R .draw-config-list-head > :first-child {
-  padding-left: 12px;
-}
-
-#CAD10004R .draw-config-row {
-  position: relative;
-  height: 48px;
-  color: #24324d;
-  font-size: 14px;
-  border-bottom: 1px solid #eef2f8;
-  transition: background 0.18s ease;
-}
-
-#CAD10004R .draw-config-row:nth-child(odd) {
-  background: #f5f8fd;
-}
-
-#CAD10004R .draw-config-row:hover,
-#CAD10004R .draw-config-row.selected {
-  background: #e8f2ff;
-}
-
-#CAD10004R .draw-config-row > :first-child {
-  padding-left: 12px;
-}
-
-#CAD10004R .row-zoom {
+#CAD10004R .row-action {
   width: 24px;
   height: 24px;
-  color: #346bdd;
+  color: #1764e8;
   font-size: 15px;
   background: transparent;
   border: none;
   cursor: pointer;
 }
 
-#CAD10004R .row-name {
-  min-width: 0;
-  overflow: hidden;
-  color: #2f73df;
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+#CAD10004R .row-action.active {
+  color: #1764e8;
+}
+
+#CAD10004R .row-action-text {
+  padding: 0 4px;
+  color: #1764e8;
+  font-size: 13px;
   background: transparent;
   border: none;
   cursor: pointer;
 }
 
-#CAD10004R .col-seq,
-#CAD10004R .col-code {
-  color: #55637b;
-  text-align: center;
+#CAD10004R .row-action-text:hover {
+  text-decoration: underline;
+}
+
+#CAD10004R .row-action-text.danger {
+  color: #ed4014;
+}
+
+#CAD10004R .draw-config-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: auto;
+  padding: 16px 0 0;
+  font-size: 14px;
+  flex: none;
 }
 
 #CAD10004R .viewer-content .loading-overlay {
@@ -276,25 +270,20 @@
 
 @media (max-width: 760px) {
   #CAD10004R .draw-config-panel {
-    width: calc(100vw - 22px);
-    min-width: 0;
+    width: calc(100vw - 16px);
+    padding: 20px 40px 20px 20px;
   }
 
-  #CAD10004R .draw-config-toolbar {
+  #CAD10004R .draw-config-panel.panel-collapsed {
+    transform: translateX(calc(-100vw + 66px));
+  }
+
+  #CAD10004R .draw-config-tabbar {
     flex-wrap: wrap;
   }
 
-  #CAD10004R .draw-config-panel-inner {
-    padding: 14px 14px 8px;
-  }
-
-  #CAD10004R .draw-config-toolbar .ivu-btn {
+  #CAD10004R .draw-config-add.ivu-btn {
     padding: 0 8px;
     font-size: 12px;
-  }
-
-  #CAD10004R .draw-config-list-head,
-  #CAD10004R .draw-config-row {
-    min-width: 350px;
   }
 }

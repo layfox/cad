@@ -12,122 +12,80 @@
           :class="{ 'panel-collapsed': panelCollapsed }"
         >
           <div class="draw-config-panel-inner">
-            <div class="draw-config-toolbar">
-              <Button type="primary" plain @click="openWorkFaceDialog">
-                <Icon type="md-add" />
-                添加工作面
-              </Button>
-              <Button type="primary" plain @click="openSectionDialog">
-                <Icon type="md-add" />
-                添加断面
-              </Button>
-              <Button plain @click="deleteSelectedConfigurations">
-                <Icon type="ios-trash-outline" />
-                删除图层
-              </Button>
-            </div>
-
-            <div class="draw-config-tabs">
-              <button
-                type="button"
-                class="draw-config-tab"
-                :class="{ active: activeConfigTab === 'workface' }"
-                @click="activeConfigTab = 'workface'"
+            <div class="draw-config-tabbar">
+              <div class="draw-config-tabs">
+                <button
+                  type="button"
+                  class="draw-config-tab"
+                  :class="{ active: activeConfigTab === 'workface' }"
+                  @click="activeConfigTab = 'workface'"
+                >
+                  工作面
+                  <span>({{ workFaces.length }})</span>
+                </button>
+                <button
+                  type="button"
+                  class="draw-config-tab"
+                  :class="{ active: activeConfigTab === 'section' }"
+                  @click="activeConfigTab = 'section'"
+                >
+                  断面
+                  <span>({{ sections.length }})</span>
+                </button>
+              </div>
+              <Button
+                class="draw-config-add"
+                type="primary"
+                plain
+                @click="openActiveConfigDialog"
               >
-                工作面
-                <span>({{ workFaces.length }})</span>
-              </button>
-              <button
-                type="button"
-                class="draw-config-tab"
-                :class="{ active: activeConfigTab === 'section' }"
-                @click="activeConfigTab = 'section'"
-              >
-                断面
-                <span>({{ sections.length }})</span>
-              </button>
+                <Icon type="md-add" />
+                新增
+              </Button>
             </div>
 
             <div class="draw-config-list">
               <template v-if="activeConfigTab === 'workface'">
-                <div class="draw-config-list-head">
-                  <Checkbox
-                    :value="workFaceAllSelected"
-                    :indeterminate="workFaceIndeterminate"
-                    @on-change="toggleAllWorkFaces"
+                <Table
+                  class="draw-config-table"
+                  :columns="workFaceColumns"
+                  :data="pagedWorkFaces"
+                  :row-class-name="configRowClassName"
+                  size="small"
+                  :border="false"
+                  no-data-text="暂无工作面"
+                  @on-row-dblclick="onConfigRowDblClick"
+                />
+                <div class="draw-config-pager">
+                  <Page
+                    show-total
+                    :current="workFacePage"
+                    :page-size="configPageSize"
+                    :total="workFaces.length"
+                    @on-change="onWorkFacePageChange"
                   />
-                  <span class="col-seq">序号</span>
-                  <span class="col-name">工作面名称</span>
-                  <span class="col-code">工作面编码</span>
-                </div>
-                <div
-                  v-for="(item, index) in workFaces"
-                  :key="item.id"
-                  class="draw-config-row"
-                  :class="{ selected: isWorkFaceSelected(item.id) }"
-                >
-                  <Checkbox
-                    :value="isWorkFaceSelected(item.id)"
-                    @on-change="toggleWorkFace(item.id)"
-                  />
-                  <button
-                    type="button"
-                    class="row-zoom"
-                    title="定位到工作面"
-                    @click="zoomToConfiguration(item, 'workface')"
-                  >
-                    <Icon type="ios-search" />
-                  </button>
-                  <span class="col-seq">{{ index + 1 }}</span>
-                  <button
-                    type="button"
-                    class="col-name row-name"
-                    @click="openWorkFaceConfig(item)"
-                  >
-                    {{ item.name }}
-                  </button>
-                  <span class="col-code">{{ item.code }}</span>
                 </div>
               </template>
 
               <template v-else>
-                <div class="draw-config-list-head">
-                  <Checkbox
-                    :value="sectionAllSelected"
-                    :indeterminate="sectionIndeterminate"
-                    @on-change="toggleAllSections"
+                <Table
+                  class="draw-config-table"
+                  :columns="sectionColumns"
+                  :data="pagedSections"
+                  :row-class-name="configRowClassName"
+                  size="small"
+                  :border="false"
+                  no-data-text="暂无断面"
+                  @on-row-dblclick="onConfigRowDblClick"
+                />
+                <div class="draw-config-pager">
+                  <Page
+                    show-total
+                    :current="sectionPage"
+                    :page-size="configPageSize"
+                    :total="sections.length"
+                    @on-change="onSectionPageChange"
                   />
-                  <span class="col-seq">序号</span>
-                  <span class="col-name">断面名称</span>
-                  <span class="col-code">断面编码</span>
-                </div>
-                <div
-                  v-for="(item, index) in sections"
-                  :key="item.id"
-                  class="draw-config-row"
-                  :class="{ selected: isSectionSelected(item.id) }"
-                >
-                  <Checkbox
-                    :value="isSectionSelected(item.id)"
-                    @on-change="toggleSection(item.id)"
-                  />
-                  <button
-                    type="button"
-                    class="row-zoom"
-                    title="定位到断面"
-                    @click="zoomToConfiguration(item, 'section')"
-                  >
-                    <Icon type="ios-search" />
-                  </button>
-                  <span class="col-seq">{{ index + 1 }}</span>
-                  <button
-                    type="button"
-                    class="col-name row-name"
-                    @click="openSectionConfig(item)"
-                  >
-                    {{ item.name }}
-                  </button>
-                  <span class="col-code">{{ item.code }}</span>
                 </div>
               </template>
             </div>
@@ -138,9 +96,7 @@
             class="collapse-btn"
             :title="panelCollapsed ? '展开配置面板' : '收起配置面板'"
             @click="panelCollapsed = !panelCollapsed"
-          >
-            <Icon :type="panelCollapsed ? 'md-arrow-forward' : 'md-arrow-back'" />
-          </button>
+          ></button>
         </aside>
 
         <div class="viewer-content">
@@ -170,8 +126,10 @@
         :visible="workFaceDialogVisible"
         :value="editingWorkFace"
         :next-code="nextWorkFaceCode"
+        :can-delete="workFaceExists"
         @pick-coordinate="onPickCoordinate"
         @confirm="onSaveWorkFace"
+        @delete="removeEditingWorkFace"
         @cancel="closeWorkFaceDialog"
       />
     </Modal>
@@ -218,6 +176,41 @@ export default {
 </style>
 
 <style>
+/* 表格内部节点由 iview 渲染，scoped 样式覆盖不到，只能放在全局样式里用 #CAD10004R 限定。
+   行高、表头底色、斑马纹取自 CAD10001R ViewerPanel 的 .vp-body 规则 */
+#CAD10004R .draw-config-table .ivu-table-header thead tr th {
+  height: 42px;
+  padding: 0 8px;
+  color: #515a6e;
+  font-size: 13px;
+  background: #fff;
+}
+
+#CAD10004R .draw-config-table .ivu-table {
+    background: transparent;
+}
+
+#CAD10004R .draw-config-table .ivu-table-body tr td {
+  height: 42px;
+  padding: 0 8px;
+}
+
+#CAD10004R .draw-config-table .ivu-table-body tr:nth-child(2n + 1) td {
+    background: #EDF1F9;
+}
+
+#CAD10004R .draw-config-table .ivu-table-body tr:nth-child(2n + 2) td {
+  background: #fff;
+}
+
+#CAD10004R .draw-config-table .ivu-table-cell {
+  padding: 0;
+}
+
+#CAD10004R .draw-config-table .ivu-table-body .ivu-table-row.config-row-active td {
+  background: #e8f2ff;
+}
+
 .cad10004-config-modal {
   display: flex;
   align-items: center;

@@ -24,11 +24,26 @@ const WORK_FACE_FILL_COLOR = [218, 241, 250]
 const SECTION_COLOR = [231, 69, 69]
 const SECTION_FILL_COLOR = [255, 231, 226]
 
+// 工作面线宽/线色默认值。线色直接由 WORK_FACE_COLOR 推导，避免两处维护同一个色值
+const DEFAULT_WORK_FACE_LINE_COLOR = rgbToHex(WORK_FACE_COLOR)
+
+// 工作面的四个端点（机头/机尾各两点），按此顺序推导多边形并绘制端点圆
+const WORK_FACE_ENDPOINTS = ['headStart', 'headEnd', 'tailStart', 'tailEnd']
+
+// 端点名称：弹窗选点时和正式绘制时都画在端点圆旁边，标明该点对应机头/机尾的哪一端
+const WORK_FACE_ENDPOINT_LABELS = {
+  headStart: '机头开始',
+  headEnd: '机头结束',
+  tailStart: '机尾开始',
+  tailEnd: '机尾结束'
+}
+
 // —— 固定绘制参数：工作面/断面的线宽与文字大小固定，不随绘制区域大小变化 ——
 const FIXED_LINE_WIDTH = 2        // 工作面边界线 / 断面剖切线的线宽
 const FIXED_LIGHT_LINE_WIDTH = 1  // 辅助区域（选中框、预警区等）线宽
 const FIXED_TEXT_HEIGHT = 12      // 名称文字高度
 const FIXED_MARKER_RADIUS = 4     // 端点 / 中心标记圆半径
+const ENDPOINT_LABEL_OFFSET = FIXED_MARKER_RADIUS + 6  // 端点名称文字相对圆心的 X/Y 偏移（doc 单位）
 const FIXED_ARROW_SIZE = 40       // 方向箭头长度
 const FIXED_LABEL_SIZE = 60       // 工作面名称标签（SVG）固定尺寸
 const LABEL_HIT_RADIUS = FIXED_LABEL_SIZE * 1.5  // 点击工作面标签/文字时的命中半径（doc 单位，可调）
@@ -115,6 +130,40 @@ function isWorkFaceGeometryValid(face) {
     isPointValid(face.tailEnd)
 }
 
+function isSamePoint(a, b) {
+  return isPointValid(a) && isPointValid(b) &&
+    Number(a.x) === Number(b.x) && Number(a.y) === Number(b.y)
+}
+
+function rgbToHex(rgb) {
+  const hex = rgb.map(value => {
+    const part = Math.max(0, Math.min(255, Math.round(Number(value) || 0))).toString(16)
+    return part.length === 1 ? `0${part}` : part
+  }).join('')
+  return `#${hex}`.toUpperCase()
+}
+
+function hexToRgb(hex) {
+  const value = String(hex || '').replace('#', '')
+  if (!/^[0-9a-fA-F]{6}$/.test(value)) return null
+  return [
+    parseInt(value.slice(0, 2), 16),
+    parseInt(value.slice(2, 4), 16),
+    parseInt(value.slice(4, 6), 16)
+  ]
+}
+
+// 机头线段与机尾线段是工作面的两条对边，四个端点按「机头起→机头止→机尾止→机尾起」
+// 回绕即成闭合四边形：headStart↔tailStart、headEnd↔tailEnd 分别为两条长边
+function buildWorkFacePolygon(headStart, headEnd, tailStart, tailEnd) {
+  return [
+    point(headStart.x, headStart.y),
+    point(headEnd.x, headEnd.y),
+    point(tailEnd.x, tailEnd.y),
+    point(tailStart.x, tailStart.y)
+  ]
+}
+
 export default {
   data() {
     return {
@@ -132,8 +181,31 @@ export default {
       activeConfigTab: 'workface',
       workFaces: [],
       sections: [],
-      selectedWorkFaceIds: [],
-      selectedSectionIds: [],
+      configPageSize: 10,
+      workFacePage: 1,
+      sectionPage: 1,
+      workFaceColumns: [
+        { title: '序号', key: 'seq', width: 64, align: 'center' },
+        { title: '工作面名称', key: 'name', minWidth: 120, tooltip: true },
+        { title: '工作面编码', key: 'code', width: 106 },
+        {
+          title: '操作',
+          width: 152,
+          align: 'center',
+          render: (h, { row }) => this.renderConfigRowActions(h, 'workface', row)
+        }
+      ],
+      sectionColumns: [
+        { title: '序号', key: 'seq', width: 64, align: 'center' },
+        { title: '断面名称', key: 'name', minWidth: 120, tooltip: true },
+        { title: '断面编码', key: 'code', width: 106 },
+        {
+          title: '操作',
+          width: 152,
+          align: 'center',
+          render: (h, { row }) => this.renderConfigRowActions(h, 'section', row)
+        }
+      ],
       workFaceDialogVisible: false,
       sectionDialogVisible: false,
       editingWorkFace: null,
@@ -145,30 +217,23 @@ export default {
       polygonFinishRequested: false,
       polygonCloseRequested: false,
       polygonSelectionPreviewIds: [],
+      workFacePreviewIds: [],
       isCoordinatePicking: false,
       isPanningByCtrl: false,
       pointerGesture: null,
       isReplayingCanvasEvent: false,
       activeVertexDrag: null,
+      activeVertexEditId: null,
+      activeVertexEditKind: '',
       fileLoadTimer: null
     }
   },
   computed: {
-    workFaceAllSelected() {
-      return this.workFaces.length > 0 &&
-        this.selectedWorkFaceIds.length === this.workFaces.length
+    pagedWorkFaces() {
+      return this.paginateConfigs(this.workFaces, this.workFacePage)
     },
-    workFaceIndeterminate() {
-      return this.selectedWorkFaceIds.length > 0 &&
-        this.selectedWorkFaceIds.length < this.workFaces.length
-    },
-    sectionAllSelected() {
-      return this.sections.length > 0 &&
-        this.selectedSectionIds.length === this.sections.length
-    },
-    sectionIndeterminate() {
-      return this.selectedSectionIds.length > 0 &&
-        this.selectedSectionIds.length < this.sections.length
+    pagedSections() {
+      return this.paginateConfigs(this.sections, this.sectionPage)
     },
     nextWorkFaceCode() {
       const codes = this.workFaces
@@ -183,6 +248,11 @@ export default {
         .filter(Number.isFinite)
       const max = codes.length ? Math.max.apply(null, codes) : 12031
       return String(max + 1)
+    },
+    // 弹窗里打开的这条工作面是否已在列表中：已存在的才给「删除」，也才跳过端点预览
+    workFaceExists() {
+      const item = this.editingWorkFace
+      return !!item && this.workFaces.some(face => face.id === item.id)
     }
   },
   mounted() {
@@ -208,8 +278,12 @@ export default {
         "x": 23372734.155462973,
         "y": -30388427.809688352
     },
-    "workFaceId": "workface-1790666321742",
-    "warningDistance": 50,
+    "workFaceLinks": [
+        {
+            "workFaceId": "workface-1791450247304",
+            "warningDistance": 50
+        }
+    ],
     "bounds": {
         "minX": 23372644.474770945,
         "maxX": 23372823.836154997,
@@ -243,6 +317,7 @@ export default {
     }
   },
   beforeDestroy() {
+    this.exitVertexEdit()
     this.removePolygonReference()
     this.destroyCtrlPan()
     if (this.fileLoadTimer) {
@@ -493,8 +568,7 @@ export default {
           code: face.code,
           name: face.name,
           range: interpolate(face.headStart, face.tailStart, t),
-          workFaceId: face.id,
-          warningDistance: 50,
+          workFaceLinks: [{ workFaceId: face.id, warningDistance: 50 }],
           entityIds: []
         }
       })
@@ -591,6 +665,27 @@ export default {
   this.$set(item, 'entityIds', [])
 },
 
+    // 仅清理几何实体（填充/边界等），保留 SVG 名称标签与拾取热区。
+    // 重绘时用它替代 eraseConfigurationEntities，可避免反复销毁重建 MxDbSVG 实体
+    // （重建会让实体内部的 material 模型重新异步加载，导致图标在编辑后消失）。
+    eraseGeometryEntities(item) {
+      if (!item) return
+      if (!Array.isArray(item.entityIds)) {
+        this.$set(item, 'entityIds', [])
+        return
+      }
+      item.entityIds.forEach(objectId => {
+        try {
+          if (objectId && objectId.isValid && objectId.isValid()) {
+            objectId.erase()
+          }
+        } catch (error) {
+          console.warn('删除 CAD 实体失败:', error)
+        }
+      })
+      this.$set(item, 'entityIds', [])
+    },
+
     drawTextEntity(item, position, text, height, layerName, rgb) {
       if (!text) return
       const entity = new McDbText()
@@ -606,6 +701,23 @@ export default {
         layerName,
         rgb,
         McDb.LineWeight.kLnWt020
+      )
+    },
+
+    // 端点名称文字：画在端点圆的右上方，不压住圆点本身
+    drawEndpointLabel(item, markerPoint, endpointKey, rgb) {
+      const label = WORK_FACE_ENDPOINT_LABELS[endpointKey]
+      if (!label || !isPointValid(markerPoint)) return null
+      return this.drawTextEntity(
+        item,
+        point(
+          Number(markerPoint.x) + ENDPOINT_LABEL_OFFSET,
+          Number(markerPoint.y) + ENDPOINT_LABEL_OFFSET
+        ),
+        label,
+        FIXED_TEXT_HEIGHT,
+        WORK_FACE_LAYER,
+        rgb
       )
     },
 
@@ -656,9 +768,10 @@ export default {
     },
 
     // —— 独立功能：在工作面上按日期绘制区域块（起点为工作面 polygon 前两个点，沿机头→机尾向量每天前进10m） ——
-    renderWorkFaceDailyImages() {
+    renderWorkFaceDailyImages(onlyFace = null) {
       if (!this.mxcad) return
-      this.workFaces.forEach(face => {
+      const faces = onlyFace ? [onlyFace] : this.workFaces
+      faces.forEach(face => {
         this.eraseDailyImages(face)
         const pts = Array.isArray(face && face.polygon) && face.polygon.length >= 4
           ? face.polygon
@@ -743,11 +856,25 @@ export default {
       this.$set(face, 'dailyEntityIds', [])
     },
 
+    // 端点圆用「两个端点 + 两段半圆弧」的闭合多段线表示：McDbCircle 没有 constantWidth，
+    // 只有多段线才能用和工作面边界完全相同的方式表达线宽
+    createVertexMarker(markerPoint, radius, lineWidth) {
+      const polyline = new McDbPolyline()
+      polyline.isClosed = true
+      polyline.constantWidth = lineWidth
+      polyline.addVertexAt(new McGePoint3d(markerPoint.x - radius, markerPoint.y, 0))
+      polyline.addVertexAt(new McGePoint3d(markerPoint.x + radius, markerPoint.y, 0))
+      polyline.setBulgeAt(0, 1)
+      polyline.setBulgeAt(1, 1)
+      return polyline
+    },
+
     renderWorkFace(face) {
       if (!this.mxcad || !isWorkFaceGeometryValid(face)) return
-      this.eraseConfigurationEntities(face)
+      // 只清几何，保留 SVG 名称标签实体（重建会导致图标重载消失）
+      this.eraseGeometryEntities(face)
       face.kind = 'workface'
-      this.createWorkFaceLabelAnchor(face, face.range)
+      this.createWorkFaceLabelAnchor(face, this.getWorkFaceLabelDocPoint(face))
 
       const vertices = Array.isArray(face.polygon) && face.polygon.length >= 3
         ? face.polygon.map(item => point(item.x, item.y))
@@ -771,25 +898,45 @@ export default {
       const hatch = new McDbHatch()
       hatch.appendLoop(new McGePoint3dArray(cadVertices))
       hatch.clearPatternDefinition()
-      this.drawCadEntity(
+      const hatchId = this.drawCadEntity(
         face,
         hatch,
         WORK_FACE_LAYER,
         WORK_FACE_FILL_COLOR,
         McDb.LineWeight.kLnWt000
       )
+      // 保存填充实体引用，供顶点编辑态下同步填充轮廓使用
+      this.$set(face, 'draftHatchId', hatchId)
+
+      const lineWidth = Number(face.lineWidth) > 0 ? Number(face.lineWidth) : FIXED_LINE_WIDTH
+      const lineColor = hexToRgb(face.lineColor) || WORK_FACE_COLOR
 
       const boundary = new McDbPolyline()
       boundary.isClosed = true
-      boundary.constantWidth = FIXED_LINE_WIDTH
+      boundary.constantWidth = lineWidth
       cadVertices.forEach(vertex => boundary.addVertexAt(vertex))
-      this.drawCadEntity(
+      const boundaryId = this.drawCadEntity(
         face,
         boundary,
         WORK_FACE_LAYER,
-        WORK_FACE_COLOR,
+        lineColor,
         McDb.LineWeight.kLnWt070
       )
+      // 保存边界实体引用，供顶点编辑态下增量更新边界使用
+      this.$set(face, 'draftBoundaryId', boundaryId)
+
+      // 机头/机尾四个端点用小圆圈标出，线色与线宽跟随该工作面的配置
+      WORK_FACE_ENDPOINTS.forEach(key => {
+        this.drawCadEntity(
+          face,
+          this.createVertexMarker(face[key], FIXED_MARKER_RADIUS, lineWidth),
+          WORK_FACE_LAYER,
+          lineColor,
+          McDb.LineWeight.kLnWt070
+        )
+        // 端点旁标出「机头开始」这类名称，避免只看到圆点却不知道是哪一个点
+        this.drawEndpointLabel(face, face[key], key, lineColor)
+      })
 
     //   const headMidpoint = midpoint(face.headStart, face.headEnd)
     //   const tailMidpoint = midpoint(face.tailStart, face.tailEnd)
@@ -1063,6 +1210,27 @@ export default {
   if (!worldPoint || !mxObj || !mxObj.addMxEntity) return
 
   const iconRealSize = MxFun.docCoordLong2World(FIXED_LABEL_SIZE)
+
+  // 已有标签实体则只移动位置 / 刷新文字，不销毁重建：
+  // MxDbSVG 内部缓存模型 material，反复 add/erase 会让图标异步重载而消失
+  if (face.labelEntityId && mxObj.getMxEntity) {
+    const exist = mxObj.getMxEntity(face.labelEntityId)
+    if (exist && exist.setSvgPostion) {
+      exist.setSvgPostion(worldPoint)
+      const text = exist.getText && exist.getText(0)
+      if (text) {
+        text.txt = face.name || face.code || '工作面'
+        text.txtPos = new THREE.Vector3(
+          worldPoint.x,
+          worldPoint.y + iconRealSize * 0.34,
+          worldPoint.z || 0
+        )
+      }
+      this.moveLabelHotRect(face, docPoint)
+      return
+    }
+  }
+
   // svg显示包围盒（仅视觉渲染，不再作为拾取主体）
   const svg = new MxDbSVG()
   svg.setSvgPath('models/svg/target.svg')
@@ -1090,15 +1258,9 @@ export default {
   this.$set(face, 'labelEntityId', entityId)
 
   // =========【方案B核心】生成CAD透明拾取热区矩形（doc世界坐标，跟随缩放平移）=========
-  // 热区包围盒大小：适配图标+文字，doc文档坐标
-  const hotW = FIXED_LABEL_SIZE * 2.8
-  const hotH = FIXED_LABEL_SIZE * 1.6
   const hotRect = new McDbPolyline()
   hotRect.isClosed = true
-  hotRect.addVertexAt(new McGePoint3d(docPoint.x - hotW / 2, docPoint.y, 0))
-  hotRect.addVertexAt(new McGePoint3d(docPoint.x + hotW / 2, docPoint.y, 0))
-  hotRect.addVertexAt(new McGePoint3d(docPoint.x + hotW / 2, docPoint.y + hotH, 0))
-  hotRect.addVertexAt(new McGePoint3d(docPoint.x - hotW / 2, docPoint.y + hotH, 0))
+  this.labelHotRectCorners(docPoint).forEach(item => hotRect.addVertexAt(item))
 
   const hotItem = { id: `${face.id}-hot`, kind: 'label-hot', entityIds: [] }
   const hotId = this.drawCadEntity(
@@ -1118,6 +1280,35 @@ export default {
   // 保存热区实体id，后续统一擦除
   this.$set(face, 'labelEntityIds', hotItem.entityIds || [])
 },
+
+  // 名称标签拾取热区的四个角点（doc 文档坐标），大小适配图标+文字
+  labelHotRectCorners(docPoint) {
+    const hotW = FIXED_LABEL_SIZE * 2.8
+    const hotH = FIXED_LABEL_SIZE * 1.6
+    return [
+      new McGePoint3d(docPoint.x - hotW / 2, docPoint.y, 0),
+      new McGePoint3d(docPoint.x + hotW / 2, docPoint.y, 0),
+      new McGePoint3d(docPoint.x + hotW / 2, docPoint.y + hotH, 0),
+      new McGePoint3d(docPoint.x - hotW / 2, docPoint.y + hotH, 0)
+    ]
+  },
+
+  // 跟随名称标签移动拾取热区（复用同一实体，不重建）
+  moveLabelHotRect(item, docPoint) {
+    if (!item || !isPointValid(docPoint)) return
+    const ids = Array.isArray(item.labelEntityIds) ? item.labelEntityIds : []
+    if (!ids.length) return
+    try {
+      const poly = ids[0] && ids[0].getMcDbEntity ? ids[0].getMcDbEntity() : null
+      if (poly && poly.setPointAt) {
+        this.labelHotRectCorners(docPoint).forEach((corner, index) => {
+          poly.setPointAt(index, corner)
+        })
+      }
+    } catch (error) {
+      console.warn('更新标签热区失败:', error)
+    }
+  },
 
 
     getSectionLabelDocPoint(section) {
@@ -1147,6 +1338,26 @@ export default {
   if (!worldPoint || !mxObj || !mxObj.addMxEntity) return
 
   const iconRealSize = MxFun.docCoordLong2World(FIXED_LABEL_SIZE)
+
+  // 已有标签实体则只移动位置 / 刷新文字，不销毁重建（原因同工作面标签）
+  if (section.labelEntityId && mxObj.getMxEntity) {
+    const exist = mxObj.getMxEntity(section.labelEntityId)
+    if (exist && exist.setSvgPostion) {
+      exist.setSvgPostion(worldPoint)
+      const text = exist.getText && exist.getText(0)
+      if (text) {
+        text.txt = section.name || section.code || '断面'
+        text.txtPos = new THREE.Vector3(
+          worldPoint.x,
+          worldPoint.y + iconRealSize * 0.34,
+          worldPoint.z || 0
+        )
+      }
+      this.moveLabelHotRect(section, docPoint)
+      return
+    }
+  }
+
   const svg = new MxDbSVG()
   svg.setSvgPath('models/svg/target.svg')
   svg.useSvgColor = true
@@ -1173,14 +1384,9 @@ export default {
   this.$set(section, 'labelEntityId', entityId)
 
   // CAD透明拾取热区矩形
-  const hotW = FIXED_LABEL_SIZE * 2.8
-  const hotH = FIXED_LABEL_SIZE * 1.6
   const hotRect = new McDbPolyline()
   hotRect.isClosed = true
-  hotRect.addVertexAt(new McGePoint3d(docPoint.x - hotW / 2, docPoint.y, 0))
-  hotRect.addVertexAt(new McGePoint3d(docPoint.x + hotW / 2, docPoint.y, 0))
-  hotRect.addVertexAt(new McGePoint3d(docPoint.x + hotW / 2, docPoint.y + hotH, 0))
-  hotRect.addVertexAt(new McGePoint3d(docPoint.x - hotW / 2, docPoint.y + hotH, 0))
+  this.labelHotRectCorners(docPoint).forEach(item => hotRect.addVertexAt(item))
 
   const hotItem = { id: `${section.id}-hot`, kind: 'label-hot', entityIds: [] }
   const hotId = this.drawCadEntity(
@@ -1202,19 +1408,20 @@ export default {
 
     refreshWorkFaceLabelEntity(face) {
       if (!face) return
-      const docPoint = this.getWorkFaceLabelDocPoint(face)
-      if (face.labelEntityId) {
-        const mxObj = MxFun.getCurrentDraw()
-        if (mxObj && mxObj.eraseMxEntity) {
-          mxObj.eraseMxEntity(face.labelEntityId)
-        }
-        this.$set(face, 'labelEntityId', null)
-      }
-      this.createWorkFaceLabelAnchor(face, docPoint)
+      // 只移动/刷新已有标签，不销毁重建
+      this.createWorkFaceLabelAnchor(face, this.getWorkFaceLabelDocPoint(face))
+    },
+
+    refreshSectionLabelEntity(section) {
+      if (!section) return
+      this.createSectionLabelAnchor(section, this.getSectionLabelDocPoint(section))
     },
 
     getSectionLine(section) {
-      const face = this.workFaces.find(item => item.id === section.workFaceId)
+      const firstLink = Array.isArray(section.workFaceLinks) ? section.workFaceLinks[0] : null
+      const face = firstLink
+        ? this.workFaces.find(item => item.id === firstLink.workFaceId)
+        : null
       if (section.bounds) {
         const width = Number(section.bounds.maxX) - Number(section.bounds.minX)
         const height = Number(section.bounds.maxY) - Number(section.bounds.minY)
@@ -1263,7 +1470,8 @@ export default {
 
     renderSection(section) {
       if (!this.mxcad || !isPointValid(section.range)) return
-      this.eraseConfigurationEntities(section)
+      // 只清几何，保留 SVG 名称标签实体（重建会导致图标重载消失）
+      this.eraseGeometryEntities(section)
       section.kind = 'section'
       this.createSectionLabelAnchor(section, this.getSectionLabelDocPoint(section))
 
@@ -1287,13 +1495,15 @@ export default {
         selectionPoints.forEach(item => {
           selectionArea.addVertexAt(new McGePoint3d(item.x, item.y, 0))
         })
-        this.drawCadEntity(
+        const boundaryId = this.drawCadEntity(
           section,
           selectionArea,
           SECTION_LAYER,
           SECTION_COLOR,
           McDb.LineWeight.kLnWt050
         )
+        // 保存边界实体引用，供顶点编辑态下增量更新使用
+        this.$set(section, 'draftBoundaryId', boundaryId)
       }
 
     //   const sectionLine = new McDbLine(
@@ -1386,7 +1596,8 @@ export default {
           geometry.face.headStart,
           geometry.face.headEnd
         )
-        const warningDistance = Number(section.warningDistance) || 0
+        const firstLink = Array.isArray(section.workFaceLinks) ? section.workFaceLinks[0] : null
+        const warningDistance = firstLink ? Number(firstLink.warningDistance) || 0 : 0
         if (warningDistance > 0) {
           const startPlus = point(
             geometry.start.x + direction.x * warningDistance,
@@ -1468,14 +1679,71 @@ export default {
       }
     },
 
-    async openWorkFaceDialog() {
-      await this.startAreaSelection('workface')
+    openWorkFaceDialog() {
+      if (!this.mxcad) {
+        this.$Message.warning('图纸尚未加载完成')
+        return
+      }
+      this.activeConfigTab = 'workface'
+      // 工作面不再框选：直接开配置弹窗，由机头/机尾四个端点推导闭合多边形
+      this.openWorkFaceConfig({
+        id: `workface-${Date.now()}`,
+        code: this.nextWorkFaceCode,
+        name: '',
+        headStart: { x: '', y: '' },
+        headEnd: { x: '', y: '' },
+        tailStart: { x: '', y: '' },
+        tailEnd: { x: '', y: '' },
+        lineWidth: FIXED_LINE_WIDTH,
+        lineColor: DEFAULT_WORK_FACE_LINE_COLOR,
+        entityIds: []
+      })
+      this.$Message.info('请配置机头/机尾坐标，确认后自动绘制工作面')
     },
 
     openWorkFaceConfig(item) {
       if (!item) return
+      // 打开配置弹窗前退出顶点编辑态，避免确认重绘后把手残留 / 边界引用失效
+      this.exitVertexEdit()
+      this.clearWorkFaceEndpointPreview()
       this.editingWorkFace = item
       this.workFaceDialogVisible = true
+    },
+
+    // 新建工作面时，把弹窗里已选定的端点及其名称实时画到图纸上，
+    // 否则选完点弹窗重新盖住图纸，用户看不到自己点在了哪里
+    renderWorkFaceEndpointPreview(payload) {
+      this.clearWorkFaceEndpointPreview()
+      if (!this.mxcad || !payload) return
+      const lineWidth = Number(payload.lineWidth) > 0 ? Number(payload.lineWidth) : FIXED_LINE_WIDTH
+      const lineColor = hexToRgb(payload.lineColor) || WORK_FACE_COLOR
+      // 借用一次性的 item 收集 objectId，结束后转存到 workFacePreviewIds 单独管理，
+      // 不挂到 editingWorkFace 上，避免预览实体被正式重绘当成工作面几何误删
+      const preview = { id: `workface-preview-${Date.now()}`, kind: 'workface-preview' }
+      WORK_FACE_ENDPOINTS.forEach(key => {
+        if (!isPointValid(payload[key])) return
+        this.drawCadEntity(
+          preview,
+          this.createVertexMarker(payload[key], FIXED_MARKER_RADIUS, lineWidth),
+          WORK_FACE_LAYER,
+          lineColor,
+          McDb.LineWeight.kLnWt070
+        )
+        this.drawEndpointLabel(preview, payload[key], key, lineColor)
+      })
+      this.workFacePreviewIds = preview.entityIds ? preview.entityIds.slice() : []
+      this.mxcad.updateDisplay(true)
+    },
+
+    clearWorkFaceEndpointPreview() {
+      this.workFacePreviewIds.forEach(objectId => {
+        try {
+          if (objectId && objectId.isValid && objectId.isValid()) objectId.erase()
+        } catch (error) {
+          console.warn('清除端点预览失败:', error)
+        }
+      })
+      this.workFacePreviewIds = []
     },
 
     async startAreaSelection(kind) {
@@ -1485,6 +1753,7 @@ export default {
       }
 
       this.removePolygonReference()
+      this.exitVertexEdit()
       const label = kind === 'workface' ? '工作面' : '断面'
       this.currentCommand = 'AREA_SELECT'
       try {
@@ -1525,8 +1794,7 @@ export default {
               x: (bounds.minX + bounds.maxX) / 2,
               y: (bounds.minY + bounds.maxY) / 2
             },
-            workFaceId: '',
-            warningDistance: 50,
+            workFaceLinks: [],
             bounds,
             polygon,
             entityIds: []
@@ -1781,6 +2049,7 @@ export default {
     closeWorkFaceDialog() {
       if (!this.isCoordinatePicking) {
         this.removePolygonReference()
+        this.clearWorkFaceEndpointPreview()
       }
       this.workFaceDialogVisible = false
       this.editingWorkFace = null
@@ -1790,8 +2059,19 @@ export default {
       await this.startAreaSelection('section')
     },
 
+    // 顶部只有一个「新增」，按当前标签页分发到对应的新增流程
+    openActiveConfigDialog() {
+      if (this.activeConfigTab === 'section') {
+        this.openSectionDialog()
+      } else {
+        this.openWorkFaceDialog()
+      }
+    },
+
     openSectionConfig(item) {
       if (!item) return
+      // 打开配置弹窗前退出顶点编辑态，避免确认重绘后把手残留 / 边界引用失效
+      this.exitVertexEdit()
       this.editingSection = item
       this.sectionDialogVisible = true
     },
@@ -1806,23 +2086,53 @@ export default {
 
     onSaveWorkFace(value) {
       this.removePolygonReference()
+      const index = this.workFaces.findIndex(face => face.id === value.id)
+      const previous = index > -1 ? this.workFaces[index] : null
       const item = {
         ...value,
+        ...this.resolveWorkFaceGeometry(value, previous),
         kind: 'workface',
         entityIds: []
       }
-      const index = this.workFaces.findIndex(face => face.id === item.id)
-      if (index > -1) {
-        this.eraseConfigurationEntities(this.workFaces[index])
+      if (previous) {
+        this.eraseConfigurationEntities(previous)
         this.$set(this.workFaces, index, item)
       } else {
         this.workFaces.push(item)
       }
-      console.log(JSON.stringify(item), 11111)
       this.renderWorkFace(item)
       this.renderWorkFaceDailyImages()
       this.closeWorkFaceDialog()
       this.$Message.success('工作面已绘制')
+    },
+
+    // 四个端点有变化（或新建）时按四点重算多边形/包围盒/中心点；端点没动就沿用原多边形——
+    // 顶点拖拽能把多边形改成任意边数，不能因为只改了名称或线色就被四点的四边形覆盖掉
+    resolveWorkFaceGeometry(value, previous) {
+      const moved = !previous ||
+        WORK_FACE_ENDPOINTS.some(key => !isSamePoint(previous[key], value[key]))
+      if (!moved && Array.isArray(previous.polygon) && previous.polygon.length >= 3) {
+        return {
+          polygon: previous.polygon,
+          bounds: previous.bounds,
+          range: previous.range
+        }
+      }
+      const polygon = buildWorkFacePolygon(
+        value.headStart,
+        value.headEnd,
+        value.tailStart,
+        value.tailEnd
+      )
+      const bounds = this.normalizePolygonBounds(polygon)
+      return {
+        polygon,
+        bounds,
+        range: {
+          x: (bounds.minX + bounds.maxX) / 2,
+          y: (bounds.minY + bounds.maxY) / 2
+        }
+      }
     },
 
     onSaveSection(value) {
@@ -1881,6 +2191,12 @@ export default {
             Number(selectedPoint.y)
           )
         }
+        // 新建的工作面还没画到图纸上，选完点立刻预览，让用户看到四个点选在了哪里；
+        // 编辑已存在的工作面时图纸上本来就有端点和名称，不重复画
+        if (context.dialog === 'workface' && !this.workFaceExists &&
+          dialogRef && dialogRef.getPreviewPayload) {
+          this.renderWorkFaceEndpointPreview(dialogRef.getPreviewPayload())
+        }
       } catch (error) {
         console.warn('选择坐标失败:', error)
         this.reopenCoordinateDialog(context)
@@ -1898,73 +2214,136 @@ export default {
       }
     },
 
-    toggleWorkFace(id) {
-      const index = this.selectedWorkFaceIds.indexOf(id)
-      if (index > -1) {
-        this.selectedWorkFaceIds.splice(index, 1)
-      } else {
-        this.selectedWorkFaceIds.push(id)
-      }
+    // —— 配置表格：分页 ——
+    // 表格只吃轻量视图对象：iview Table 内部会深拷贝 data，直接传工作面/断面实体
+    //（含 CAD ObjectId、标签实体引用）既浪费又会被复制出无意义的副本。
+    paginateConfigs(list, page) {
+      const start = (page - 1) * this.configPageSize
+      return list.slice(start, start + this.configPageSize).map((item, index) => ({
+        id: item.id,
+        seq: start + index + 1,
+        name: item.name || '',
+        code: item.code || ''
+      }))
     },
 
-    isWorkFaceSelected(id) {
-      return this.selectedWorkFaceIds.indexOf(id) > -1
+    onWorkFacePageChange(page) {
+      this.workFacePage = page
     },
 
-    toggleAllWorkFaces(checked) {
-      this.selectedWorkFaceIds = checked
-        ? this.workFaces.map(item => item.id)
-        : []
+    onSectionPageChange(page) {
+      this.sectionPage = page
     },
 
-    toggleSection(id) {
-      const index = this.selectedSectionIds.indexOf(id)
-      if (index > -1) {
-        this.selectedSectionIds.splice(index, 1)
-      } else {
-        this.selectedSectionIds.push(id)
-      }
+    // 删除后当前页可能已越界，回退到最后一页
+    clampConfigPages() {
+      const maxWorkFacePage = Math.max(1, Math.ceil(this.workFaces.length / this.configPageSize))
+      if (this.workFacePage > maxWorkFacePage) this.workFacePage = maxWorkFacePage
+      const maxSectionPage = Math.max(1, Math.ceil(this.sections.length / this.configPageSize))
+      if (this.sectionPage > maxSectionPage) this.sectionPage = maxSectionPage
     },
 
-    isSectionSelected(id) {
-      return this.selectedSectionIds.indexOf(id) > -1
+    findWorkFaceById(id) {
+      return this.workFaces.find(face => face.id === id) || null
     },
 
-    toggleAllSections(checked) {
-      this.selectedSectionIds = checked
-        ? this.sections.map(item => item.id)
-        : []
+    findSectionById(id) {
+      return this.sections.find(section => section.id === id) || null
     },
 
-    deleteSelectedConfigurations() {
-      const isWorkFace = this.activeConfigTab === 'workface'
-      const selectedIds = isWorkFace
-        ? this.selectedWorkFaceIds.slice()
-        : this.selectedSectionIds.slice()
-      if (!selectedIds.length) {
-        this.$Message.warning(isWorkFace ? '请先选择工作面' : '请先选择断面')
-        return
-      }
-
+    // 表格「操作」列：定位 / 编辑顶点 / 编辑 / 删除
+    renderConfigRowActions(h, kind, row) {
+      const isWorkFace = kind === 'workface'
+      const item = isWorkFace ? this.findWorkFaceById(row.id) : this.findSectionById(row.id)
+      if (!item) return h('div', { class: 'row-actions' })
       const label = isWorkFace ? '工作面' : '断面'
+      const editing = this.activeVertexEditId === item.id
+      const iconButton = (icon, title, active, onClick) => h(
+        'button',
+        {
+          class: ['row-action', { active }],
+          attrs: { type: 'button', title },
+          on: { click: onClick }
+        },
+        [h('i', { class: `ivu-icon ivu-icon-${icon}` })]
+      )
+      // 双击行会定位，但双击操作按钮时不该连带触发定位
+      return h('div', {
+        class: 'row-actions',
+        on: { dblclick: event => event.stopPropagation() }
+      }, [
+        h('button', {
+          class: 'row-action-text',
+          attrs: { type: 'button' },
+          on: { click: () => (isWorkFace ? this.openWorkFaceConfig(item) : this.openSectionConfig(item)) }
+        }, '编辑'),
+        h('button', {
+          class: ['row-action-text', 'danger'],
+          attrs: { type: 'button' },
+          on: { click: () => (isWorkFace ? this.removeWorkFace(item) : this.removeSection(item)) }
+        }, '删除')
+      ])
+    },
+
+    // 表格行高亮：正在顶点编辑的那一行
+    configRowClassName(row) {
+      return this.activeVertexEditId && row.id === this.activeVertexEditId
+        ? 'config-row-active'
+        : ''
+    },
+
+    // 双击表格行定位。事件带回的是表格自己的视图对象副本，按 id 回查真实工作面/断面
+    onConfigRowDblClick(row) {
+      const isWorkFace = this.activeConfigTab === 'workface'
+      const item = isWorkFace ? this.findWorkFaceById(row.id) : this.findSectionById(row.id)
+      if (!item) return
+      this.zoomToConfiguration(item, isWorkFace ? 'workface' : 'section')
+    },
+
+    removeWorkFace(item, onRemoved) {
+      if (!item) return
       this.$Modal.confirm({
         title: '删除确认',
-        content: `确定删除选中的 ${selectedIds.length} 个${label}图层吗？`,
+        content: `确定删除工作面「${item.name}」吗？`,
         onOk: () => {
-          const source = isWorkFace ? this.workFaces : this.sections
-          for (let index = source.length - 1; index >= 0; index--) {
-            if (selectedIds.indexOf(source[index].id) > -1) {
-              this.eraseConfigurationEntities(source[index])
-              source.splice(index, 1)
-            }
-          }
-          if (isWorkFace) {
-            this.selectedWorkFaceIds = []
-          } else {
-            this.selectedSectionIds = []
-          }
-          if (this.mxcad) this.mxcad.updateDisplay(true)
-          this.$Message.success(`${label}图层已删除`)
+          const index = this.workFaces.findIndex(face => face.id === item.id)
+          if (index < 0) return
+          // 若正在编辑该对象，先退出编辑态移除顶点把手，避免把手泄漏
+          if (this.activeVertexEditId === item.id) this.exitVertexEdit()
+          const target = this.workFaces[index]
+          // 日期区块实体单独挂在工作面上，eraseConfigurationEntities 不会清理
+          this.eraseDailyImages(target)
+          this.eraseConfigurationEntities(target)
+          this.workFaces.splice(index, 1)
+          this.clampConfigPages()
+          if (this.mxcad && this.mxcad.updateDisplay) this.mxcad.updateDisplay(true)
+          this.$Message.success('工作面已删除')
+          if (onRemoved) onRemoved()
+        }
+      })
+    },
+
+    // 弹窗内「删除」：只能删已存在的面，删除成功后关闭弹窗
+    removeEditingWorkFace() {
+      const item = this.editingWorkFace
+      if (!item || !this.workFaces.some(face => face.id === item.id)) return
+      this.removeWorkFace(item, () => this.closeWorkFaceDialog())
+    },
+
+    removeSection(item) {
+      if (!item) return
+      this.$Modal.confirm({
+        title: '删除确认',
+        content: `确定删除断面「${item.name}」吗？`,
+        onOk: () => {
+          const index = this.sections.findIndex(section => section.id === item.id)
+          if (index < 0) return
+          if (this.activeVertexEditId === item.id) this.exitVertexEdit()
+          this.eraseConfigurationEntities(this.sections[index])
+          this.sections.splice(index, 1)
+          this.clampConfigPages()
+          if (this.mxcad && this.mxcad.updateDisplay) this.mxcad.updateDisplay(true)
+          this.$Message.success('断面已删除')
         }
       })
     },
@@ -2114,7 +2493,13 @@ export default {
       }
     },
 
-    findDraftVertex(event) {
+    findEditableVertex(event) {
+      // 仅在顶点编辑态下命中，且只查找当前处于编辑态的工作面/断面
+      if (!this.activeVertexEditId) return null
+      const kind = this.activeVertexEditKind
+      const source = kind === 'section' ? this.sections : this.workFaces
+      const item = source.find(entry => entry.id === this.activeVertexEditId)
+      if (!item || !Array.isArray(item.polygon)) return null
       const canvas = document.getElementById('mxcad')
       if (!canvas) return null
       const rect = canvas.getBoundingClientRect()
@@ -2122,36 +2507,29 @@ export default {
         x: event.clientX - rect.left,
         y: event.clientY - rect.top
       }
-      for (let faceIndex = this.workFaces.length - 1; faceIndex >= 0; faceIndex--) {
-        const face = this.workFaces[faceIndex]
-        if (face.status !== 'draft' || !Array.isArray(face.polygon)) continue
-        for (let vertexIndex = 0; vertexIndex < face.polygon.length; vertexIndex++) {
-          const screenPoint = this.projectDocPointToCanvas(face.polygon[vertexIndex])
-          if (screenPoint &&
-            Math.hypot(screenPoint.x - mousePoint.x, screenPoint.y - mousePoint.y) <= 14) {
-            return { face, vertexIndex }
-          }
-        }
-      }
-      for (let sectionIndex = this.sections.length - 1; sectionIndex >= 0; sectionIndex--) {
-        const section = this.sections[sectionIndex]
-        if (section.status !== 'draft' || !Array.isArray(section.polygon)) continue
-        for (let vertexIndex = 0; vertexIndex < section.polygon.length; vertexIndex++) {
-          const screenPoint = this.projectDocPointToCanvas(section.polygon[vertexIndex])
-          if (screenPoint &&
-            Math.hypot(screenPoint.x - mousePoint.x, screenPoint.y - mousePoint.y) <= 14) {
-            return { face: section, vertexIndex, kind: 'section' }
-          }
+      for (let vertexIndex = 0; vertexIndex < item.polygon.length; vertexIndex++) {
+        const screenPoint = this.projectDocPointToCanvas(item.polygon[vertexIndex])
+        if (screenPoint &&
+          Math.hypot(screenPoint.x - mousePoint.x, screenPoint.y - mousePoint.y) <= 14) {
+          return { face: item, vertexIndex, kind }
         }
       }
       return null
     },
 
-    handleWorkFaceVertexMouseDown(event) {
+    handleEditVertexMouseDown(event) {
       if (event.button !== 0 || event.ctrlKey || event.metaKey) return
       if (this.isPolygonSelecting || this.isCoordinatePicking) return
-      const hit = this.findDraftVertex(event)
-      if (!hit) return
+      if (!this.activeVertexEditId) return
+      const hit = this.findEditableVertex(event)
+      if (!hit) {
+        // 编辑态下点击空白处：退出编辑，并消费该次点击（避免同时触发平移/拾取）
+        event.preventDefault()
+        event.stopPropagation()
+        event.stopImmediatePropagation()
+        this.exitVertexEdit()
+        return
+      }
       event.preventDefault()
       event.stopPropagation()
       event.stopImmediatePropagation()
@@ -2160,7 +2538,7 @@ export default {
       if (canvas) canvas.style.cursor = 'move'
     },
 
-    handleWorkFaceVertexMouseMove(event) {
+    handleEditVertexMouseMove(event) {
       if (!this.activeVertexDrag) return
       const docPoint = this.getCanvasDocPoint(event)
       if (!docPoint) return
@@ -2175,21 +2553,45 @@ export default {
       )
     },
 
-    handleWorkFaceVertexMouseUp(event) {
+    handleEditVertexMouseUp(event) {
       if (!this.activeVertexDrag) return
       event.preventDefault()
       event.stopPropagation()
       event.stopImmediatePropagation()
+      const dragged = this.activeVertexDrag
       this.activeVertexDrag = null
       const canvas = document.getElementById('mxcad')
       if (canvas) canvas.style.cursor = ''
+      const item = dragged.face
+      if (!item) return
+      if (dragged.kind === 'section') {
+        // 松手后按最新 polygon 整体重绘该断面（兜底修正边界/名称标签）
+        if (Array.isArray(item.polygon) && item.polygon.length >= 3) {
+          this.renderSection(item)
+        }
+      } else {
+        // 松手后按最新 polygon 整体重绘该工作面：兜底修正填充/边界/名称标签，
+        // 并重绘依赖 polygon 的日期区域（仅该面，避免打乱其它面的随机区块）
+        if (Array.isArray(item.polygon) && item.polygon.length >= 3) {
+          this.renderWorkFace(item)
+        }
+        this.renderWorkFaceDailyImages(item)
+      }
+      if (this.mxcad && this.mxcad.updateDisplay) this.mxcad.updateDisplay(true)
+    },
+
+    handleVertexEditKeyDown(event) {
+      if (!this.activeVertexEditId) return
+      if (event.key === 'Escape' || event.keyCode === 27) {
+        this.exitVertexEdit()
+      }
     },
 
     handleConfigLabelClick(event) {
       const canvas = document.getElementById('mxcad')
       if (!canvas) return
       if (event.button !== 0 || event.ctrlKey || event.metaKey) return
-      if (this.isPolygonSelecting || this.isCoordinatePicking || this.activeVertexDrag) return
+      if (this.isPolygonSelecting || this.isCoordinatePicking || this.activeVertexDrag || this.activeVertexEditId) return
 
       try {
         const rect = canvas.getBoundingClientRect()
@@ -2287,7 +2689,9 @@ export default {
         x: (bounds.minX + bounds.maxX) / 2,
         y: (bounds.minY + bounds.maxY) / 2
       })
-      if (face.kind !== 'section') {
+      if (this.activeVertexEditKind === 'section' || face.kind === 'section') {
+        this.refreshSectionLabelEntity(face)
+      } else {
         this.refreshWorkFaceLabelEntity(face)
       }
 
@@ -2312,11 +2716,100 @@ export default {
           vertexEntity.center = new McGePoint3d(x, y, 0)
         }
 
+        // 同步填充（hatch）外轮廓，避免拖拽时只有边界线移动、填充停留在原位
+        const hatchEntity = face.draftHatchId &&
+          face.draftHatchId.getMcDbEntity
+          ? face.draftHatchId.getMcDbEntity()
+          : null
+        if (hatchEntity && hatchEntity.setLoopAt) {
+          const loopPoints = face.polygon
+            .filter(isPointValid)
+            .map(item => new McGePoint3d(item.x, item.y, 0))
+          if (loopPoints.length >= 3) {
+            hatchEntity.setLoopAt(
+              0,
+              new McGePoint3dArray(loopPoints),
+              [],
+              McDb.HatchLoopType.kPolyline
+            )
+          }
+        }
+
       } catch (error) {
         console.warn('更新圈选顶点失败:', error)
       }
       if (this.mxcad && this.mxcad.updateDisplay) {
         this.mxcad.updateDisplay(true)
+      }
+    },
+
+    // —— 顶点编辑态：进入后显示可拖拽的顶点把手，退出后移除把手（工作面/断面通用） ——
+    enterVertexEdit(item, kind = 'workface') {
+      if (!this.mxcad || !item) return
+      const isSection = kind === 'section'
+      const label = isSection ? '断面' : '工作面'
+      const layerName = isSection ? SECTION_LAYER : WORK_FACE_LAYER
+      if (!Array.isArray(item.polygon) || item.polygon.length < 3) {
+        this.$Message.warning(`该${label}没有可编辑的多边形区域`)
+        return
+      }
+      this.exitVertexEdit()
+      this.activeVertexEditId = item.id
+      this.activeVertexEditKind = kind
+      try {
+        this.ensureLayer(layerName)
+        // 注意：不能过滤空值，需与 polygon 下标严格对应（updateDraftVertex 按索引更新把手）
+        const vertexIds = item.polygon.map(vertex => {
+          if (!isPointValid(vertex)) return null
+          const handle = new McDbCircle(
+            Number(vertex.x),
+            Number(vertex.y),
+            0,
+            FIXED_MARKER_RADIUS
+          )
+          handle.layer = layerName
+          handle.trueColor = new McCmColor(255, 255, 255)
+          handle.lineweight = McDb.LineWeight.kLnWt025
+          const objectId = this.mxcad.drawEntity(handle)
+          return objectId && objectId.isValid && objectId.isValid() ? objectId : null
+        })
+        this.$set(item, 'draftVertexIds', vertexIds)
+      } catch (error) {
+        console.warn('绘制顶点把手失败:', error)
+      }
+      if (this.mxcad.updateDisplay) this.mxcad.updateDisplay(true)
+    },
+
+    exitVertexEdit() {
+      if (!this.activeVertexEditId) return
+      const item = this.workFaces.find(face => face.id === this.activeVertexEditId) ||
+        this.sections.find(section => section.id === this.activeVertexEditId)
+      if (item && Array.isArray(item.draftVertexIds)) {
+        item.draftVertexIds.forEach(objectId => {
+          try {
+            if (objectId && objectId.isValid && objectId.isValid()) {
+              objectId.erase()
+            }
+          } catch (error) {
+            console.warn('移除顶点把手失败:', error)
+          }
+        })
+        this.$set(item, 'draftVertexIds', [])
+      }
+      this.activeVertexDrag = null
+      this.activeVertexEditId = null
+      this.activeVertexEditKind = ''
+      const canvas = document.getElementById('mxcad')
+      if (canvas) canvas.style.cursor = ''
+      if (this.mxcad && this.mxcad.updateDisplay) this.mxcad.updateDisplay(true)
+    },
+
+    toggleVertexEdit(item, kind = 'workface') {
+      if (!item) return
+      if (this.activeVertexEditId === item.id) {
+        this.exitVertexEdit()
+      } else {
+        this.enterVertexEdit(item, kind)
       }
     },
 
@@ -2326,14 +2819,18 @@ export default {
   // 标签点击处理器放在第一位，优先执行
   canvas.addEventListener('mousedown', this.handleConfigLabelClick, true)
 
-  canvas.addEventListener('mousedown', this.handleWorkFaceVertexMouseDown, true)
-  canvas.addEventListener('mousemove', this.handleWorkFaceVertexMouseMove, true)
-  canvas.addEventListener('mouseup', this.handleWorkFaceVertexMouseUp, true)
+  canvas.addEventListener('mousedown', this.handleEditVertexMouseDown, true)
+  // mousemove / mouseup 挂在 window 上：拖拽顶点时鼠标移出画布也能继续跟随、正常结束，
+  // 否则在画布外松手会导致拖拽状态卡住。处理器内部以 activeVertexDrag 做守卫，非拖拽时直接返回。
+  window.addEventListener('mousemove', this.handleEditVertexMouseMove, true)
+  window.addEventListener('mouseup', this.handleEditVertexMouseUp, true)
 
   canvas.addEventListener('mousedown', this.handleCtrlPanMouseDown, true)
   canvas.addEventListener('mousemove', this.handleCtrlPanMouseMove, true)
   canvas.addEventListener('mouseup', this.handleCtrlPanMouseUp, true)
   canvas.addEventListener('mouseleave', this.handleCtrlPanMouseUp, true)
+
+  window.addEventListener('keydown', this.handleVertexEditKeyDown, true)
 },
 
     destroyCtrlPan() {
@@ -2341,14 +2838,16 @@ export default {
   if (!canvas) return
   canvas.removeEventListener('mousedown', this.handleConfigLabelClick, true)
 
-  canvas.removeEventListener('mousedown', this.handleWorkFaceVertexMouseDown, true)
-  canvas.removeEventListener('mousemove', this.handleWorkFaceVertexMouseMove, true)
-  canvas.removeEventListener('mouseup', this.handleWorkFaceVertexMouseUp, true)
+  canvas.removeEventListener('mousedown', this.handleEditVertexMouseDown, true)
+  window.removeEventListener('mousemove', this.handleEditVertexMouseMove, true)
+  window.removeEventListener('mouseup', this.handleEditVertexMouseUp, true)
 
   canvas.removeEventListener('mousedown', this.handleCtrlPanMouseDown, true)
   canvas.removeEventListener('mousemove', this.handleCtrlPanMouseMove, true)
   canvas.removeEventListener('mouseup', this.handleCtrlPanMouseUp, true)
   canvas.removeEventListener('mouseleave', this.handleCtrlPanMouseUp, true)
+
+  window.removeEventListener('keydown', this.handleVertexEditKeyDown, true)
 },
 
     simulateMouseButtonEvent(event, type, button = 1) {

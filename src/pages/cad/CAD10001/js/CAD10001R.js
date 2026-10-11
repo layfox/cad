@@ -109,7 +109,7 @@ export default {
             highlightLineGroup: null,
             highlightMeshList: [],
             highlightUseTempLine: false,
-            isDev: false,
+            isDev: true,
             pointParsed: false,
             annotationMeshMap: new Map(),
             annotationById: new Map(),

@@ -379,7 +379,7 @@ export default {
 .vp-body .ivu-table-header thead tr th {
     height: 42px;
     padding: 0 8px;
-    background: #EEF1F6;
+    background: #fff;
 }
 
 .vp-body .ivu-table-body tr td {
@@ -388,7 +388,7 @@ export default {
 }
 
 .vp-body  .ivu-table-body tr:nth-child(2n + 2) td {
-    background: #EEF1F6;
+    background: #fff;
 }
 
 .vp-body .ivu-table-cell {

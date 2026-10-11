@@ -12,16 +12,17 @@
         <Input v-model.trim="form.name" :maxlength="50" placeholder="请输入工作面名称" />
       </FormItem>
 
-      <FormItem v-if="!form.bounds" label="范围坐标" required>
-        <div class="coord-row">
-          <Input v-model="form.range.x" placeholder="X" />
-          <Input v-model="form.range.y" placeholder="Y" />
-          <Button type="primary" plain @click="requestPick('range')">选择坐标</Button>
-        </div>
-      </FormItem>
-      <FormItem v-else label="圈选区域">
-        <div class="selection-summary">
-          已记录 {{ selectionPointCount }} 个多边形顶点
+      <FormItem label="工作面线段" required>
+        <div class="line-style-row">
+          <Select v-model="form.lineWidth" class="line-width-select">
+            <Option
+              v-for="width in lineWidthOptions"
+              :key="width"
+              :value="width"
+              :label="String(width)"
+            />
+          </Select>
+          <ColorPicker v-model="form.lineColor" class="line-color-picker" />
         </div>
       </FormItem>
 
@@ -71,11 +72,17 @@
     <div class="draw-config-footer">
       <Button type="primary" @click="onConfirm">确定</Button>
       <Button @click="onCancel">取消</Button>
+      <Button v-if="canDelete" type="error" ghost @click="onDelete">删除</Button>
     </div>
   </div>
 </template>
 
 <script>
+// 线宽/线色默认值与 js/CAD10004R.js 的 FIXED_LINE_WIDTH / DEFAULT_WORK_FACE_LINE_COLOR 保持一致
+const DEFAULT_LINE_WIDTH = 2
+const DEFAULT_LINE_COLOR = '#0D5CE0'
+const LINE_WIDTH_OPTIONS = [1, 2, 3, 4, 5]
+
 function emptyPoint() {
   return { x: '', y: '' }
 }
@@ -93,19 +100,27 @@ function clonePoint(point) {
   }
 }
 
-function cloneBounds(bounds) {
-  if (!bounds) return null
-  return {
-    minX: Number(bounds.minX),
-    maxX: Number(bounds.maxX),
-    minY: Number(bounds.minY),
-    maxY: Number(bounds.maxY)
-  }
+function isPointValid(value) {
+  return value &&
+    value.x !== '' && value.y !== '' &&
+    value.x !== null && value.y !== null &&
+    value.x !== undefined && value.y !== undefined &&
+    Number.isFinite(Number(value.x)) &&
+    Number.isFinite(Number(value.y))
 }
 
-function clonePolygon(polygon) {
-  if (!Array.isArray(polygon)) return []
-  return polygon.map(item => clonePoint(item))
+function isSamePoint(a, b) {
+  return isPointValid(a) && isPointValid(b) &&
+    Number(a.x) === Number(b.x) && Number(a.y) === Number(b.y)
+}
+
+function normalizeLineWidth(value) {
+  const width = Math.round(Number(value))
+  return Number.isFinite(width) && width >= 1 ? width : DEFAULT_LINE_WIDTH
+}
+
+function normalizeLineColor(value) {
+  return /^#[0-9a-fA-F]{6}$/.test(String(value || '')) ? String(value) : DEFAULT_LINE_COLOR
 }
 
 function directionVector(start, end) {
@@ -133,17 +148,19 @@ export default {
     nextCode: {
       type: String,
       default: ''
+    },
+    canDelete: {
+      type: Boolean,
+      default: false
     }
   },
   data() {
     return {
-      form: this.createEmptyForm()
+      form: this.createEmptyForm(),
+      lineWidthOptions: LINE_WIDTH_OPTIONS
     }
   },
   computed: {
-    selectionPointCount() {
-      return this.form.polygon.length || (this.form.bounds ? 4 : 0)
-    },
     headVector() {
       return directionVector(this.form.headStart, this.form.headEnd)
     },
@@ -165,13 +182,12 @@ export default {
             id: val.id,
             code: val.code || '',
             name: val.name || '',
-            range: clonePoint(val.range || emptyPoint()),
+            lineWidth: normalizeLineWidth(val.lineWidth),
+            lineColor: normalizeLineColor(val.lineColor),
             headStart: clonePoint(val.headStart || emptyPoint()),
             headEnd: clonePoint(val.headEnd || emptyPoint()),
             tailStart: clonePoint(val.tailStart || emptyPoint()),
-            tailEnd: clonePoint(val.tailEnd || emptyPoint()),
-            bounds: cloneBounds(val.bounds),
-            polygon: clonePolygon(val.polygon)
+            tailEnd: clonePoint(val.tailEnd || emptyPoint())
           }
         } else if (this.visible) {
           this.form = this.createEmptyForm()
@@ -185,13 +201,12 @@ export default {
         id: '',
         code: this.nextCode || '',
         name: '',
-        range: emptyPoint(),
+        lineWidth: DEFAULT_LINE_WIDTH,
+        lineColor: DEFAULT_LINE_COLOR,
         headStart: emptyPoint(),
         headEnd: emptyPoint(),
         tailStart: emptyPoint(),
-        tailEnd: emptyPoint(),
-        bounds: null,
-        polygon: []
+        tailEnd: emptyPoint()
       }
     },
     requestPick(field) {
@@ -205,6 +220,17 @@ export default {
       this.form[field].x = Number(x)
       this.form[field].y = Number(y)
     },
+    // 供父组件在选点后取当前状态，用于在图纸上实时预览端点位置与名称
+    getPreviewPayload() {
+      return {
+        lineWidth: normalizeLineWidth(this.form.lineWidth),
+        lineColor: normalizeLineColor(this.form.lineColor),
+        headStart: clonePoint(this.form.headStart),
+        headEnd: clonePoint(this.form.headEnd),
+        tailStart: clonePoint(this.form.tailStart),
+        tailEnd: clonePoint(this.form.tailEnd)
+      }
+    },
     validateCoordinates() {
       const pointNames = {
         headStart: '机头开始坐标',
@@ -212,21 +238,19 @@ export default {
         tailStart: '机尾开始坐标',
         tailEnd: '机尾结束坐标'
       }
-      if (!this.form.bounds) {
-        pointNames.range = '范围坐标'
-      }
       for (const field of Object.keys(pointNames)) {
-        const point = this.form[field]
-        if (
-          !point ||
-          point.x === '' || point.y === '' ||
-          point.x === null || point.y === null ||
-          point.x === undefined || point.y === undefined ||
-          !Number.isFinite(Number(point.x)) || !Number.isFinite(Number(point.y))
-        ) {
+        if (!isPointValid(this.form[field])) {
           this.$Message.warning(`请选择完整的${pointNames[field]}`)
           return false
         }
+      }
+      if (isSamePoint(this.form.headStart, this.form.headEnd)) {
+        this.$Message.warning('机头的开始坐标与结束坐标不能重合')
+        return false
+      }
+      if (isSamePoint(this.form.tailStart, this.form.tailEnd)) {
+        this.$Message.warning('机尾的开始坐标与结束坐标不能重合')
+        return false
       }
       return true
     },
@@ -241,28 +265,24 @@ export default {
       }
       if (!this.validateCoordinates()) return
 
-      const range = this.form.bounds
-        ? {
-          x: (Number(this.form.bounds.minX) + Number(this.form.bounds.maxX)) / 2,
-          y: (Number(this.form.bounds.minY) + Number(this.form.bounds.maxY)) / 2
-        }
-        : clonePoint(this.form.range)
-
+      // 多边形/包围盒/中心点由四个端点推导，交给 CAD10004R.js 统一计算
       this.$emit('confirm', {
         id: this.form.id || `workface-${Date.now()}`,
         code: this.form.code,
         name: this.form.name,
-        range,
+        lineWidth: normalizeLineWidth(this.form.lineWidth),
+        lineColor: normalizeLineColor(this.form.lineColor),
         headStart: clonePoint(this.form.headStart),
         headEnd: clonePoint(this.form.headEnd),
         tailStart: clonePoint(this.form.tailStart),
-        tailEnd: clonePoint(this.form.tailEnd),
-        bounds: cloneBounds(this.form.bounds),
-        polygon: clonePolygon(this.form.polygon)
+        tailEnd: clonePoint(this.form.tailEnd)
       })
     },
     onCancel() {
       this.$emit('cancel')
+    },
+    onDelete() {
+      this.$emit('delete')
     }
   }
 }
@@ -318,14 +338,15 @@ export default {
   gap: 8px;
 }
 
-.selection-summary {
-  height: 32px;
-  padding: 0 12px;
-  color: #2f73df;
-  line-height: 30px;
-  background: #eef5ff;
-  border: 1px solid #cfe1ff;
-  border-radius: 4px;
+.line-style-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.line-width-select {
+  width: 140px;
+  flex: none;
 }
 
 .coord-row .ivu-input-number,
