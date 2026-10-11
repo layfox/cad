@@ -27,6 +27,9 @@ const SECTION_FILL_COLOR = [255, 231, 226]
 // 工作面线宽/线色默认值。线色直接由 WORK_FACE_COLOR 推导，避免两处维护同一个色值
 const DEFAULT_WORK_FACE_LINE_COLOR = rgbToHex(WORK_FACE_COLOR)
 
+// 断层线宽/线色默认值，同理由 SECTION_COLOR 推导
+const DEFAULT_SECTION_LINE_COLOR = rgbToHex(SECTION_COLOR)
+
 // 工作面的四个端点（机头/机尾各两点），按此顺序推导多边形并绘制端点圆
 const WORK_FACE_ENDPOINTS = ['headStart', 'headEnd', 'tailStart', 'tailEnd']
 
@@ -39,7 +42,7 @@ const WORK_FACE_ENDPOINT_LABELS = {
 }
 
 // —— 固定绘制参数：工作面/断面的线宽与文字大小固定，不随绘制区域大小变化 ——
-const FIXED_LINE_WIDTH = 2        // 工作面边界线 / 断面剖切线的线宽
+const FIXED_LINE_WIDTH = 2        // 工作面边界线 / 断层多边形的线宽
 const FIXED_LIGHT_LINE_WIDTH = 1  // 辅助区域（选中框、预警区等）线宽
 const FIXED_TEXT_HEIGHT = 12      // 名称文字高度
 const FIXED_MARKER_RADIUS = 4     // 端点 / 中心标记圆半径
@@ -47,6 +50,11 @@ const ENDPOINT_LABEL_OFFSET = FIXED_MARKER_RADIUS + 6  // 端点名称文字相�
 const FIXED_ARROW_SIZE = 40       // 方向箭头长度
 const FIXED_LABEL_SIZE = 60       // 工作面名称标签（SVG）固定尺寸
 const LABEL_HIT_RADIUS = FIXED_LABEL_SIZE * 1.5  // 点击工作面标签/文字时的命中半径（doc 单位，可调）
+
+// 顶点把手：默认是白色小圆，被选中时放大变红——不然 Del 要删的是哪一个完全看不出来
+const VERTEX_HANDLE_COLOR = [255, 255, 255]
+const VERTEX_HANDLE_SELECTED_COLOR = [237, 64, 20]
+const VERTEX_HANDLE_SELECTED_RADIUS = FIXED_MARKER_RADIUS * 1.8
 
 // —— 模拟每日回采区域（图片）数据与绘制参数（独立功能，可替换为真实接口数据） ——
 const MOCK_DAILY_DATES = [
@@ -197,8 +205,8 @@ export default {
       ],
       sectionColumns: [
         { title: '序号', key: 'seq', width: 64, align: 'center' },
-        { title: '断面名称', key: 'name', minWidth: 120, tooltip: true },
-        { title: '断面编码', key: 'code', width: 106 },
+        { title: '断层名称', key: 'name', minWidth: 120, tooltip: true },
+        { title: '断层编码', key: 'code', width: 106 },
         {
           title: '操作',
           width: 152,
@@ -225,6 +233,10 @@ export default {
       activeVertexDrag: null,
       activeVertexEditId: null,
       activeVertexEditKind: '',
+      activeVertexEditItem: null,
+      // 当前选中的顶点下标（点中把手即选中），Del 键删的就是它
+      activeVertexIndex: null,
+      sectionDrawSession: false,
       fileLoadTimer: null
     }
   },
@@ -273,7 +285,7 @@ export default {
             {
     "id": "section-1790667900075",
     "code": "12033",
-    "name": "12033断面",
+    "name": "12033断层",
     "range": {
         "x": 23372734.155462973,
         "y": -30388427.809688352
@@ -1346,7 +1358,7 @@ export default {
       exist.setSvgPostion(worldPoint)
       const text = exist.getText && exist.getText(0)
       if (text) {
-        text.txt = section.name || section.code || '断面'
+        text.txt = section.name || section.code || '断层'
         text.txtPos = new THREE.Vector3(
           worldPoint.x,
           worldPoint.y + iconRealSize * 0.34,
@@ -1369,7 +1381,7 @@ export default {
 
   const textHeight = iconRealSize * 0.22
   const text = new MxDbSVGText()
-  text.txt = section.name || section.code || '断面'
+  text.txt = section.name || section.code || '断层'
   text.txtPos = new THREE.Vector3(
     worldPoint.x,
     worldPoint.y + iconRealSize * 0.34,
@@ -1475,10 +1487,8 @@ export default {
       section.kind = 'section'
       this.createSectionLabelAnchor(section, this.getSectionLabelDocPoint(section))
 
-      const geometry = this.getSectionLine(section)
-      const lineWidth = FIXED_LINE_WIDTH
-      const markerRadius = FIXED_MARKER_RADIUS
-      const textHeight = FIXED_TEXT_HEIGHT
+      const lineWidth = Number(section.lineWidth) > 0 ? Number(section.lineWidth) : FIXED_LINE_WIDTH
+      const lineColor = hexToRgb(section.lineColor) || SECTION_COLOR
 
       if ((Array.isArray(section.polygon) && section.polygon.length >= 3) || section.bounds) {
         const selectionPoints = Array.isArray(section.polygon) && section.polygon.length >= 3
@@ -1491,7 +1501,7 @@ export default {
           ]
         const selectionArea = new McDbPolyline()
         selectionArea.isClosed = true
-        selectionArea.constantWidth = FIXED_LIGHT_LINE_WIDTH
+        selectionArea.constantWidth = lineWidth
         selectionPoints.forEach(item => {
           selectionArea.addVertexAt(new McGePoint3d(item.x, item.y, 0))
         })
@@ -1499,157 +1509,12 @@ export default {
           section,
           selectionArea,
           SECTION_LAYER,
-          SECTION_COLOR,
+          lineColor,
           McDb.LineWeight.kLnWt050
         )
         // 保存边界实体引用，供顶点编辑态下增量更新使用
         this.$set(section, 'draftBoundaryId', boundaryId)
       }
-
-    //   const sectionLine = new McDbLine(
-    //     new McGePoint3d(geometry.start.x, geometry.start.y, 0),
-    //     new McGePoint3d(geometry.end.x, geometry.end.y, 0)
-    //   )
-    //   sectionLine.constantWidth = lineWidth
-    //   this.drawCadEntity(
-    //     section,
-    //     sectionLine,
-    //     SECTION_LAYER,
-    //     [231, 69, 69],
-    //     McDb.LineWeight.kLnWt050
-    //   )
-
-      
-
-      
-      
-      const markerCenter = interpolate(geometry.start, geometry.end, 0.5)
-
-    },
-
-    renderSection1(section) {
-      if (!this.mxcad || !isPointValid(section.range)) return
-      this.eraseConfigurationEntities(section)
-      section.kind = 'section'
-      this.createSectionLabelAnchor(section, section.range)
-
-      const geometry = this.getSectionLine(section)
-      const lineWidth = FIXED_LINE_WIDTH
-      const markerRadius = FIXED_MARKER_RADIUS
-      const textHeight = FIXED_TEXT_HEIGHT
-
-      if ((Array.isArray(section.polygon) && section.polygon.length >= 3) || section.bounds) {
-        const selectionPoints = Array.isArray(section.polygon) && section.polygon.length >= 3
-          ? section.polygon
-          : [
-            point(section.bounds.minX, section.bounds.minY),
-            point(section.bounds.maxX, section.bounds.minY),
-            point(section.bounds.maxX, section.bounds.maxY),
-            point(section.bounds.minX, section.bounds.maxY)
-          ]
-        const selectionArea = new McDbPolyline()
-        selectionArea.isClosed = true
-        selectionArea.constantWidth = FIXED_LIGHT_LINE_WIDTH
-        selectionPoints.forEach(item => {
-          selectionArea.addVertexAt(new McGePoint3d(item.x, item.y, 0))
-        })
-        this.drawCadEntity(
-          section,
-          selectionArea,
-          SECTION_LAYER,
-          SECTION_COLOR,
-          McDb.LineWeight.kLnWt020
-        )
-      }
-
-      const sectionLine = new McDbLine(
-        new McGePoint3d(geometry.start.x, geometry.start.y, 0),
-        new McGePoint3d(geometry.end.x, geometry.end.y, 0)
-      )
-      sectionLine.constantWidth = lineWidth
-      this.drawCadEntity(
-        section,
-        sectionLine,
-        SECTION_LAYER,
-        [231, 69, 69],
-        McDb.LineWeight.kLnWt080
-      )
-
-      ;[geometry.start, geometry.end].forEach((item, index) => {
-        const circle = new McDbCircle(
-          item.x,
-          item.y,
-          0,
-          markerRadius
-        )
-        this.drawCadEntity(
-          section,
-          circle,
-          SECTION_LAYER,
-          index === 0 ? [233, 80, 73] : [178, 46, 40],
-          McDb.LineWeight.kLnWt025
-        )
-      })
-
-      if (geometry.face) {
-        const direction = normalizeVector(
-          geometry.face.headStart,
-          geometry.face.headEnd
-        )
-        const firstLink = Array.isArray(section.workFaceLinks) ? section.workFaceLinks[0] : null
-        const warningDistance = firstLink ? Number(firstLink.warningDistance) || 0 : 0
-        if (warningDistance > 0) {
-          const startPlus = point(
-            geometry.start.x + direction.x * warningDistance,
-            geometry.start.y + direction.y * warningDistance
-          )
-          const endPlus = point(
-            geometry.end.x + direction.x * warningDistance,
-            geometry.end.y + direction.y * warningDistance
-          )
-          const startMinus = point(
-            geometry.start.x - direction.x * warningDistance,
-            geometry.start.y - direction.y * warningDistance
-          )
-          const endMinus = point(
-            geometry.end.x - direction.x * warningDistance,
-            geometry.end.y - direction.y * warningDistance
-          )
-          const warningArea = new McDbPolyline()
-          warningArea.isClosed = true
-          warningArea.constantWidth = FIXED_LIGHT_LINE_WIDTH
-          ;[startPlus, endPlus, endMinus, startMinus].forEach(item => {
-            warningArea.addVertexAt(new McGePoint3d(item.x, item.y, 0))
-          })
-          this.drawCadEntity(
-            section,
-            warningArea,
-            SECTION_LAYER,
-            [248, 190, 120],
-            McDb.LineWeight.kLnWt018
-          )
-        }
-      }
-
-      const markerDirection = normalizeVector(
-        geometry.start,
-        geometry.end
-      )
-      const markerCenter = interpolate(geometry.start, geometry.end, 0.5)
-      if (markerDirection.length > 0) {
-        this.drawDirectionArrow(
-          section,
-          markerCenter,
-          {
-            x: -markerDirection.y,
-            y: markerDirection.x
-          },
-          FIXED_ARROW_SIZE,
-          SECTION_LAYER,
-          [222, 63, 64]
-        )
-      }
-
     },
 
     renderAllConfigurations() {
@@ -1671,7 +1536,7 @@ export default {
         }
       })
       // 独立功能：在工作面上按日期绘制区域块（使用模拟数据）
-      this.renderWorkFaceDailyImages()
+      // this.renderWorkFaceDailyImages()
       try {
         this.mxcad.updateDisplay(true)
       } catch (error) {
@@ -1679,11 +1544,37 @@ export default {
       }
     },
 
+    // 取点 / 断层绘制进行中——这两个状态下配置弹窗是隐藏的（遮罩跟着消失），
+    // 配置面板直接露在外面可点。此时再点新增/编辑会叠出第二个弹窗，
+    // 并把 editingWorkFace/editingSection 换成新草稿，正在等待的那次取点就回填到别的对象上
+    blockedByPickOrDraw() {
+      if (this.isCoordinatePicking) {
+        this.$Message.warning('请先完成当前坐标选择')
+        return true
+      }
+      if (this.sectionDrawSession) {
+        this.$Message.warning('请先完成断层绘制')
+        return true
+      }
+      return false
+    },
+
+    // 开配置弹窗前的闸门：除了取点/绘制，已经在配置中的弹窗也不许再叠一个
+    isConfigDialogBusy() {
+      if (this.blockedByPickOrDraw()) return true
+      if (this.workFaceDialogVisible || this.sectionDialogVisible) {
+        this.$Message.warning('请先完成当前配置')
+        return true
+      }
+      return false
+    },
+
     openWorkFaceDialog() {
       if (!this.mxcad) {
         this.$Message.warning('图纸尚未加载完成')
         return
       }
+      if (this.isConfigDialogBusy()) return
       this.activeConfigTab = 'workface'
       // 工作面不再框选：直接开配置弹窗，由机头/机尾四个端点推导闭合多边形
       this.openWorkFaceConfig({
@@ -1703,6 +1594,7 @@ export default {
 
     openWorkFaceConfig(item) {
       if (!item) return
+      if (this.isConfigDialogBusy()) return
       // 打开配置弹窗前退出顶点编辑态，避免确认重绘后把手残留 / 边界引用失效
       this.exitVertexEdit()
       this.clearWorkFaceEndpointPreview()
@@ -1746,67 +1638,25 @@ export default {
       this.workFacePreviewIds = []
     },
 
-    async startAreaSelection(kind) {
+
+    // 断层还没有任何点位时的首次绘制：复用连续取点，F / 右键 / 点回首点附近完成
+    async pickSectionPolygonFresh() {
       if (!this.mxcad) {
         this.$Message.warning('图纸尚未加载完成')
-        return
+        return null
       }
-
-      this.removePolygonReference()
       this.exitVertexEdit()
-      const label = kind === 'workface' ? '工作面' : '断面'
       this.currentCommand = 'AREA_SELECT'
       try {
-        this.$Message.info(`请依次选择${label}多边形顶点，输入F或者右键完成`)
+        this.$Message.info('请依次选择断层多边形顶点，输入F或者右键完成')
         this.startPolygonKeyboardCapture()
-        const polygon = await this.pickPolygonArea(kind)
-        if (!polygon) return
-        // 圈选完成后保留多边形连线，作为配置弹窗中坐标点选的参照；点击弹窗“确认”后才移除
-        this.polygonSelectionPreviewIds = this.drawPolygonReference(polygon, kind)
-        const bounds = this.normalizePolygonBounds(polygon)
-        if (kind === 'workface') {
-          const draft = {
-            id: `workface-${Date.now()}`,
-            code: this.nextWorkFaceCode,
-            name: '新工作面',
-            range: {
-              x: (bounds.minX + bounds.maxX) / 2,
-              y: (bounds.minY + bounds.maxY) / 2
-            },
-            headStart: { x: '', y: '' },
-            headEnd: { x: '', y: '' },
-            tailStart: { x: '', y: '' },
-            tailEnd: { x: '', y: '' },
-            bounds,
-            polygon,
-            entityIds: []
-          }
-          // 圈选完成后直接弹出配置弹窗，确认后再加入列表并正式绘制（不出现临时工作面）
-          this.activeConfigTab = 'workface'
-          this.openWorkFaceConfig(draft)
-          this.$Message.info('请完善工作面配置，确认后自动加入列表')
-        } else {
-          const draft = {
-            id: `section-${Date.now()}`,
-            code: this.nextSectionCode,
-            name: '新断面',
-            range: {
-              x: (bounds.minX + bounds.maxX) / 2,
-              y: (bounds.minY + bounds.maxY) / 2
-            },
-            workFaceLinks: [],
-            bounds,
-            polygon,
-            entityIds: []
-          }
-          // 圈选完成后直接弹出配置弹窗，确认后再加入列表并正式绘制（不出现临时断面）
-          this.activeConfigTab = 'section'
-          this.openSectionConfig(draft)
-          this.$Message.info('请完善断面配置，确认后自动加入列表')
-        }
+        const polygon = await this.pickPolygonArea('section')
+        if (!polygon || polygon.length < 3) return null
+        return polygon
       } catch (error) {
-        console.warn('圈选区域失败:', error)
-        this.$Message.warning('未获取到有效的圈选范围')
+        console.warn('绘制断层失败:', error)
+        this.$Message.warning('未获取到有效的断层范围')
+        return null
       } finally {
         this.stopPolygonKeyboardCapture()
         this.currentCommand = ''
@@ -1877,13 +1727,14 @@ export default {
     async pickPolygonArea(kind = 'workface') {
       const polygon = []
       const isSection = kind === 'section'
+      const kindLabel = isSection ? '断层' : '工作面'
       const color = isSection ? SECTION_COLOR : WORK_FACE_COLOR
       const fillColor = isSection ? 0xfce2de : 0xdaf1fa
 
       while (true) {
         const getPoint = new MxCADUiPrPoint()
         if (polygon.length === 0) {
-          getPoint.setMessage('\n请指定工作面多边形的第一个点:')
+          getPoint.setMessage(`\n请指定${kindLabel}多边形的第一个点:`)
         } else {
           const lastPoint = polygon[polygon.length - 1]
           getPoint.setBasePt(new McGePoint3d(lastPoint.x, lastPoint.y, 0))
@@ -2055,8 +1906,27 @@ export default {
       this.editingWorkFace = null
     },
 
-    async openSectionDialog() {
-      await this.startAreaSelection('section')
+    openSectionDialog() {
+      if (!this.mxcad) {
+        this.$Message.warning('图纸尚未加载完成')
+        return
+      }
+      if (this.isConfigDialogBusy()) return
+      this.activeConfigTab = 'section'
+      // 断层不再框选：直接开配置弹窗，多边形由弹窗里的「绘制断层」触发
+      this.openSectionConfig({
+        id: `section-${Date.now()}`,
+        code: this.nextSectionCode,
+        name: '',
+        lineWidth: FIXED_LINE_WIDTH,
+        lineColor: DEFAULT_SECTION_LINE_COLOR,
+        range: { x: '', y: '' },
+        workFaceLinks: [],
+        bounds: null,
+        polygon: [],
+        entityIds: []
+      })
+      this.$Message.info('请配置断层，点击「绘制断层」绘制多边形')
     },
 
     // 顶部只有一个「新增」，按当前标签页分发到对应的新增流程
@@ -2070,18 +1940,204 @@ export default {
 
     openSectionConfig(item) {
       if (!item) return
-      // 打开配置弹窗前退出顶点编辑态，避免确认重绘后把手残留 / 边界引用失效
+      // 绘制会话进行中会被 isConfigDialogBusy 拦下，所以这里不会再遇到活的会话
+      if (this.isConfigDialogBusy()) return
+      // 打开配置弹窗前退出顶点编辑态，避免确认重绘后把手残留、边界引用失效
       this.exitVertexEdit()
       this.editingSection = item
       this.sectionDialogVisible = true
     },
 
     closeSectionDialog() {
+      this.abortSectionDrawSession()
       if (!this.isCoordinatePicking) {
         this.removePolygonReference()
+        // 新建但未保存的断层：它的名称标签和轮廓是本次会话画上去的，取消时要一并清除
+        const item = this.editingSection
+        if (item && !this.sections.some(section => section.id === item.id)) {
+          this.eraseConfigurationEntities(item)
+        }
       }
       this.sectionDialogVisible = false
       this.editingSection = null
+    },
+
+    // 弹窗里的「绘制断层」：让出画布，按是否已有点位进入绘制或编辑，结束后回填弹窗
+    async onDrawSectionPolygon() {
+      const item = this.editingSection
+      if (!item || !this.mxcad) {
+        this.$Message.warning('图纸尚未加载完成')
+        return
+      }
+      if (this.sectionDrawSession) return
+      this._sectionSessionAborted = false
+      this.sectionDialogVisible = false
+      await this.$nextTick()
+
+      const polygon = Array.isArray(item.polygon) && item.polygon.length >= 3
+        ? await this.runSectionEditSession(item)
+        : await this.pickSectionPolygonFresh()
+
+      // 会话被外部打断（关弹窗 / 切到别的断层 / 删行）时不要再把弹窗抢回来，
+      // 也不要把结果写回已经不是当前弹窗对象的 item
+      const aborted = this._sectionSessionAborted || this.editingSection !== item
+      this._sectionSessionAborted = false
+      if (aborted) return
+
+      if (polygon && polygon.length >= 3) {
+        this.applySectionPolygon(item, polygon)
+        this.renderSection(item)
+      }
+
+      this.sectionDialogVisible = true
+      await this.$nextTick()
+      const dialogRef = this.$refs.sectionDialog
+      if (dialogRef && dialogRef.applyPolygon && polygon && polygon.length >= 3) {
+        dialogRef.applyPolygon({
+          polygon: item.polygon,
+          bounds: item.bounds,
+          range: item.range
+        })
+      }
+    },
+
+    // 写回多边形并同步包围盒 / 中心点：renderSection、双击定位、顶点编辑都依赖 range
+    applySectionPolygon(item, polygon) {
+      const points = polygon.map(vertex => ({ x: Number(vertex.x), y: Number(vertex.y) }))
+      const bounds = this.normalizePolygonBounds(points)
+      this.$set(item, 'polygon', points)
+      this.$set(item, 'bounds', bounds)
+      this.$set(item, 'range', {
+        x: (bounds.minX + bounds.maxX) / 2,
+        y: (bounds.minY + bounds.maxY) / 2
+      })
+    },
+
+    // 已有点位时进入编辑会话：期间不跑取点 prompt，加点 / 删点 / 拖拽全由鼠标事件自己处理
+    runSectionEditSession(item) {
+      return new Promise(resolve => {
+        // 先按当前 polygon 对齐 bounds/range，renderSection 与标签定位都依赖 range
+        this.applySectionPolygon(item, item.polygon)
+        this._sectionSessionSnapshot = item.polygon
+          .map(vertex => ({ x: Number(vertex.x), y: Number(vertex.y) }))
+        this._sectionSessionResolve = resolve
+        this.renderSection(item)
+        this.enterVertexEdit(item, 'section')
+        this.startSectionEditSession()
+        this.$Message.info('拖拽顶点可移动，点击空白处新增顶点，点中顶点后按 Del 或右键删除，按 F 或回车完成')
+      })
+    },
+
+    startSectionEditSession() {
+      this.sectionDrawSession = true
+      this._suppressContextMenuOnce = false
+      window.addEventListener('mousedown', this.handleSessionRightMouseDown, true)
+    },
+
+    endSectionEditSession(polygon) {
+      if (!this.sectionDrawSession) return
+      this.sectionDrawSession = false
+      window.removeEventListener('mousedown', this.handleSessionRightMouseDown, true)
+      this.exitVertexEdit()
+      const resolve = this._sectionSessionResolve
+      this._sectionSessionResolve = null
+      this._sectionSessionSnapshot = null
+      if (resolve) resolve(polygon || null)
+    },
+
+    // 会话中途被打断（切换配置项 / 关弹窗 / 删除行）时收尾，
+    // 否则 Promise 永不 resolve，弹窗会一直藏在画布后面
+    abortSectionDrawSession() {
+      // 首次绘制还在连续取点：先结束 prompt，pickPolygonArea 才会返回、外层 await 才能收尾
+      if (this.isPolygonSelecting) {
+        this.polygonFinishRequested = true
+        try {
+          const uiData = MxFun.getUIData && MxFun.getUIData()
+          if (uiData && uiData.executeOperations) uiData.executeOperations(2)
+        } catch (error) {
+          console.warn('结束断层取点失败:', error)
+        }
+      }
+      if (!this.sectionDrawSession) return
+      this._sectionSessionAborted = true
+      this.endSectionEditSession(null)
+    },
+
+    // 增删顶点会让 McDbPolyline 内部下标移位，而 draftVertexIds 与 setPointAt 都是按下标对位的，
+    // 所以结构变化后必须整体重建边界与把手，不能就地 splice
+    rebuildSectionEditVisuals(item) {
+      if (!item || !Array.isArray(item.polygon) || item.polygon.length < 3) return
+      this.applySectionPolygon(item, item.polygon)
+      this.exitVertexEdit()
+      this.renderSection(item)
+      this.enterVertexEdit(item, 'section')
+    },
+
+    appendSectionVertex(event) {
+      const item = this.resolveVertexEditTarget()
+      if (!item || this.activeVertexEditKind !== 'section') return
+      const docPoint = this.getCanvasDocPoint(event)
+      if (!isPointValid(docPoint)) return
+      item.polygon.push({ x: Number(docPoint.x), y: Number(docPoint.y) })
+      this.rebuildSectionEditVisuals(item)
+      if (this.mxcad && this.mxcad.updateDisplay) this.mxcad.updateDisplay(true)
+    },
+
+    deleteSectionVertex(vertexIndex) {
+      const item = this.resolveVertexEditTarget()
+      if (!item || !Array.isArray(item.polygon) || !item.polygon[vertexIndex]) return
+      if (item.polygon.length <= 3) {
+        this.$Message.warning(`${this.activeVertexEditKind === 'section' ? '断层' : '工作面'}多边形至少需要 3 个顶点`)
+        return
+      }
+      item.polygon.splice(vertexIndex, 1)
+      this.rebuildSectionEditVisuals(item)
+      if (this.mxcad && this.mxcad.updateDisplay) this.mxcad.updateDisplay(true)
+    },
+
+    // Del / Backspace：删掉当前选中的顶点（与右键点顶点的删除走同一条路径）
+    deleteActiveVertex() {
+      const index = this.activeVertexIndex
+      if (index === null || index === undefined) {
+        this.$Message.info('请先点击要删除的顶点')
+        return
+      }
+      const item = this.resolveVertexEditTarget()
+      if (!item || !Array.isArray(item.polygon) || !item.polygon[index]) {
+        this.activeVertexIndex = null
+        return
+      }
+      // 先清选中：rebuildSectionEditVisuals 会重建把手，旧下标已经没意义
+      this.activeVertexIndex = null
+      this.deleteSectionVertex(index)
+    },
+
+    // 会话内的右键：命中顶点删除该顶点，未命中则结束会话
+    handleSessionRightMouseDown(event) {
+      if (!this.sectionDrawSession || event.button !== 2) return
+      event.preventDefault()
+      event.stopPropagation()
+      event.stopImmediatePropagation()
+      const hit = this.findEditableVertex(event)
+      if (hit) {
+        this.deleteSectionVertex(hit.vertexIndex)
+        return
+      }
+      const item = this.resolveVertexEditTarget()
+      // 会话结束时监听已摘掉，紧接着的 contextmenu 拦不住，用一次性标记补上，
+      // 否则右键完成会顺带弹出浏览器右键菜单
+      this._suppressContextMenuOnce = true
+      this.endSectionEditSession(item && item.polygon ? item.polygon : null)
+    },
+
+    // 常驻监听：会话期间（含右键结束的那一次）屏蔽画布右键菜单
+    handleSessionContextMenu(event) {
+      const suppressOnce = this._suppressContextMenuOnce
+      if (suppressOnce) this._suppressContextMenuOnce = false
+      if (!this.sectionDrawSession && !suppressOnce) return
+      event.preventDefault()
+      event.stopPropagation()
+      event.stopImmediatePropagation()
     },
 
     onSaveWorkFace(value) {
@@ -2101,7 +2157,7 @@ export default {
         this.workFaces.push(item)
       }
       this.renderWorkFace(item)
-      this.renderWorkFaceDailyImages()
+      // this.renderWorkFaceDailyImages()
       this.closeWorkFaceDialog()
       this.$Message.success('工作面已绘制')
     },
@@ -2151,7 +2207,7 @@ export default {
       }
       this.renderSection(item)
       this.closeSectionDialog()
-      this.$Message.success('断面已绘制')
+      this.$Message.success('断层已绘制')
     },
 
     async onPickCoordinate(context) {
@@ -2256,7 +2312,7 @@ export default {
       const isWorkFace = kind === 'workface'
       const item = isWorkFace ? this.findWorkFaceById(row.id) : this.findSectionById(row.id)
       if (!item) return h('div', { class: 'row-actions' })
-      const label = isWorkFace ? '工作面' : '断面'
+      const label = isWorkFace ? '工作面' : '断层'
       const editing = this.activeVertexEditId === item.id
       const iconButton = (icon, title, active, onClick) => h(
         'button',
@@ -2302,6 +2358,8 @@ export default {
 
     removeWorkFace(item, onRemoved) {
       if (!item) return
+      // 这里不能连配置弹窗开着一起拦：弹窗自己的「删除」按钮就是弹窗开着时点的
+      if (this.blockedByPickOrDraw()) return
       this.$Modal.confirm({
         title: '删除确认',
         content: `确定删除工作面「${item.name}」吗？`,
@@ -2332,9 +2390,11 @@ export default {
 
     removeSection(item) {
       if (!item) return
+      // 会话/取点期间删行会打断绘制、还可能删掉正在画的那条，先拦住（同上，不拦配置弹窗）
+      if (this.blockedByPickOrDraw()) return
       this.$Modal.confirm({
         title: '删除确认',
-        content: `确定删除断面「${item.name}」吗？`,
+        content: `确定删除断层「${item.name}」吗？`,
         onOk: () => {
           const index = this.sections.findIndex(section => section.id === item.id)
           if (index < 0) return
@@ -2343,7 +2403,7 @@ export default {
           this.sections.splice(index, 1)
           this.clampConfigPages()
           if (this.mxcad && this.mxcad.updateDisplay) this.mxcad.updateDisplay(true)
-          this.$Message.success('断面已删除')
+          this.$Message.success('断层已删除')
         }
       })
     },
@@ -2493,12 +2553,27 @@ export default {
       }
     },
 
-    findEditableVertex(event) {
-      // 仅在顶点编辑态下命中，且只查找当前处于编辑态的工作面/断面
+    // 顶点编辑的目标对象。不能只按 id 在 workFaces/sections 里找：新建但尚未保存的
+    // 工作面/断层不在列表里，找不回对象就既拖不动顶点、也擦不掉把手
+    resolveVertexEditTarget() {
+      if (this.activeVertexEditItem) return this.activeVertexEditItem
       if (!this.activeVertexEditId) return null
+      const source = this.activeVertexEditKind === 'section' ? this.sections : this.workFaces
+      const found = source.find(entry => entry.id === this.activeVertexEditId)
+      if (found) return found
+      if (this.editingSection && this.editingSection.id === this.activeVertexEditId) {
+        return this.editingSection
+      }
+      if (this.editingWorkFace && this.editingWorkFace.id === this.activeVertexEditId) {
+        return this.editingWorkFace
+      }
+      return null
+    },
+
+    findEditableVertex(event) {
+      // 仅在顶点编辑态下命中，且只查找当前处于编辑态的工作面/断层
+      const item = this.resolveVertexEditTarget()
       const kind = this.activeVertexEditKind
-      const source = kind === 'section' ? this.sections : this.workFaces
-      const item = source.find(entry => entry.id === this.activeVertexEditId)
       if (!item || !Array.isArray(item.polygon)) return null
       const canvas = document.getElementById('mxcad')
       if (!canvas) return null
@@ -2523,6 +2598,9 @@ export default {
       if (!this.activeVertexEditId) return
       const hit = this.findEditableVertex(event)
       if (!hit) {
+        // 断层绘制会话里点击空白处是「追加顶点」：这里不能消费事件、也不能退出编辑，
+        // 要留给 handleCtrlPanMouseDown 记录手势、再由 handleCtrlPanMouseUp 落点
+        if (this.sectionDrawSession) return
         // 编辑态下点击空白处：退出编辑，并消费该次点击（避免同时触发平移/拾取）
         event.preventDefault()
         event.stopPropagation()
@@ -2533,6 +2611,9 @@ export default {
       event.preventDefault()
       event.stopPropagation()
       event.stopImmediatePropagation()
+      // 点中把手即选中该顶点（不移动就是纯选中），选中后可按 Del 删除
+      this.activeVertexIndex = hit.vertexIndex
+      this.paintVertexHandles(hit.face)
       this.activeVertexDrag = hit
       const canvas = document.getElementById('mxcad')
       if (canvas) canvas.style.cursor = 'move'
@@ -2582,8 +2663,46 @@ export default {
 
     handleVertexEditKeyDown(event) {
       if (!this.activeVertexEditId) return
-      if (event.key === 'Escape' || event.keyCode === 27) {
-        this.exitVertexEdit()
+      const key = event.key
+      if (key === 'Escape' || event.keyCode === 27) {
+        if (!this.sectionDrawSession) {
+          this.exitVertexEdit()
+          return
+        }
+        // ESC 丢弃本次会话的全部改动，polygon 还原成进入会话前的样子
+        const item = this.resolveVertexEditTarget()
+        if (item && this._sectionSessionSnapshot) {
+          this.$set(item, 'polygon', this._sectionSessionSnapshot.map(vertex => ({
+            x: vertex.x,
+            y: vertex.y
+          })))
+          this.applySectionPolygon(item, item.polygon)
+          this.renderSection(item)
+        }
+        this.endSectionEditSession(null)
+        if (this.mxcad && this.mxcad.updateDisplay) this.mxcad.updateDisplay(true)
+        return
+      }
+      // Del / Backspace 删除选中的顶点：Mac 上标着 Delete 的键发的就是 Backspace，两个都收
+      if (key === 'Delete' || key === 'Backspace' || event.keyCode === 46 || event.keyCode === 8) {
+        event.preventDefault()
+        event.stopPropagation()
+        event.stopImmediatePropagation()
+        this.deleteActiveVertex()
+        return
+      }
+      if (!this.sectionDrawSession) return
+      if (key === 'f' || key === 'F' || key === 'Enter') {
+        event.preventDefault()
+        event.stopPropagation()
+        event.stopImmediatePropagation()
+        const item = this.resolveVertexEditTarget()
+        const polygon = item && Array.isArray(item.polygon) ? item.polygon : []
+        if (polygon.length < 3) {
+          this.$Message.warning('断层多边形至少需要 3 个顶点')
+          return
+        }
+        this.endSectionEditSession(polygon)
       }
     },
 
@@ -2747,7 +2866,7 @@ export default {
     enterVertexEdit(item, kind = 'workface') {
       if (!this.mxcad || !item) return
       const isSection = kind === 'section'
-      const label = isSection ? '断面' : '工作面'
+      const label = isSection ? '断层' : '工作面'
       const layerName = isSection ? SECTION_LAYER : WORK_FACE_LAYER
       if (!Array.isArray(item.polygon) || item.polygon.length < 3) {
         this.$Message.warning(`该${label}没有可编辑的多边形区域`)
@@ -2756,6 +2875,8 @@ export default {
       this.exitVertexEdit()
       this.activeVertexEditId = item.id
       this.activeVertexEditKind = kind
+      this.activeVertexEditItem = item
+      this.activeVertexIndex = null
       try {
         this.ensureLayer(layerName)
         // 注意：不能过滤空值，需与 polygon 下标严格对应（updateDraftVertex 按索引更新把手）
@@ -2768,7 +2889,7 @@ export default {
             FIXED_MARKER_RADIUS
           )
           handle.layer = layerName
-          handle.trueColor = new McCmColor(255, 255, 255)
+          handle.trueColor = new McCmColor(...VERTEX_HANDLE_COLOR)
           handle.lineweight = McDb.LineWeight.kLnWt025
           const objectId = this.mxcad.drawEntity(handle)
           return objectId && objectId.isValid && objectId.isValid() ? objectId : null
@@ -2780,10 +2901,24 @@ export default {
       if (this.mxcad.updateDisplay) this.mxcad.updateDisplay(true)
     },
 
+    // 把选中状态刷到把手上：选中的那个放大变红，其余恢复白色
+    paintVertexHandles(item) {
+      if (!item || !Array.isArray(item.draftVertexIds)) return
+      item.draftVertexIds.forEach((objectId, index) => {
+        const handle = objectId && objectId.getMcDbEntity ? objectId.getMcDbEntity() : null
+        if (!handle) return
+        const selected = index === this.activeVertexIndex
+        handle.trueColor = new McCmColor(
+          ...(selected ? VERTEX_HANDLE_SELECTED_COLOR : VERTEX_HANDLE_COLOR)
+        )
+        handle.radius = selected ? VERTEX_HANDLE_SELECTED_RADIUS : FIXED_MARKER_RADIUS
+      })
+      if (this.mxcad && this.mxcad.updateDisplay) this.mxcad.updateDisplay(true)
+    },
+
     exitVertexEdit() {
       if (!this.activeVertexEditId) return
-      const item = this.workFaces.find(face => face.id === this.activeVertexEditId) ||
-        this.sections.find(section => section.id === this.activeVertexEditId)
+      const item = this.resolveVertexEditTarget()
       if (item && Array.isArray(item.draftVertexIds)) {
         item.draftVertexIds.forEach(objectId => {
           try {
@@ -2799,6 +2934,8 @@ export default {
       this.activeVertexDrag = null
       this.activeVertexEditId = null
       this.activeVertexEditKind = ''
+      this.activeVertexEditItem = null
+      this.activeVertexIndex = null
       const canvas = document.getElementById('mxcad')
       if (canvas) canvas.style.cursor = ''
       if (this.mxcad && this.mxcad.updateDisplay) this.mxcad.updateDisplay(true)
@@ -2829,6 +2966,8 @@ export default {
   canvas.addEventListener('mousemove', this.handleCtrlPanMouseMove, true)
   canvas.addEventListener('mouseup', this.handleCtrlPanMouseUp, true)
   canvas.addEventListener('mouseleave', this.handleCtrlPanMouseUp, true)
+  // 常驻：内部按 sessionDrawSession / 一次性标记决定是否拦截
+  canvas.addEventListener('contextmenu', this.handleSessionContextMenu, true)
 
   window.addEventListener('keydown', this.handleVertexEditKeyDown, true)
 },
@@ -2846,6 +2985,7 @@ export default {
   canvas.removeEventListener('mousemove', this.handleCtrlPanMouseMove, true)
   canvas.removeEventListener('mouseup', this.handleCtrlPanMouseUp, true)
   canvas.removeEventListener('mouseleave', this.handleCtrlPanMouseUp, true)
+  canvas.removeEventListener('contextmenu', this.handleSessionContextMenu, true)
 
   window.removeEventListener('keydown', this.handleVertexEditKeyDown, true)
 },
@@ -2888,7 +3028,8 @@ export default {
     handleCtrlPanMouseDown(event) {
       if (this.isReplayingCanvasEvent || this.activeVertexDrag) return
       if (event.button !== 0) return
-      const isPickingGeometryPoint = this.isPolygonSelecting || this.isCoordinatePicking
+      const isPickingGeometryPoint = this.isPolygonSelecting || this.isCoordinatePicking ||
+        this.sectionDrawSession
       if (isPickingGeometryPoint) {
         event.preventDefault()
         event.stopPropagation()
@@ -2947,6 +3088,10 @@ export default {
         event.stopImmediatePropagation()
         if (gesture.moved) {
           this.simulateMouseButtonEvent(event, 'mouseup', 1)
+        } else if (event.type !== 'mouseup') {
+          // mouseleave：在画布上按下、拖出画布、在外面松手，不应算作一次点击
+        } else if (this.sectionDrawSession) {
+          this.appendSectionVertex(gesture.event)
         } else {
           this.replayLeftClick(gesture.event)
         }

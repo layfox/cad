@@ -29,7 +29,7 @@
                   :class="{ active: activeConfigTab === 'section' }"
                   @click="activeConfigTab = 'section'"
                 >
-                  断面
+                  断层
                   <span>({{ sections.length }})</span>
                 </button>
               </div>
@@ -75,7 +75,7 @@
                   :row-class-name="configRowClassName"
                   size="small"
                   :border="false"
-                  no-data-text="暂无断面"
+                  no-data-text="暂无断层"
                   @on-row-dblclick="onConfigRowDblClick"
                 />
                 <div class="draw-config-pager">
@@ -149,6 +149,7 @@
         :work-faces="workFaces"
         :next-code="nextSectionCode"
         @pick-coordinate="onPickCoordinate"
+        @draw-polygon="onDrawSectionPolygon"
         @confirm="onSaveSection"
         @cancel="closeSectionDialog"
       />

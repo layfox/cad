@@ -1,28 +1,38 @@
 <template>
   <div class="draw-config-dialog section-dialog">
     <div class="draw-config-header">
-      <span class="draw-config-title">断面</span>
+      <span class="draw-config-title">断层</span>
     </div>
 
     <Form ref="formRef" class="draw-config-form" :model="form" :label-width="112">
       <FormItem label="编码" required>
-        <Input v-model.trim="form.code" :maxlength="30" placeholder="请输入断面编码" />
+        <Input v-model.trim="form.code" :maxlength="30" placeholder="请输入断层编码" />
       </FormItem>
       <FormItem label="名称" required>
-        <Input v-model.trim="form.name" :maxlength="50" placeholder="请输入断面名称" />
+        <Input v-model.trim="form.name" :maxlength="50" placeholder="请输入断层名称" />
       </FormItem>
-      <!-- <FormItem v-if="!form.bounds" label="范围坐标" required>
-        <div class="coord-row">
-          <Input v-model="form.range.x" placeholder="X" />
-          <Input v-model="form.range.y" placeholder="Y" />
-          <Button type="primary" plain @click="$emit('pick-coordinate', { dialog: 'section', field: 'range' })">选择坐标</Button>
+
+      <FormItem label="断层线段" required>
+        <div class="line-style-row">
+          <Select v-model="form.lineWidth" class="line-width-select">
+            <Option
+              v-for="width in lineWidthOptions"
+              :key="width"
+              :value="width"
+              :label="String(width)"
+            />
+          </Select>
+          <ColorPicker v-model="form.lineColor" class="line-color-picker" />
         </div>
       </FormItem>
-      <FormItem v-else label="圈选区域">
-        <div class="selection-summary">
-          已记录 {{ selectionPointCount }} 个多边形顶点
+
+      <FormItem label="断层范围" required>
+        <div class="section-range-row">
+          <span class="selection-summary">已记录 {{ selectionPointCount }} 个顶点</span>
+          <Button type="primary" plain @click="$emit('draw-polygon')">绘制断层</Button>
         </div>
-      </FormItem> -->
+      </FormItem>
+
       <FormItem label="影响工作面" required>
         <div
           v-for="(link, index) in form.workFaceLinks"
@@ -70,7 +80,7 @@
     </Form>
 
     <div class="draw-config-tip">
-      根据提醒距离、设计范围和断面坐标，提前计算影响范围。
+      根据提醒距离、设计范围和断层坐标，提前计算影响范围。
     </div>
 
     <div class="draw-config-footer">
@@ -81,6 +91,11 @@
 </template>
 
 <script>
+// 线宽/线色默认值与 js/CAD10004R.js 的 FIXED_LINE_WIDTH / DEFAULT_SECTION_LINE_COLOR 保持一致
+const DEFAULT_LINE_WIDTH = 2
+const DEFAULT_LINE_COLOR = '#E74545'
+const LINE_WIDTH_OPTIONS = [1, 2, 3, 4, 5]
+
 function emptyPoint() {
   return { x: '', y: '' }
 }
@@ -118,6 +133,15 @@ function normalizeWarningDistance(value) {
   return Number.isFinite(distance) && distance >= 1 ? distance : 50
 }
 
+function normalizeLineWidth(value) {
+  const width = Math.round(Number(value))
+  return Number.isFinite(width) && width >= 1 ? width : DEFAULT_LINE_WIDTH
+}
+
+function normalizeLineColor(value) {
+  return /^#[0-9a-fA-F]{6}$/.test(String(value || '')) ? String(value) : DEFAULT_LINE_COLOR
+}
+
 // 行 key 只需在组件内唯一，用模块级自增值即可，避免与表单数据混在一起
 let linkKeySeed = 0
 
@@ -143,7 +167,8 @@ export default {
   },
   data() {
     return {
-      form: this.createEmptyForm()
+      form: this.createEmptyForm(),
+      lineWidthOptions: LINE_WIDTH_OPTIONS
     }
   },
   computed: {
@@ -165,6 +190,8 @@ export default {
             id: val.id,
             code: val.code || '',
             name: val.name || '',
+            lineWidth: normalizeLineWidth(val.lineWidth),
+            lineColor: normalizeLineColor(val.lineColor),
             range: clonePoint(val.range || emptyPoint()),
             workFaceLinks: this.createWorkFaceLinks(val),
             bounds: cloneBounds(val.bounds),
@@ -182,6 +209,8 @@ export default {
         id: '',
         code: this.nextCode || '',
         name: '',
+        lineWidth: DEFAULT_LINE_WIDTH,
+        lineColor: DEFAULT_LINE_COLOR,
         range: emptyPoint(),
         workFaceLinks: [
           this.createWorkFaceLink(this.workFaces.length ? this.workFaces[0].id : '')
@@ -243,31 +272,26 @@ export default {
       }
       return true
     },
-    fillCoordinate(field, x, y) {
-      if (!this.form[field]) return
-      this.form[field].x = Number(x)
-      this.form[field].y = Number(y)
+    // 绘制会话结束后唯一的回填通路：value prop 引用没变，watcher 不会触发，
+    // 只能由父组件命令式调用。只覆盖绘制结果，不动用户已填的编码/名称/线段/影响工作面
+    applyPolygon(payload) {
+      if (!payload) return
+      this.form.polygon = clonePolygon(payload.polygon)
+      this.form.bounds = cloneBounds(payload.bounds)
+      this.form.range = clonePoint(payload.range || emptyPoint())
     },
     onConfirm() {
       if (!this.form.code) {
-        this.$Message.warning('请输入断面编码')
+        this.$Message.warning('请输入断层编码')
         return
       }
       if (!this.form.name) {
-        this.$Message.warning('请输入断面名称')
+        this.$Message.warning('请输入断层名称')
         return
       }
-      if (!this.form.bounds) {
-        if (
-          this.form.range.x === '' || this.form.range.y === '' ||
-          this.form.range.x === null || this.form.range.y === null ||
-          this.form.range.x === undefined || this.form.range.y === undefined ||
-          !Number.isFinite(Number(this.form.range.x)) ||
-          !Number.isFinite(Number(this.form.range.y))
-        ) {
-          this.$Message.warning('请选择完整的范围坐标')
-          return
-        }
+      if (!Array.isArray(this.form.polygon) || this.form.polygon.length < 3) {
+        this.$Message.warning('请先点击「绘制断层」绘制多边形')
+        return
       }
       if (!this.validateWorkFaceLinks()) return
 
@@ -275,6 +299,8 @@ export default {
         id: this.form.id || `section-${Date.now()}`,
         code: this.form.code,
         name: this.form.name,
+        lineWidth: normalizeLineWidth(this.form.lineWidth),
+        lineColor: normalizeLineColor(this.form.lineColor),
         range: this.form.bounds
           ? {
             x: (Number(this.form.bounds.minX) + Number(this.form.bounds.maxX)) / 2,
@@ -352,11 +378,36 @@ export default {
   width: 100%;
 }
 
+.line-style-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.line-width-select {
+  width: 140px;
+  flex: none;
+}
+
+.section-range-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.section-range-row .selection-summary {
+  min-width: 0;
+  flex: 1;
+}
+
 .selection-summary {
   height: 32px;
   padding: 0 12px;
+  overflow: hidden;
   color: #d64b4b;
   line-height: 30px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   background: #fff2f0;
   border: 1px solid #ffd3cf;
   border-radius: 4px;
