@@ -132,6 +132,30 @@ function projectParameter(target, start, end) {
   return Math.max(0, Math.min(1, t))
 }
 
+// 点到线段的最短距离：先把点投到线段上（projectParameter 会把参数夹在 [0,1] 内），
+// 再量投影点到该点的距离——投影落在延长线上时，投影点就是端点本身
+function distanceToSegment(target, start, end) {
+  return distance(target, interpolate(start, end, projectParameter(target, start, end)))
+}
+
+// 新增顶点该插到哪个下标：取离落点最近的那条边（相邻两个顶点连成的线段），
+// 返回它后半段的顶点下标，插进去就落在这两个点之间。
+// 末点到首点这条边自然返回 polygon.length，等价于追加到末尾
+function nearestEdgeInsertIndex(polygon, target) {
+  let insertIndex = polygon.length
+  let minDistance = Infinity
+  for (let i = 0; i < polygon.length; i++) {
+    const start = polygon[i]
+    const end = polygon[(i + 1) % polygon.length]
+    const segmentDistance = distanceToSegment(target, start, end)
+    if (segmentDistance < minDistance) {
+      minDistance = segmentDistance
+      insertIndex = i + 1
+    }
+  }
+  return insertIndex
+}
+
 function isPointValid(value) {
   return value &&
     value.x !== '' && value.y !== '' &&
@@ -2066,7 +2090,13 @@ export default {
       if (!item || this.activeVertexEditKind !== 'section') return
       const docPoint = this.getCanvasDocPoint(event)
       if (!isPointValid(docPoint)) return
-      item.polygon.push({ x: Number(docPoint.x), y: Number(docPoint.y) })
+      const target = point(docPoint.x, docPoint.y)
+      // 一律追加到末尾会让多边形从末点绕一大圈再回到首点，轮廓被拉坏；
+      // 插到离落点最近的两个顶点之间，只有落在「末点→首点」那条边上才追加到末尾
+      const insertIndex = item.polygon.length >= 2
+        ? nearestEdgeInsertIndex(item.polygon, target)
+        : item.polygon.length
+      item.polygon.splice(insertIndex, 0, target)
       this.rebuildSectionEditVisuals(item)
       if (this.mxcad && this.mxcad.updateDisplay) this.mxcad.updateDisplay(true)
     },

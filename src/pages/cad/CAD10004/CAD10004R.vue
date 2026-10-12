@@ -115,7 +115,7 @@
 
     <Modal
       v-model="workFaceDialogVisible"
-      :width="720"
+      :width="640"
       :mask-closable="false"
       :footer-hide="true"
       class-name="cad10004-config-modal"
@@ -136,7 +136,7 @@
 
     <Modal
       v-model="sectionDialogVisible"
-      :width="650"
+      :width="600"
       :mask-closable="false"
       :footer-hide="true"
       class-name="cad10004-config-modal"
@@ -227,7 +227,7 @@ export default {
 }
 
 .cad10004-config-modal .ivu-modal-close {
-  top: 10px;
+  top: 8px;
   z-index: 3;
 }
 </style>

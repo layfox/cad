@@ -1,6 +1,7 @@
 <template>
   <div class="draw-config-dialog section-dialog">
     <div class="draw-config-header">
+      <img src="../css/images/modal-icon.png" alt="">
       <span class="draw-config-title">断层</span>
     </div>
 
@@ -79,8 +80,8 @@
       </FormItem>
     </Form>
     <div class="draw-config-footer">
-      <Button type="primary" @click="onConfirm">确定</Button>
       <Button @click="onCancel">取消</Button>
+      <Button type="primary" @click="onConfirm">确定</Button>
     </div>
   </div>
 </template>
@@ -329,21 +330,22 @@ export default {
 }
 
 .draw-config-header {
-  height: 52px;
+  height: 48px;
+  padding: 0 16px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 6px;
   border-bottom: 1px solid #edf0f5;
 }
 
 .draw-config-title {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 600;
   color: #333;
 }
 
 .draw-config-form {
-  padding: 22px 30px 8px;
+  padding: 16px;
 }
 
 .draw-config-tip {
@@ -358,14 +360,14 @@ export default {
 
 .draw-config-footer {
   display: flex;
-  justify-content: center;
-  gap: 20px;
+  justify-content: flex-end;
+  gap: 8px;
   padding: 16px;
   border-top: 1px solid #edf0f5;
 }
 
 .draw-config-footer .ivu-btn {
-  min-width: 86px;
+  /* min-width: 86px; */
 }
 
 .coord-row {
